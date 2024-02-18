@@ -30,3 +30,14 @@
 *.exe
 *.out
 *.app
+
+# SPIR-V shaders
+*.spv
+
+.vs/
+.vscode/
+build/*
+thirdparty/*
+
+.DS_Store
+.idea
