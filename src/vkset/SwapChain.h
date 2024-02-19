@@ -13,6 +13,9 @@ public:
 	void Resize(DeviceContext* device, int width, int height);
 
 	uint32_t BeginFrame(DeviceContext* device);
+	void EndFrame(DeviceContext* device);
+
+	void BeginRenderPass(DeviceContext* device);
 	void EndRenderPass(DeviceContext* device);
 
 	VkSemaphore m_vkImageAvailableSemaphore;
