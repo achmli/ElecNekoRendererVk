@@ -7,7 +7,7 @@
 class vfs
 {
 public:
-	static void LINK(VkInstance instance);
+	static void Link(VkInstance instance);
 
 	static PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT;
 	static PFN_vkDestroyDebugReportCallbackEXT vkDestoryDebugReportCallbackEXT;
@@ -28,7 +28,7 @@ public:
 	std::vector<VkExtensionProperties> m_vkExtensionProperties;
 
 	bool AcquireProperties(VkPhysicalDevice device, VkSurfaceKHR vkSurface);
-	bool HasExtensions(const char** extensions, const int num);
+	bool HasExtensions(const char** extensions, const int num) const;
 };
 
 /** Device Context */
