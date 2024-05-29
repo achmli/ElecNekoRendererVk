@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.0)
+cmake_minimum_required (VERSION 3.6)
 project (ElecNekoSurface)
 
 SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -6,7 +6,7 @@ SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS ON)
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo" CACHE STRING "Configuration types" FORCE)
 
 SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake")
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 file(GLOB_RECURSE SHADERS
@@ -16,6 +16,7 @@ file(GLOB_RECURSE SHADERS
 
 file(GLOB_RECURSE SRC_FILES
         ${CMAKE_SOUURCE_DIR}/src/*.h
+        ${CMAKE_SOUURCE_DIR}/src/*.hpp
         ${CMAKE_SOUURCE_DIR}/src/*.cpp
 )
 
@@ -23,8 +24,8 @@ file(GLOB_RECURSE EXT_FILES
         ${CMAKE_SOURCE_DIR}/thirdparty/stb/*.h
         ${CMAKE_SOURCE_DIR}/thirdparty/imgui/*.h
         ${CMAKE_SOURCE_DIR}/thirdparty/imgui/*.cpp
-        ${CMAKE_SOURCE_DIR}/thirdparty/imguizmo/*.h
-        ${CMAKE_SOURCE_DIR}/thirdparty/imguizmo/*.cpp
+        #${CMAKE_SOURCE_DIR}/thirdparty/imguizmo/*.h
+        #${CMAKE_SOURCE_DIR}/thirdparty/imguizmo/*.cpp
         ${CMAKE_SOURCE_DIR}/thirdparty/oidn/*.h
         ${CMAKE_SOURCE_DIR}/thirdparty/oidn/*.hpp
         ${CMAKE_SOURCE_DIR}/thirdparty/tinydir/*.h
@@ -45,10 +46,10 @@ set(GLM_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/thirdparty/glm)
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/vkset
     ${CMAKE_SOURCE_DIR}/thirdparty/imgui
     ${CMAKE_SOURCE_DIR}/thirdparty/stb
     ${CMAKE_SOURCE_DIR}/thirdparty/imguizmo
-    ${CMAKE_SOURCE_DIR}/thirdparty/RadeonRays
     ${CMAKE_SOURCE_DIR}/thirdparty/tinydir
     ${CMAKE_SOURCE_DIR}/thirdparty/tinyobjloader
     ${CMAKE_SOURCE_DIR}/thirdparty/oidn/include
