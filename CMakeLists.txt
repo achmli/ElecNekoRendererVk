@@ -15,9 +15,9 @@ file(GLOB_RECURSE SHADERS
 )
 
 file(GLOB_RECURSE SRC_FILES
-        ${CMAKE_SOUURCE_DIR}/src/*.h
-        ${CMAKE_SOUURCE_DIR}/src/*.hpp
-        ${CMAKE_SOUURCE_DIR}/src/*.cpp
+        ${CMAKE_SOURCE_DIR}/src/*.h
+        ${CMAKE_SOURCE_DIR}/src/*.hpp
+        ${CMAKE_SOURCE_DIR}/src/*.cpp
 )
 
 file(GLOB_RECURSE EXT_FILES
@@ -75,7 +75,7 @@ foreach(f ${SRCS})
     # Source_group expects \\ (double antislash), not / (slash)
     string(REPLACE / \\ SRCGR ${SRCGR})
     source_group("${SRCGR}" FILES ${f})
-endforeach(f ${SRCS})
+endforeach()
 
 if(WIN32)
     set(GUI_TYPE WIN32)
@@ -89,7 +89,8 @@ set(LINK_OPTIONS " ")
 set(EXE_NAME "ElectricalNekoSurface")
 
 # create the executable
-add_executable(${EXE_NAME} ${SRCS})
+add_executable(${EXE_NAME} ${SRCS}
+        src/vkset/Fence.cpp)
 
 if(WIN32)
 TARGET_LINK_LIBRARIES(${EXE_NAME} ${SDL2_LIBRARIES} ${OIDN_LIBRARIES})
