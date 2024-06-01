@@ -48,7 +48,7 @@ public:
 	bool CreatePhysicalDevice();
 	bool CreateLogicalDevice();
 
-	std::vector<PhysicalDeviceProperties> physicalDevices;
+	std::vector<PhysicalDeviceProperties> vkPhysicalDevices;
 
 	// Device related
 	int32_t deviceIndex;
@@ -57,6 +57,9 @@ public:
 
 	int32_t graphicsFamilyIdx;
 	int32_t presentFamilyIdx;
+
+    VkQueue vkGraphicsQueue;
+    VkQueue vkPresentQueue;
 
 	uint32_t FindMemoryTypeIndex(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
@@ -69,7 +72,7 @@ public:
 	VkCommandPool vkCommandPool;
 	std::vector<VkCommandBuffer> vkCommandBuffers;
 
-	VkCommandBuffer CreateCommandBuffer(VkCommandBufferLevel level);
+	VkCommandBuffer CreateCommandBuffer(VkCommandBufferLevel level) const;
 	void FlushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue);
 
 	// Swapchain related
