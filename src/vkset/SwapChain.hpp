@@ -18,26 +18,26 @@ public:
 	void BeginRenderPass(DeviceContext* device);
 	void EndRenderPass(DeviceContext* device);
 public:
-	VkSemaphore ImageAvailableSemaphore;
-	VkSemaphore RenderFinishedSemaphore;
+	VkSemaphore vkImageAvailableSemaphore;
+	VkSemaphore vkRenderFinishedSemaphore;
 
 	int32_t windowHeight;
 	int32_t windowWidth;
 
-	VkSwapchainKHR swapChain;
-	VkExtent2D ext;
+	VkSwapchainKHR vkSwapChain;
+	VkExtent2D vkExt;
 
 	uint32_t currentImageIndex;
-	VkFormat colorImageFormat;
-	std::vector<VkImage> colorImages;
-	std::vector<VkImageView> imageViews;
+	VkFormat vkColorImageFormat;
+	std::vector<VkImage> vkColorImages;
+	std::vector<VkImageView> vkImageViews;
 
-	VkFormat depthFormat;
-	VkImage depthImage;
-	VkImageView depthImageView;
-	VkDeviceMemory depthImageMemory;
+	VkFormat vkDepthFormat;
+	VkImage vkDepthImage;
+	VkImageView vkDepthImageView;
+	VkDeviceMemory vkDepthImageMemory;
 
-	std::vector<VkFramebuffer> framebuffers;
+	std::vector<VkFramebuffer> vkFramebuffers;
 
-	VkRenderPass renderPass;
+	VkRenderPass vkRenderPass;
 };

@@ -89,8 +89,7 @@ set(LINK_OPTIONS " ")
 set(EXE_NAME "ElectricalNekoSurface")
 
 # create the executable
-add_executable(${EXE_NAME} ${SRCS}
-        src/vkset/Fence.cpp)
+add_executable(${EXE_NAME} ${SRCS})
 
 if(WIN32)
 TARGET_LINK_LIBRARIES(${EXE_NAME} ${SDL2_LIBRARIES} ${OIDN_LIBRARIES})
