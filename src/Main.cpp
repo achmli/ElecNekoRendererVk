@@ -1,12 +1,12 @@
 #include "build.hpp"
 
 #include <chrono>
-#include <math.h>
+#include <cmath>
 #include <cstring>
 
 #include <vulkan/vulkan.hpp>
 
-#include "SDLGeneral.hpp"
+#include "Application.hpp"
 
 #if ENS_VULKAN && ENS_IMGUI
 #include "imgui.h"
@@ -20,7 +20,7 @@
 #include <gtc/matrix_transform.hpp>
 
 
-bool done;
+/*bool done;
 
 bool InitializeWindow(VkExtent2D size, bool bFullScreen = false, bool bResizeable = true, bool bLimitFrameRate = true);
 void TerminateWindow();
@@ -28,6 +28,9 @@ void TerminateWindow();
 void MainLoop(LoopData& arg)
 {
 	SDL_Event event;
+
+	uint64_t startTime=SDL_GetPerformanceCounter();
+	uint64_t lastTime=startTime;
 	while (SDL_PollEvent(&event))
 	{
 #if ENS_IMGUI
@@ -39,11 +42,11 @@ void MainLoop(LoopData& arg)
 		}
 
 	}
-}
+}*/
 
 int main(int argc, char** argv)
 {
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
+	/*if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
 	{
 		std::printf("Error to initial SDL: %s\n", SDL_GetError());
 		return -1;
@@ -80,6 +83,8 @@ int main(int argc, char** argv)
 
 	done = false;
 
+	loopData.device->
+
 	SDL_Surface* SDLsurface = SDL_GetWindowSurface(loopData.mWindow);
 
 	SDL_FillRect(SDLsurface, NULL, SDL_MapRGB(SDLsurface->format, 0, 0, 0));
@@ -93,5 +98,14 @@ int main(int argc, char** argv)
 
 	SDL_Quit();
 
+	return 0;*/
+
+	Application *application=new Application();
+
+	application->Initialize();
+	while(!application->IsDone())
+		application->MainLoop();
+
+	delete application;
 	return 0;
 }

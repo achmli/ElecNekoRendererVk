@@ -239,7 +239,7 @@ bool DeviceContext::CreateInstance(bool enableLayers, const std::vector<const ch
 
 void DeviceContext::Cleanup()
 {
-	//swapChain.Cleanup(this);
+	swapChain.Cleanup(this);
 
     // Destroy Command Buffers
     vkFreeCommandBuffers(vkDevice,vkCommandPool,(uint32_t)vkCommandBuffers.size(),vkCommandBuffers.data());
