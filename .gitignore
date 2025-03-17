@@ -1,45 +1,16 @@
-# Prerequisites
-*.d
+# 默认忽略的文件
+/shelf/
+/workspace.xml
+# 基于编辑器的 HTTP 客户端请求
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
-# SPIR-V shaders
-*.spv
-
-.vs/
-.vscode/
-build/*
 cmake-build-debug/*
 cmake-build-release/*
-#thirdparty/*
+build/*
+.idea/*
+res/*
 
-.DS_Store
-.idea
+*.spirv
