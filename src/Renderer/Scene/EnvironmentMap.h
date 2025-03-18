@@ -5,24 +5,27 @@
 #include "Math/LCP.h"
 #include "stb_image.h"
 
-class EnvironmentMap
+namespace ElecNeko
 {
-public:
-    EnvironmentMap() : width(0), height(0), img(nullptr), cdf(nullptr) {};
-
-    ~EnvironmentMap()
+    class EnvironmentMap
     {
-        stbi_image_free(img);
-        delete[] cdf;
-    }
+    public:
+        EnvironmentMap() : width(0), height(0), img(nullptr), cdf(nullptr) {};
 
-    bool LoadMap(const std::string &filename);
-    void BuildCDF();
+        ~EnvironmentMap()
+        {
+            stbi_image_free(img);
+            delete[] cdf;
+        }
 
-public:
-    int width;
-    int height;
-    float totalSum;
-    float *img;
-    float *cdf;
-};
+        bool LoadMap(const std::string &filename);
+        void BuildCDF();
+
+    public:
+        int width;
+        int height;
+        float totalSum;
+        float *img;
+        float *cdf;
+    };
+} // namespace ElecNeko
