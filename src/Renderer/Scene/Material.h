@@ -55,7 +55,7 @@ namespace ElecNeko
         float emissionMapTexId;
 
         float opacity;
-        float alphaMode;
+        int32_t alphaMode;
         float alphaCutoff;
         float padding2;
     };
@@ -93,7 +93,7 @@ namespace ElecNeko
         emissionMapTexId = -1.f;
 
         opacity = 1.f;
-        alphaMode = 0.f;
+        alphaMode = 0;
         alphaCutoff = 0.f;
 
         padding2 = 0;

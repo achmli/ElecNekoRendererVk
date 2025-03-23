@@ -34,6 +34,54 @@ namespace ElecNeko
         float type;
     };
 
+    struct RenderOption
+    {
+        RenderOption()
+        {
+            renderResolution = iVec2(1280, 720);
+            windowResolution = iVec2(1280, 720);
+            uniformLightCol = Vec3(.3f, .3f, .3f);
+            backgroundLightCol = Vec3(1.f, 1.f, 1.f);
+            texArrayWidth = 2048;
+            texArrayHeight = 2048;
+            enableTonemap = true;
+            enableAces = false;
+            simpleAcesFit = false;
+            enableEnvMap = false;
+            enableUniformLight = false;
+            hideEmitters = false;
+            enableBackground = false;
+            transparentBackground = false;
+            independentRenderSize = false;
+            enableRoughnessMollification = false;
+            enableVolumeMIS = false;
+            envMapIntensity = 1.f;
+            envMapRot = 0.f;
+            roughnessMollificationAmt = 0.f;
+        }
+
+        iVec2 renderResolution;
+        iVec2 windowResolution;
+        Vec3 uniformLightCol;
+        Vec3 backgroundLightCol;
+        int texArrayWidth;
+        int texArrayHeight;
+        bool enableTonemap;
+        bool enableAces;
+        bool simpleAcesFit;
+        bool enableEnvMap;
+        bool enableUniformLight;
+        bool hideEmitters;
+        bool enableBackground;
+        bool transparentBackground;
+        bool independentRenderSize;
+        bool enableRoughnessMollification;
+        bool enableVolumeMIS;
+        float envMapIntensity;
+        float envMapRot;
+        float roughnessMollificationAmt;
+    };
+
     class Scene
     {
     public:
@@ -53,12 +101,22 @@ namespace ElecNeko
         void RebuildInstance();
 
     public:
+        // options
+        RenderOption renderOption;
+
         // Meshes
         std::vector<std::unique_ptr<Mesh>> meshes;
 
         // Scene Mesh Data
-        std::vector<uint32_t> vertIndices;
-        std::vector<vert_t> vertices;
+        std::vector<uint32_t> opaqueIndices;
+        std::vector<vert_t> opaqueVertices;
+
+        std::vector<uint32_t> maskIndices;
+        std::vector<vert_t> maskVertices;
+
+        std::vector<uint32_t> blendIndices;
+        std::vector<vert_t> blendVertices;
+
         std::vector<Mat4> transforms;
 
         // Materials

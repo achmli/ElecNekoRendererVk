@@ -123,12 +123,113 @@ namespace ElecNeko
 
     void Scene::ProcessScene()
     {
-        // Copy Mesh Data
-        int verticesCnt = 0;
-        for (const auto &mesh: meshes)
         {
-            int numIndices = mesh->vertices.size();
-        }
-    }
+            // Copy Mesh Data
+            int opaqueVerticesCnt = 0;
+            int blendVerticesCnt = 0;
+            int maskVerticesCnt = 0;
+            for (int i = 0; i < meshes.size(); i++)
+            {
+                const auto &mesh = meshes[i];
+                int matID = meshInstances[i].materialId;
+                const auto &alphaMode = materials[matID].alphaMode;
 
+                // select target vector according to alpha mode
+                std::vector<vert_t> *targetVertices = nullptr;
+                std::vector<uint32_t> *targetIndices = nullptr;
+                int *targetVertexCnt = nullptr;
+
+                if (alphaMode == AlphaMode::Mask)
+                {
+                    targetVertices = &maskVertices;
+                    targetIndices = &maskIndices;
+                    targetVertexCnt = &maskVerticesCnt;
+                }
+                else if (alphaMode == AlphaMode::Blend)
+                {
+                    targetVertices = &blendVertices;
+                    targetIndices = &blendIndices;
+                    targetVertexCnt = &blendVerticesCnt;
+                }
+                else
+                {
+                    targetVertices = &opaqueVertices;
+                    targetIndices = &opaqueIndices;
+                    targetVertexCnt = &opaqueVerticesCnt;
+                }
+
+                if (targetIndices && targetVertices && targetVertexCnt)
+                {
+                    // process vertices
+                    targetVertices->insert(targetVertices->end(), mesh->vertices.begin(), mesh->vertices.end());
+
+                    // process offset of indices
+                    const int numVertices = mesh->vertices.size();
+                    const int numIndices = mesh->indices.size();
+
+                    targetVertices->reserve(targetVertices->size() + numVertices);
+                    targetIndices->reserve(targetIndices->size() + numIndices);
+
+                    for (const uint32_t index: mesh->indices)
+                    {
+                        // calculate new index
+                        uint32_t adjustedIndex = index + *targetVertexCnt;
+                        targetIndices->emplace_back(adjustedIndex);
+                    }
+
+                    // update total vertices num
+                    *targetVertexCnt += numVertices;
+                }
+            }
+        }
+
+        {
+            // copy transform
+            transforms.resize(meshInstances.size());
+            for (int i = 0; i < meshInstances.size(); i++)
+            {
+                transforms[i] = meshInstances[i].transform;
+            }
+        }
+
+        {
+            // copy textures
+            const int reqWidth = renderOption.texArrayWidth;
+            const int reqHeight = renderOption.texArrayHeight;
+            const int texBytes = reqWidth * reqHeight * 4;
+
+            textureMapsArray.resize(texBytes * textures.size());
+
+#pragma omp parallel for
+            for (int i = 0; i < textures.size(); i++)
+            {
+                const int texWidth = textures[i]->width;
+                const int texHeight = textures[i]->height;
+
+                // resize textures to fit 2D texture array
+                if (texWidth != reqWidth || texHeight != reqHeight)
+                {
+                    auto *resizedTex = new uint8_t[texBytes];
+                    stbir_resize_uint8(&textures[i]->texData[0], texWidth, texHeight, 0, resizedTex, reqWidth,
+                                       reqHeight, 0, 4);
+                    std::copy_n(resizedTex, texBytes, &textureMapsArray[i * texBytes]);
+                    delete[] resizedTex;
+                }
+                else
+                {
+                    std::copy_n(textures[i]->texData.begin(), textures.size(), &textureMapsArray[i * texBytes]);
+                }
+            }
+        }
+
+        {
+            // add a default camera
+            if (!camera)
+            {
+                AddCamera(Vec3(0, 0, 5), Vec3(0, 0, 0), 60.f);
+            }
+        }
+
+        initialized = true;
+    }
 } // namespace ElecNeko
