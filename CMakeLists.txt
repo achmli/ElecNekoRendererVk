@@ -4,8 +4,8 @@ project(ElceNekoSurface)
 set(CMAKE_CXX_STANDARD 20)
 
 file(GLOB_RECURSE SHADERS
-        ${CMAKE_SOUURCE_DIR}/src/shaders/*.glsl
-        ${CMAKE_SOUURCE_DIR}/src/shaders/*.hlsl
+        ${CMAKE_SOURCE_DIR}/src/shaders/*.glsl
+        ${CMAKE_SOURCE_DIR}/src/shaders/*.hlsl
 )
 
 file(GLOB_RECURSE SRC_FILES
