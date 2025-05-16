@@ -6,21 +6,6 @@
 
 namespace ElecNeko
 {
-    bool RenderPass::InitializeFrameBuffer(DeviceContext *device) const
-    {
-        if (!frameBufferShared)
-        {
-            FrameBuffer::CreateParms_t frameBufferParams{};
-            frameBufferParams.width = width;
-            frameBufferParams.height = height;
-            frameBufferParams.hasColor = hasColor;
-            frameBufferParams.hasDepth = hasDepth;
-
-            return frameBuffer->Create(device, frameBufferParams);
-        }
-        return true;
-    }
-
     bool RenderPass::InitializeDescriptors(DeviceContext *device)
     {
         Descriptors::CreateParms_t createParams{};
@@ -43,12 +28,6 @@ namespace ElecNeko
 
     bool RenderPass::InitializePipeline(DeviceContext *device)
     {
-        if (!InitializeFrameBuffer(device))
-        {
-            printf("Failed to initialize frame buffer");
-            return false;
-        }
-
         if (!shader.Load(device, shaderName))
         {
             printf("Failed to load %s shader\n", shaderName);

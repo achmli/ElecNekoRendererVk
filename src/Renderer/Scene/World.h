@@ -41,7 +41,7 @@ namespace ElecNeko
             renderResolution = iVec2(1280, 720);
             windowResolution = iVec2(1280, 720);
             uniformLightCol = Vec3(.3f, .3f, .3f);
-            backgroundLightCol = Vec3(1.f, 1.f, 1.f);
+            backgroundCol = Vec3(1.f, 1.f, 1.f);
             texArrayWidth = 2048;
             texArrayHeight = 2048;
             enableTonemap = true;
@@ -63,7 +63,7 @@ namespace ElecNeko
         iVec2 renderResolution;
         iVec2 windowResolution;
         Vec3 uniformLightCol;
-        Vec3 backgroundLightCol;
+        Vec3 backgroundCol;
         int texArrayWidth;
         int texArrayHeight;
         bool enableTonemap;

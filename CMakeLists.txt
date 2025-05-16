@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(ElceNekoSurface)
+project(ElecNekoSurface)
 
 set(CMAKE_CXX_STANDARD 20)
 
@@ -48,6 +48,6 @@ find_library(VULKAN_LIBRARY
         PATHS ${CMAKE_SOURCE_DIR}/thirdParty/vulkan/Lib
 )
 
-add_executable(ElceNekoSurface ${SRCS})
+add_executable(ElecNekoSurface ${SRCS})
 
-target_link_libraries(ElceNekoSurface ${VULKAN_LIBRARY} glfw imgui)
+target_link_libraries(ElecNekoSurface ${VULKAN_LIBRARY} glfw imgui)
