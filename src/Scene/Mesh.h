@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-#include "../model.h"
+#include "RHI/model.h"
 
 namespace ElecNeko
 {

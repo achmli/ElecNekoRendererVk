@@ -8,8 +8,8 @@
 #include "../Math/Bounds.h"
 #include "Shapes.h"
 
-#include "../Renderer/model.h"
-#include "../Renderer/shader.h"
+#include "../RHI/model.h"
+#include "../RHI/shader.h"
 
 /*
 ====================================================

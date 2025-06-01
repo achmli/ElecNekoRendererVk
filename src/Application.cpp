@@ -4,16 +4,16 @@
 #include <chrono>
 #include <thread>
 
-#include "Renderer/DeviceContext.h"
-#include "Renderer/Samplers.h"
-#include "Renderer/model.h"
-#include "Renderer/shader.h"
+#include "RHI/DeviceContext.h"
+#include "RHI/Samplers.h"
+#include "RHI/model.h"
+#include "RHI/shader.h"
 
 #include <assert.h>
 #include "Fileio.h"
 #include "application.h"
 
-#include "Renderer/OffscreenRenderer.h"
+#include "RHI/OffscreenRenderer.h"
 
 #include "Scene.h"
 

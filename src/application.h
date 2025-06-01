@@ -14,10 +14,10 @@
 #include "Physics/Body.h"
 #include "Physics/Shapes.h"
 
-#include "Renderer/DeviceContext.h"
-#include "Renderer/FrameBuffer.h"
-#include "Renderer/model.h"
-#include "Renderer/shader.h"
+#include "RHI/DeviceContext.h"
+#include "RHI/FrameBuffer.h"
+#include "RHI/model.h"
+#include "RHI/shader.h"
 
 /*
 ====================================================
