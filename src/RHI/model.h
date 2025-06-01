@@ -71,38 +71,51 @@ class Shape;
 Model
 ====================================================
 */
-class Model {
-public:
-	Model() : m_isVBO( false ) {}
-	~Model() {}
+//class Model {
+//public:
+//	Model() : m_isVBO( false ) {}
+//	~Model() {}
+//
+//	std::vector< vert_t > m_vertices;
+//	std::vector< unsigned int > m_indices;
+//
+//	bool BuildFromShape( const Shape * shape );
+//	bool MakeVBO( DeviceContext * device );
+//
+//	// GPU Data
+//	bool m_isVBO;
+//	Buffer	m_vertexBuffer;
+//	Buffer	m_indexBuffer;
+//
+//	void Cleanup( DeviceContext & deviceContext );
+//
+//	void DrawIndexed( VkCommandBuffer vkCommandBUffer );
+//};
+//
+//void FillCube( Model & model );
+//void FillFullScreenQuad( Model & model );
+//
+//
+//
+//
+//struct RenderModel {
+//	Model * model;			// The vao buffer to draw
+//	uint32_t uboByteOffset;	// The byte offset into the uniform buffer
+//	uint32_t uboByteSize;	// how much space we consume in the uniform buffer
+//
+//	Vec3 pos;
+//	Quat orient;
+//};
 
-	std::vector< vert_t > m_vertices;
-	std::vector< unsigned int > m_indices;
+namespace ElecNeko
+{
+	struct MeshPart
+	{
+		Buffer
+	};
 
-	bool BuildFromShape( const Shape * shape );
-	bool MakeVBO( DeviceContext * device );
+    class Model
+    {
 
-	// GPU Data
-	bool m_isVBO;
-	Buffer	m_vertexBuffer;
-	Buffer	m_indexBuffer;
-
-	void Cleanup( DeviceContext & deviceContext );
-
-	void DrawIndexed( VkCommandBuffer vkCommandBUffer );
-};
-
-void FillCube( Model & model );
-void FillFullScreenQuad( Model & model );
-
-
-
-
-struct RenderModel {
-	Model * model;			// The vao buffer to draw
-	uint32_t uboByteOffset;	// The byte offset into the uniform buffer
-	uint32_t uboByteSize;	// how much space we consume in the uniform buffer
-
-	Vec3 pos;
-	Quat orient;
-};
+    };
+}
