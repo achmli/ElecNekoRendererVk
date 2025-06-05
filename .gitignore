@@ -12,3 +12,4 @@ cmake-build-release/*
 build/*
 .idea/*
 res/models/rungholt/*
+res/models/sponza/*

@@ -60,6 +60,8 @@ private:
 
     void Keyboard(int key, int scancode, int action, int modifiers);
 
+    void ProcessKeyboard(float deltaTime);
+
     static void OnWindowResized(GLFWwindow *window, int width, int height);
 
     static void OnMouseMoved(GLFWwindow *window, double x, double y);
@@ -109,6 +111,15 @@ private:
     bool m_isPaused;
     bool m_stepFrame;
     bool m_isMouseDown = false;
+
+    Vec3 m_cameraPosition = Vec3(-.7f, -7, 3);
+    float m_cameraYaw = -90.f;
+    float m_cameraPitch = 0.f;
+    Vec3 m_cameraFront = Vec3(0, 1, 0);
+    Vec3 m_cameraUp = Vec3(0, 0, 1);
+    Vec3 m_cameraRight = Vec3(1, 0, 0);
+    float m_cameraMoveSpeed = 5.0f;
+    float m_mouseSensitivity = 0.1f;
 
     std::vector<RenderModel> m_renderModels;
 

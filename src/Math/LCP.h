@@ -13,3 +13,9 @@ LCP_GaussSeidel
 ====================================================
 */
 VecN LCP_GaussSeidel(const MatN &A, const VecN &b);
+
+namespace ElecNeko
+{
+    static inline float Degrees(float radians) { return radians * (180.f / PI); };
+    static inline float Radians(float degrees) { return degrees * (PI / 180.f); };
+}

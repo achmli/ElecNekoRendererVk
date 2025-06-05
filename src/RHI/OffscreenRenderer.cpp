@@ -416,7 +416,8 @@ namespace ElecNeko
                         descriptor.BindBuffer(&mesh[i]->uniformBuffer, 0, mesh[i]->uniformBuffer.m_vkBufferSize, 1);
                         descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 2);
                         descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView, Samplers::m_samplerStandard, 0);
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mesh[i]->albedoMaps[mesh[i]->m_meshParts[j].texMapIndex].m_image.m_vkImageView, Samplers::m_samplerStandard, 1);
+                        if (mesh[i]->albedoMaps[mesh[i]->m_meshParts[j].texMapIndex].isLoaded)
+							descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mesh[i]->albedoMaps[mesh[i]->m_meshParts[j].texMapIndex].m_image.m_vkImageView, Samplers::m_samplerStandard, 1);
                         descriptor.BindDescriptor(device, cmdBuffer, &g_meshShadowPipeline);
                         mesh[i]->m_meshParts[j].DrawIndexed(cmdBuffer);
 					}

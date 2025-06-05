@@ -45,6 +45,10 @@ void main() {
 
     vec4 finalColor=texture(texAlbedo, texCoord);
 
+    if(finalColor.a<0.0001) {
+        discard;
+    }
+
     //
     //  Shadow Mapping
     //

@@ -128,12 +128,27 @@ namespace ElecNeko
                     vertex.position[1] = attrib.vertices[3 * index.vertex_index + 1];
                     vertex.position[2] = attrib.vertices[3 * index.vertex_index + 2];
 
-                    vertex.uv[0] = attrib.texcoords[2 * index.texcoord_index + 0];
-                    vertex.uv[1] = 1.f - attrib.texcoords[2 * index.texcoord_index + 1];
-
-                    vertex.normal[0] = attrib.normals[3 * index.normal_index + 0];
-                    vertex.normal[1] = attrib.normals[3 * index.normal_index + 1];
-                    vertex.normal[2] = attrib.normals[3 * index.normal_index + 2];
+                    if (index.texcoord_index >= 0)
+                    {
+                        vertex.uv[0] = attrib.texcoords[2 * index.texcoord_index + 0];
+                        vertex.uv[1] = 1.f - attrib.texcoords[2 * index.texcoord_index + 1];
+                    }
+                    else
+                    {
+                        vertex.uv[0] = vertex.uv[1] = 0.f;
+                    }
+                    if (index.normal_index >= 0)
+                    {
+                        vertex.normal[0] = attrib.normals[3 * index.normal_index + 0];
+                        vertex.normal[1] = attrib.normals[3 * index.normal_index + 1];
+                        vertex.normal[2] = attrib.normals[3 * index.normal_index + 2];
+                    }
+                    else
+                    {
+                        vertex.normal[0] = 0.f;
+                        vertex.normal[1] = 0.f;
+                        vertex.normal[2] = 1.f;
+                    }
 
                     m_meshParts[material_id + 1].m_vertices.emplace_back(vertex);
                     m_meshParts[material_id + 1].m_indices.emplace_back(m_meshParts[material_id + 1].m_indices.size());

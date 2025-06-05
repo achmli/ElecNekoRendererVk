@@ -159,7 +159,7 @@ void Application::InitializeGLFW()
     glfwSetWindowUserPointer(m_glfwWindow, this);
     glfwSetWindowSizeCallback(m_glfwWindow, Application::OnWindowResized);
 
-    glfwSetInputMode(m_glfwWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    glfwSetInputMode(m_glfwWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetInputMode(m_glfwWindow, GLFW_STICKY_KEYS, GLFW_TRUE);
     glfwSetCursorPosCallback(m_glfwWindow, Application::OnMouseMoved);
     glfwSetScrollCallback(m_glfwWindow, Application::OnMouseWheelScrolled);
@@ -526,7 +526,7 @@ Application::OnMouseMoved
 void Application::OnMouseMoved(GLFWwindow *window, double x, double y)
 {
     Application *application = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
-    if (application->m_isMouseDown)
+    //if (application->m_isMouseDown)
         application->MouseMoved((float) x, (float) y);
 }
 
@@ -541,7 +541,7 @@ void Application::MouseMoved(float x, float y)
     Vec2 ds = newPosition - m_mousePosition;
     m_mousePosition = newPosition;
 
-    float sensitivity = 0.01f;
+    /*float sensitivity = 0.01f;
     m_cameraPositionTheta += ds.y * sensitivity;
     m_cameraPositionPhi += ds.x * sensitivity;
 
@@ -552,7 +552,25 @@ void Application::MouseMoved(float x, float y)
     if (m_cameraPositionTheta > 3.0f)
     {
         m_cameraPositionTheta = 3.0f;
-    }
+    }*/
+
+    ds *= m_mouseSensitivity;
+
+    m_cameraYaw -= ds.x;
+    m_cameraPitch -= ds.y;
+
+    // Clamp pitch to prevent flipping
+    if (m_cameraPitch > 89.0f)
+        m_cameraPitch = 89.0f;
+    if (m_cameraPitch < -89.0f)
+        m_cameraPitch = -89.0f;
+
+    float yawRad = ElecNeko::Radians(m_cameraYaw);
+    float pitchRad = ElecNeko::Radians(m_cameraPitch);
+
+    m_cameraFront = Vec3(cos(pitchRad) * cos(yawRad), cos(pitchRad) * sin(yawRad), sin(pitchRad)).Normalize();
+    m_cameraRight = m_cameraFront.Cross(Vec3(0, 0, 1)).Normalize();
+    m_cameraUp = m_cameraRight.Cross(m_cameraFront).Normalize();
 }
 
 void Application::MouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
@@ -630,6 +648,24 @@ void Application::Keyboard(int key, int scancode, int action, int modifiers)
     {
         glfwSetWindowShouldClose(m_glfwWindow, GLFW_TRUE);
     }
+}
+
+void Application::ProcessKeyboard(float deltaTime)
+{
+    float velocity = m_cameraMoveSpeed * deltaTime;
+
+    if (glfwGetKey(m_glfwWindow, GLFW_KEY_W) == GLFW_PRESS)
+        m_cameraPosition += m_cameraFront * velocity;
+    if (glfwGetKey(m_glfwWindow, GLFW_KEY_S) == GLFW_PRESS)
+        m_cameraPosition -= m_cameraFront * velocity;
+    if (glfwGetKey(m_glfwWindow, GLFW_KEY_A) == GLFW_PRESS)
+        m_cameraPosition -= m_cameraRight * velocity;
+    if (glfwGetKey(m_glfwWindow, GLFW_KEY_D) == GLFW_PRESS)
+        m_cameraPosition += m_cameraRight * velocity;
+    if (glfwGetKey(m_glfwWindow, GLFW_KEY_E) == GLFW_PRESS)
+        m_cameraPosition += m_cameraUp * velocity;
+    if (glfwGetKey(m_glfwWindow, GLFW_KEY_Q) == GLFW_PRESS)
+        m_cameraPosition -= m_cameraUp * velocity;
 }
 
 /*
@@ -744,7 +780,7 @@ void Application::UpdateUniforms()
         // Update the uniform buffer with the camera information
         //
         {
-            Vec3 camPos = Vec3(10, 0, 5) * 1.25f;
+            /*Vec3 camPos = Vec3(10, 0, 5) * 1.25f;
             Vec3 camLookAt = Vec3(0, 0, 1);
             Vec3 camUp = Vec3(0, 0, 1);
 
@@ -755,7 +791,7 @@ void Application::UpdateUniforms()
 
             camPos += m_cameraFocusPoint;
 
-            camLookAt = m_cameraFocusPoint;
+            camLookAt = m_cameraFocusPoint;*/
 
             int windowWidth;
             int windowHeight;
@@ -768,7 +804,8 @@ void Application::UpdateUniforms()
             camera.matProj.PerspectiveVulkan(fovy, aspect, zNear, zFar);
             camera.matProj = camera.matProj.Transpose();
 
-            camera.matView.LookAt(camPos, camLookAt, camUp);
+            // camera.matView.LookAt(camPos, camLookAt, camUp);
+            camera.matView.LookAt(m_cameraPosition, m_cameraPosition + m_cameraFront, m_cameraUp);
             camera.matView = camera.matView.Transpose();
 
             // Update the uniform buffer for the camera matrices
@@ -856,8 +893,6 @@ Application::DrawFrame
 */
 void Application::DrawFrame()
 {
-    UpdateUniforms();
-
     static int frameCount = 0;
     static float totalTime = 0.f;
     static auto lastTime = std::chrono::high_resolution_clock::now();
@@ -877,6 +912,8 @@ void Application::DrawFrame()
         totalTime = 0.0f;
     }
 
+    ProcessKeyboard(deltaTime.count());
+    UpdateUniforms();
     //
     //	Begin the render frame
     //
