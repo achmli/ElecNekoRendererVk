@@ -2,7 +2,7 @@
 //  Samplers.h
 //
 #pragma once
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 #include "DeviceContext.h"
 
 /*

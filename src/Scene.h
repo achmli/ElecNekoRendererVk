@@ -4,9 +4,6 @@
 #pragma once
 #include <vector>
 
-#include "Scene/Mesh.h"
-#include "Scene/Camera.h"
-
 #include "Physics/Body.h"
 #include "Physics/Constraints.h"
 #include "Physics/Manifold.h"

@@ -93,7 +93,7 @@ void Application::Initialize()
     m_scene->Initialize();
     m_scene->Reset();
 
-    m_models.reserve(m_scene->m_bodies.size());
+    /*m_models.reserve(m_scene->m_bodies.size());
     for (int i = 0; i < m_scene->m_bodies.size(); i++)
     {
         Model *model = new Model();
@@ -101,6 +101,29 @@ void Application::Initialize()
         model->MakeVBO(&m_deviceContext);
 
         m_models.push_back(model);
+    }*/
+    {
+        /*m_meshes.emplace_back();
+        if (!m_meshes[0].LoadFromFile(&m_deviceContext, "Tree"))
+        {
+            printf("Failed to Load Mesh!\n");
+            assert(0);
+        }
+
+        m_meshes[0].MakeUBO(&m_deviceContext);
+
+        for (auto &meshPart: m_meshes[0].m_meshParts)
+        {
+            meshPart.MakeVBO(&m_deviceContext);
+        }*/
+        ElecNeko::Mesh *mesh = new ElecNeko::Mesh();
+        mesh->LoadFromFile(&m_deviceContext, "lost_empire");
+        mesh->MakeUBO(&m_deviceContext);
+        for (auto& meshPart : mesh->m_meshParts)
+        {
+            meshPart.MakeVBO(&m_deviceContext);
+        }
+        m_meshes.emplace_back(mesh);
     }
 
     m_mousePosition = Vec2(0, 0);
@@ -416,12 +439,18 @@ void Application::Cleanup()
     m_scene = NULL;
 
     // Delete models
-    for (int i = 0; i < m_models.size(); i++)
+    /*for (int i = 0; i < m_models.size(); i++)
     {
         m_models[i]->Cleanup(m_deviceContext);
         delete m_models[i];
     }
-    m_models.clear();
+    m_models.clear();*/
+
+    for (auto& mesh : m_meshes)
+    {
+        mesh->Cleanup(&m_deviceContext);
+    }
+    m_meshes.clear();
 
     // Delete Uniform Buffer Memory
     m_uniformBuffer.Cleanup(&m_deviceContext);
@@ -791,30 +820,30 @@ void Application::UpdateUniforms()
         //
         //	Update the uniform buffer with the body positions/orientations
         //
-        for (int i = 0; i < m_scene->m_bodies.size(); i++)
-        {
-            Body &body = m_scene->m_bodies[i];
+        //for (int i = 0; i < m_scene->m_bodies.size(); i++)
+        //{
+        //    Body &body = m_scene->m_bodies[i];
 
-            Vec3 fwd = body.m_orientation.RotatePoint(Vec3(1, 0, 0));
-            Vec3 up = body.m_orientation.RotatePoint(Vec3(0, 0, 1));
+        //    Vec3 fwd = body.m_orientation.RotatePoint(Vec3(1, 0, 0));
+        //    Vec3 up = body.m_orientation.RotatePoint(Vec3(0, 0, 1));
 
-            Mat4 matOrient;
-            matOrient.Orient(body.m_position, fwd, up);
-            matOrient = matOrient.Transpose();
+        //    Mat4 matOrient;
+        //    matOrient.Orient(body.m_position, fwd, up);
+        //    matOrient = matOrient.Transpose();
 
-            // Update the uniform buffer with the orientation of this body
-            memcpy(mappedData + uboByteOffset, matOrient.ToPtr(), sizeof(matOrient));
+        //    // Update the uniform buffer with the orientation of this body
+        //    memcpy(mappedData + uboByteOffset, matOrient.ToPtr(), sizeof(matOrient));
 
-            RenderModel renderModel;
-            renderModel.model = m_models[i];
-            renderModel.uboByteOffset = uboByteOffset;
-            renderModel.uboByteSize = sizeof(matOrient);
-            renderModel.pos = body.m_position;
-            renderModel.orient = body.m_orientation;
-            m_renderModels.push_back(renderModel);
+        //    RenderModel renderModel;
+        //    renderModel.model = m_models[i];
+        //    renderModel.uboByteOffset = uboByteOffset;
+        //    renderModel.uboByteSize = sizeof(matOrient);
+        //    renderModel.pos = body.m_position;
+        //    renderModel.orient = body.m_orientation;
+        //    m_renderModels.push_back(renderModel);
 
-            uboByteOffset += m_deviceContext.GetAligendUniformByteOffset(sizeof(matOrient));
-        }
+        //    uboByteOffset += m_deviceContext.GetAligendUniformByteOffset(sizeof(matOrient));
+        //}
 
         m_uniformBuffer.UnmapBuffer(&m_deviceContext);
     }
@@ -854,8 +883,8 @@ void Application::DrawFrame()
     const uint32_t imageIndex = m_deviceContext.BeginFrame();
 
     // Draw everything in an offscreen buffer
-    DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
-
+    //DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
+    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_meshes);
     //
     //	Draw the offscreen framebuffer to the swap chain frame buffer
     //

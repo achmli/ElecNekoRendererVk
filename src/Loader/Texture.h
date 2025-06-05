@@ -16,7 +16,7 @@ namespace ElecNeko
     class Texture
     {
     public:
-        Texture() : width(0), height(0), components(0) {}
+        Texture() : width(0), height(0), components(0), isLoaded(false) {}
         Texture(const std::string &texName, unsigned char *data, int w, int h, int c);
         ~Texture() = default;
 
@@ -26,6 +26,7 @@ namespace ElecNeko
         int height;
         int width;
         int components;
+        bool isLoaded;
         std::vector<uint8_t> texData;
         std::string name;
 
@@ -99,6 +100,7 @@ namespace ElecNeko
         stagingBuffer.Cleanup(device);
         stbi_image_free(pixels);
 
+        isLoaded = true;
         return true;
     }
 }

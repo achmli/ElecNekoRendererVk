@@ -89,8 +89,8 @@ Buffer::MapBuffer
 */
 void * Buffer::MapBuffer( DeviceContext * device ) {
 	void * mapped_ptr = NULL;
-	uint32_t byteOffset = 0;
-	vkMapMemory( device->m_vkDevice, m_vkBufferMemory, byteOffset, m_vkBufferSize, 0, &mapped_ptr );
+	//uint32_t byteOffset = 0;
+	vkMapMemory( device->m_vkDevice, m_vkBufferMemory, m_offset, m_vkBufferSize, 0, &mapped_ptr );
 	return mapped_ptr;
 }
 
@@ -101,4 +101,18 @@ Buffer::UnmapBuffer
 */
 void Buffer::UnmapBuffer( DeviceContext * device ) {
 	vkUnmapMemory( device->m_vkDevice, m_vkBufferMemory );
+}
+
+Buffer Buffer::CreateSectionView(DeviceContext* device, VkDeviceSize offset, VkDeviceSize size)
+{ 
+	Buffer section;
+
+	section.m_vkBuffer = m_vkBuffer;
+    section.m_vkBufferMemory = m_vkBufferMemory;
+    section.m_vkBufferSize = size;
+    section.m_vkMemoryPropertyFlags = m_vkMemoryPropertyFlags;
+
+	section.m_offset = offset;
+
+	return section;
 }

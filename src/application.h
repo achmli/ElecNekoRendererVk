@@ -19,6 +19,8 @@
 #include "RHI/model.h"
 #include "RHI/shader.h"
 
+#include "Loader/Mesh.h"
+
 /*
 ====================================================
 Application
@@ -89,6 +91,8 @@ private:
     Model m_modelFullScreen;
     std::vector<Model *> m_models; // models for the bodies
 
+    std::vector<ElecNeko::Mesh *> m_meshes;
+
     //
     //	Pipeline for copying the offscreen framebuffer to the swapchain
     //
@@ -108,8 +112,8 @@ private:
 
     std::vector<RenderModel> m_renderModels;
 
-    static const int WINDOW_WIDTH = 1200;
-    static const int WINDOW_HEIGHT = 720;
+    static const int WINDOW_WIDTH = 2560;
+    static const int WINDOW_HEIGHT = 1440;
 
     static const bool m_enableLayers = true;
 };

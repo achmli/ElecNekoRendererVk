@@ -23,8 +23,11 @@ public:
 	void * MapBuffer( DeviceContext * device );
 	void UnmapBuffer( DeviceContext * device );
 
+	Buffer CreateSectionView(DeviceContext *device, VkDeviceSize offset, VkDeviceSize size);
+
 	VkBuffer		m_vkBuffer;
 	VkDeviceMemory	m_vkBufferMemory;
 	VkDeviceSize	m_vkBufferSize;
 	VkMemoryPropertyFlags m_vkMemoryPropertyFlags;
+    VkDeviceSize m_offset = 0;
 };

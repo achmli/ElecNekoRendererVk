@@ -4,6 +4,7 @@
 #include "OffscreenRenderer.h"
 #include "model.h"
 #include "Samplers.h"
+#include "Loader/Mesh.h"
 
 #include "../application.h"
 #include <assert.h>
@@ -16,14 +17,18 @@ Shader		g_skyShader;
 Descriptors	g_skyDescriptors;
 Model		g_skyModel;
 
-Pipeline	g_checkerboardShadowPipeline;
-Shader		g_checkerboardShadowShader;
-Descriptors	g_checkerboardShadowDescriptors;
+//Pipeline	g_checkerboardShadowPipeline;
+//Shader		g_checkerboardShadowShader;
+//Descriptors	g_checkerboardShadowDescriptors;
 
 FrameBuffer	g_shadowFrameBuffer;
 Pipeline	g_shadowPipeline;
 Shader		g_shadowShader;
 Descriptors	g_shadowDescriptors;
+
+Pipeline g_meshShadowPipeline;
+Shader g_meshShadowShader;
+Descriptors g_meshShadowDescriptors;
 
 /*
 ====================================================
@@ -92,7 +97,7 @@ bool InitOffscreen( DeviceContext * device, int width, int height ) {
 		pipelineParms.cullMode = Pipeline::CULL_MODE_FRONT;
 		pipelineParms.depthTest = true;
 		pipelineParms.depthWrite = true;
-		result = g_shadowPipeline.Create( device, pipelineParms );
+		result = g_shadowPipeline.CreateForMesh( device, pipelineParms );
 		if ( !result ) {
 			printf( "ERROR: Failed to build pipeline\n" );
 			assert( 0 );
@@ -146,7 +151,7 @@ bool InitOffscreen( DeviceContext * device, int width, int height ) {
 	//	CheckerBoard Shadow
 	//
 	{
-		result = g_checkerboardShadowShader.Load( device, "checkerboardShadowed2" );
+		/*result = g_checkerboardShadowShader.Load( device, "checkerboardShadowed2" );
 		if ( !result ) {
 			printf( "ERROR: Failed to load shader\n" );
 			assert( 0 );
@@ -179,7 +184,48 @@ bool InitOffscreen( DeviceContext * device, int width, int height ) {
 			printf( "ERROR: Failed to build pipeline\n" );
 			assert( 0 );
 			return false;
+		}*/
+	}
+
+	{
+        result = g_meshShadowShader.Load(device, "meshShadowed");
+		if (!result)
+		{
+            printf("ERROR: Failed to load shader\n");
+            assert(0);
+            return false;
 		}
+
+		Descriptors::CreateParms_t descriptorParms;
+        memset(&descriptorParms, 0, sizeof(descriptorParms));
+        descriptorParms.numUniformsVertex = 3;
+        descriptorParms.numUniformsFragment = 2;
+        descriptorParms.numImageSamplers = 2;
+        result = g_meshShadowDescriptors.Create(device, descriptorParms);
+        if (!result)
+        {
+            printf("ERROR: Failed to build descriptors\n");
+            assert(0);
+            return false;
+        }
+
+		Pipeline::CreateParms_t pipelineParms;
+        pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+        pipelineParms.descriptors = &g_meshShadowDescriptors;
+        pipelineParms.shader = &g_meshShadowShader;
+        pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+        pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+        pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
+        pipelineParms.depthTest = true;
+        pipelineParms.depthWrite = true;
+
+		result = g_meshShadowPipeline.CreateForMesh(device, pipelineParms);
+        if (!result)
+        {
+            printf("ERROR: Failed to build pipeline\n");
+            assert(0);
+            return false;
+        }
 	}
 
 	return true;
@@ -197,9 +243,13 @@ bool CleanupOffscreen( DeviceContext * device ) {
 	g_offscreenFrameBuffer.Cleanup( device );
 	g_skyModel.Cleanup( *device );
 
-	g_checkerboardShadowPipeline.Cleanup( device );
+	/*g_checkerboardShadowPipeline.Cleanup( device );
 	g_checkerboardShadowShader.Cleanup( device );
-	g_checkerboardShadowDescriptors.Cleanup( device );
+	g_checkerboardShadowDescriptors.Cleanup( device );*/
+
+	g_meshShadowPipeline.Cleanup(device);
+    g_meshShadowShader.Cleanup(device);
+    g_meshShadowDescriptors.Cleanup(device);
 	
 	g_shadowPipeline.Cleanup( device );
 	g_shadowShader.Cleanup( device );
@@ -275,23 +325,107 @@ void DrawOffscreen( DeviceContext * device, int cmdBufferIndex, Buffer * uniform
 		//
 		{
 			// Binding the pipeline is effectively the "use shader" we had back in our opengl apps
-			g_checkerboardShadowPipeline.BindPipeline( cmdBuffer );
-			for ( int i = 0; i < numModels; i++ ) {
-				const RenderModel & renderModel = renderModels[ i ];
+			//g_checkerboardShadowPipeline.BindPipeline( cmdBuffer );
+			//for ( int i = 0; i < numModels; i++ ) {
+			//	const RenderModel & renderModel = renderModels[ i ];
 
-				// Descriptor is how we bind our buffers and images
-				Descriptor descriptor = g_checkerboardShadowPipeline.GetFreeDescriptor();
-				descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );									// bind the camera matrices
-				descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
-				descriptor.BindBuffer( uniforms, shadowCamOffset, shadowCamSize, 2 );						// bind the shadow camera matrices
-				descriptor.BindImage( VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView, Samplers::m_samplerStandard, 0 );
-				descriptor.BindDescriptor( device, cmdBuffer, &g_checkerboardShadowPipeline );
-				renderModel.model->DrawIndexed( cmdBuffer );
-			}
+			//	// Descriptor is how we bind our buffers and images
+			//	Descriptor descriptor = g_checkerboardShadowPipeline.GetFreeDescriptor();
+			//	descriptor.BindBuffer( uniforms, camOffset, camSize, 0 );									// bind the camera matrices
+			//	descriptor.BindBuffer( uniforms, renderModel.uboByteOffset, renderModel.uboByteSize, 1 );	// bind the model matrices
+			//	descriptor.BindBuffer( uniforms, shadowCamOffset, shadowCamSize, 2 );						// bind the shadow camera matrices
+			//	descriptor.BindImage( VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView, Samplers::m_samplerStandard, 0 );
+			//	descriptor.BindDescriptor( device, cmdBuffer, &g_checkerboardShadowPipeline );
+			//	renderModel.model->DrawIndexed( cmdBuffer );
+			//}
 		}
 
 		g_offscreenFrameBuffer.EndRenderPass( device, cmdBufferIndex );
 
 		g_offscreenFrameBuffer.m_imageColor.TransitionLayout( cmdBuffer, VK_IMAGE_LAYOUT_GENERAL );		
+	}
+}
+
+namespace ElecNeko
+{
+	void DrawOffscreen(DeviceContext* device, int cmdBufferIndex, Buffer* uniforms, std::vector<Mesh*> mesh)
+	{
+        VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
+
+        const int camOffset = 0;
+        const int camSize = sizeof(float) * 16 * 4;
+
+        const int shadowCamOffset = device->GetAligendUniformByteOffset(camOffset + camSize);
+        const int shadowCamSize = camSize;
+
+		// update shadow
+		{
+            g_shadowFrameBuffer.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+			g_shadowFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
+
+			g_shadowPipeline.BindPipeline(cmdBuffer);
+			for (int i = 0; i < mesh.size(); i++)
+			{
+				for (int j = 0; j < mesh[i]->m_meshParts.size(); j++)
+				{
+                    if (mesh[i]->m_meshParts[j].m_vertices.empty())
+                        continue;
+                    Descriptor descriptor = g_shadowPipeline.GetFreeDescriptor();
+                    descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
+                    descriptor.BindBuffer(&mesh[i]->uniformBuffer, 0, mesh[i]->uniformBuffer.m_vkBufferSize, 1);
+                    descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipeline);
+                    mesh[i]->m_meshParts[j].DrawIndexed(cmdBuffer);
+				}
+			}
+
+			g_shadowFrameBuffer.EndRenderPass(device, cmdBufferIndex);
+            g_shadowFrameBuffer.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+		}
+
+		{
+            g_offscreenFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            g_offscreenFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
+            //
+            //	Draw the sky
+            //
+            {
+                // Binding the pipeline is effectively the "use shader" we had back in our opengl apps
+                g_skyPipeline.BindPipeline(cmdBuffer);
+
+                // Descriptor is how we bind our buffers and images
+                Descriptor descriptor = g_skyPipeline.GetFreeDescriptor();
+                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_skyPipeline);
+                g_skyModel.DrawIndexed(cmdBuffer);
+            }
+
+			// draw the model
+			{
+                g_meshShadowPipeline.BindPipeline(cmdBuffer);
+
+				for (int i = 0; i < mesh.size(); i++)
+				{
+					for (int j = 0; j < mesh[i]->m_meshParts.size(); j++)
+					{
+                        if (mesh[i]->m_meshParts[j].m_vertices.empty())
+                            continue;
+                        Descriptor descriptor = g_meshShadowPipeline.GetFreeDescriptor();
+                        descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                        descriptor.BindBuffer(&mesh[i]->uniformBuffer, 0, mesh[i]->uniformBuffer.m_vkBufferSize, 1);
+                        descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 2);
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView, Samplers::m_samplerStandard, 0);
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mesh[i]->albedoMaps[mesh[i]->m_meshParts[j].texMapIndex].m_image.m_vkImageView, Samplers::m_samplerStandard, 1);
+                        descriptor.BindDescriptor(device, cmdBuffer, &g_meshShadowPipeline);
+                        mesh[i]->m_meshParts[j].DrawIndexed(cmdBuffer);
+					}
+				}
+			}
+
+			g_offscreenFrameBuffer.EndRenderPass(device, cmdBufferIndex);
+
+            g_offscreenFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);	
+		}
 	}
 }

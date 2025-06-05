@@ -2,7 +2,7 @@
 //  Pipeline.h
 //
 #pragma once
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 #include "Descriptor.h"
 #include "Buffer.h"
 
@@ -50,6 +50,7 @@ public:
 		VkShaderStageFlagBits pushConstantShaderStages;
 	};
 	bool Create( DeviceContext * device, const CreateParms_t & parms );
+    bool CreateForMesh(DeviceContext *device, const CreateParms_t &parms);
 	bool CreateCompute( DeviceContext * device, const CreateParms_t & parms );
 	void Cleanup( DeviceContext * device );
 
