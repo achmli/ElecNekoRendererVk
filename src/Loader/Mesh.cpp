@@ -31,6 +31,26 @@ namespace ElecNeko
             return false;
         }
 
+        int hasTex[2] = {0, 0};
+
+        if (albTexIndex > -1)
+        {
+            hasTex[0] = 1;
+        }
+
+        if (norTexIndex > -1)
+        {
+            hasTex[1] = 1;
+        }
+        
+        bufferSize = static_cast<int>(sizeof(int) * 2);
+        if (!m_uniformBuffer.Allocate(device, hasTex, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT))
+        {
+            printf("Failed to allocate mesh part's uniform buffer!\n");
+            assert(0);
+            return false;
+        }
+
         m_isVBO = true;
         return true;
     }
@@ -44,6 +64,7 @@ namespace ElecNeko
 
         m_vertexBuffer.Cleanup(device);
         m_indexBuffer.Cleanup(device);
+        m_uniformBuffer.Cleanup(device);
     }
 
     void MeshPart::DrawIndexed(VkCommandBuffer vkCommandBuffer)
@@ -193,7 +214,7 @@ namespace ElecNeko
 
                     // m_meshParts[material_id + 1].m_vertices.emplace_back(vertex);
                     // m_meshParts[material_id + 1].m_indices.emplace_back(m_meshParts[material_id + 1].m_indices.size());
-                    faceVerts.emplace_back(vertex);
+                    faceVerts.push_back(vertex);
                 }
 
                 // triangulate non-triangle face
@@ -210,12 +231,12 @@ namespace ElecNeko
                         {
                             uint32_t newIndex = static_cast<uint32_t>(m_meshParts[partIndex].m_vertices.size());
                             mpMap[vv] = newIndex;
-                            m_meshParts[partIndex].m_vertices.emplace_back(vv);
-                            m_meshParts[partIndex].m_indices.emplace_back(newIndex);
+                            m_meshParts[partIndex].m_vertices.push_back(vv);
+                            m_meshParts[partIndex].m_indices.push_back(newIndex);
                         }
                         else
                         {
-                            m_meshParts[partIndex].m_indices.emplace_back(mpMap[vv]);
+                            m_meshParts[partIndex].m_indices.push_back(mpMap[vv]);
                         }
                     }
                 }
@@ -235,6 +256,10 @@ namespace ElecNeko
 
         Mat4 matOrient;
         matOrient.Orient(pos, fwd, up);
+
+        Mat4 S = Mat4::Scaling(scale);
+        matOrient = matOrient * S;
+
         matOrient = matOrient.Transpose();
 
         int bufferSize = sizeof(matOrient);

@@ -276,6 +276,9 @@ public:
 	void OrthoOpenGL( float xmin, float xmax, float ymin, float ymax, float znear, float zfar );
 	void OrthoVulkan( float xmin, float xmax, float ymin, float ymax, float znear, float zfar );
 
+	static Mat4 Scaling(const Vec3 &s);
+    void Scale(const Vec3 &s);
+
 	const float * ToPtr() const { return rows[ 0 ].ToPtr(); }
 	float * ToPtr() { return rows[ 0 ].ToPtr(); }
 
@@ -537,6 +540,19 @@ inline Mat4 Mat4::operator * ( const Mat4 & rhs ) const {
 	}
 	return tmp;
 }
+
+inline Mat4 Mat4::Scaling(const Vec3 &s)
+{
+    Mat4 S;
+    S.Zero();
+    S.rows[0][0] = s.x;
+    S.rows[1][1] = s.y;
+    S.rows[2][2] = s.z;
+    S.rows[3][3] = 1.0f;
+    return S;
+}
+
+inline void Mat4::Scale(const Vec3 &s) { *this = (*this) * Mat4::Scaling(s); }
 
 /*
 ====================================================

@@ -198,7 +198,7 @@ bool InitOffscreen( DeviceContext * device, int width, int height ) {
 
 		Descriptors::CreateParms_t descriptorParms;
         memset(&descriptorParms, 0, sizeof(descriptorParms));
-        descriptorParms.numUniformsVertex = 3;
+        descriptorParms.numUniformsVertex = 4;
         descriptorParms.numUniformsFragment = 2;
         descriptorParms.numImageSamplers = 2;
         result = g_meshShadowDescriptors.Create(device, descriptorParms);
@@ -415,9 +415,12 @@ namespace ElecNeko
                         descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
                         descriptor.BindBuffer(&mesh[i]->uniformBuffer, 0, mesh[i]->uniformBuffer.m_vkBufferSize, 1);
                         descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 2);
+                        descriptor.BindBuffer(&mesh[i]->m_meshParts[j].m_uniformBuffer, 0, mesh[i]->m_meshParts[j].m_uniformBuffer.m_vkBufferSize, 3);
                         descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView, Samplers::m_samplerStandard, 0);
-                        if (mesh[i]->m_meshParts[j].albTexIndex>=0)
-							descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mesh[i]->albedoMaps[mesh[i]->m_meshParts[j].albTexIndex].m_image.m_vkImageView, Samplers::m_samplerStandard, 1);
+                        if (mesh[i]->m_meshParts[j].albTexIndex >= 0)
+                        {
+                            descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mesh[i]->albedoMaps[mesh[i]->m_meshParts[j].albTexIndex].m_image.m_vkImageView, ElecNeko::ElecNekoSampler::m_samplerTexture, 1);
+                        }
                         descriptor.BindDescriptor(device, cmdBuffer, &g_meshShadowPipeline);
                         mesh[i]->m_meshParts[j].DrawIndexed(cmdBuffer);
 					}

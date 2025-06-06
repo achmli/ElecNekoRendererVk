@@ -103,6 +103,7 @@ namespace ElecNeko
 
         Buffer m_vertexBuffer;
         Buffer m_indexBuffer;
+        Buffer m_uniformBuffer;
 
         bool m_isVBO;
     };
@@ -110,7 +111,7 @@ namespace ElecNeko
     class Mesh
     {
     public:
-        Mesh() : pos(Vec3(0.f, 0.f, 0.f)), rot(Vec3(1.f, 0.f, 0.f), 3.14f / 2.f), scale(Vec3(1.f, 1.f, 1.f)), isUBO(false) {}
+        Mesh() : pos(Vec3(0.f, 0.f, 0.f)), rot(Vec3(1.f, 0.f, 0.f), 3.14f / 2.f), scale(Vec3(.01f, .01f, .01f)), isUBO(false) {}
         Mesh(const Vec3 &Pos, const Quat &Rot, const Vec3 &Scale) : pos(Pos), rot(Rot), scale(Scale), isUBO(false) {}
         ~Mesh() = default;
 
@@ -122,6 +123,7 @@ namespace ElecNeko
         std::vector<MeshPart> m_meshParts;
         std::vector<Texture> albedoMaps;
         std::vector<Texture> normalMaps;
+
         Buffer uniformBuffer;
 
         Vec3 pos;

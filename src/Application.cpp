@@ -117,7 +117,7 @@ void Application::Initialize()
             meshPart.MakeVBO(&m_deviceContext);
         }*/
         ElecNeko::Mesh *mesh = new ElecNeko::Mesh();
-        mesh->LoadFromFile(&m_deviceContext, "lost_empire");
+        mesh->LoadFromFile(&m_deviceContext, "sponza");
         mesh->MakeUBO(&m_deviceContext);
         for (auto& meshPart : mesh->m_meshParts)
         {
@@ -252,6 +252,7 @@ bool Application::InitializeVulkan()
     //	Initialize texture samplers
     //
     Samplers::InitializeSamplers(&m_deviceContext);
+    ElecNeko::ElecNekoSampler::InitializeSampler(&m_deviceContext);
 
     //
     //	Command Buffers
@@ -457,6 +458,7 @@ void Application::Cleanup()
 
     // Delete Samplers
     Samplers::Cleanup(&m_deviceContext);
+    ElecNeko::ElecNekoSampler::Cleanup(&m_deviceContext);
 
     // Delete Device Context
     m_deviceContext.Cleanup();

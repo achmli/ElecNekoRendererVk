@@ -18,6 +18,10 @@ layout(binding = 2) uniform uboShadow {
     mat4 view;
     mat4 proj;
 } shadow;
+layout(binding = 3) uniform uboHasTex {
+    int hasAlbedoMap;
+    int hasNormalMap;
+} hasTex;
 
 /*
     ==========================================
@@ -40,6 +44,7 @@ layout(location = 1) out vec4 modelPos;
 layout(location = 2) out vec3 modelNormal;
 layout(location = 3) out vec4 shadowPos;
 layout(location = 4) out vec2 texCoord;
+layout(location =5) out ivec2 hasTexture;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -65,4 +70,5 @@ void main() {
     shadowPos = shadow.proj * shadow.view * model.model * vec4(inPosition, 1.0);
 
     texCoord=inTexCoord;
+    hasTexture=ivec2(hasTex.hasAlbedoMap, hasTex.hasNormalMap);
 }

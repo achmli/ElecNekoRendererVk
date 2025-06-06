@@ -5,8 +5,8 @@ uniforms
     ==========================================
 */
 
-layout(binding = 3) uniform sampler2D texShadow;
-layout(binding = 4) uniform sampler2D texAlbedo;
+layout(binding = 4) uniform sampler2D texShadow;
+layout(binding = 5) uniform sampler2D texAlbedo;
 
 /*
     ==========================================
@@ -19,6 +19,7 @@ layout(location = 1) in vec4 modelPos;
 layout(location = 2) in vec3 modelNormal;
 layout(location = 3) in vec4 shadowPos;
 layout(location = 4) in vec2 texCoord;
+layout(location = 5) flat in ivec2 hasTexture;
 
 /*
     ==========================================
@@ -44,6 +45,10 @@ void main() {
     vec3 dirToLight = normalize(vec3(1, 1, 1));
 
     vec4 finalColor=texture(texAlbedo, texCoord);
+
+    if(hasTexture.x == 0) {
+        finalColor=vec4(1.0,1.0,1.0,1.0);
+    }
 
     if(finalColor.a<0.0001) {
         discard;
