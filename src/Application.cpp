@@ -662,9 +662,9 @@ void Application::ProcessKeyboard(float deltaTime)
         m_cameraPosition -= m_cameraRight * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_D) == GLFW_PRESS)
         m_cameraPosition += m_cameraRight * velocity;
-    if (glfwGetKey(m_glfwWindow, GLFW_KEY_E) == GLFW_PRESS)
+    if (glfwGetKey(m_glfwWindow, GLFW_KEY_SPACE) == GLFW_PRESS)
         m_cameraPosition += m_cameraUp * velocity;
-    if (glfwGetKey(m_glfwWindow, GLFW_KEY_Q) == GLFW_PRESS)
+    if (glfwGetKey(m_glfwWindow, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
         m_cameraPosition -= m_cameraUp * velocity;
 }
 

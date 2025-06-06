@@ -144,6 +144,9 @@ namespace ElecNeko
             }
         }
 
+        std::vector<std::unordered_map<VVertex, uint32_t, VVertexHash>> mapVec;
+        mapVec.resize(materials.size() + 1);
+
         for (const auto& shape : shapes)
         {
             size_t indexOffset = 0;
@@ -151,6 +154,11 @@ namespace ElecNeko
             {
                 auto ngon = shape.mesh.num_face_vertices[n];
                 auto material_id = shape.mesh.material_ids[n];
+
+                size_t partIndex = static_cast<size_t>(material_id + 1);
+
+                std::vector<VVertex> faceVerts;
+
                 for (size_t f = 0; f < ngon; f++)
                 {
                     const auto &index = shape.mesh.indices[indexOffset + f];
@@ -183,9 +191,35 @@ namespace ElecNeko
                         vertex.normal[2] = 1.f;
                     }
 
-                    m_meshParts[material_id + 1].m_vertices.emplace_back(vertex);
-                    m_meshParts[material_id + 1].m_indices.emplace_back(m_meshParts[material_id + 1].m_indices.size());
+                    // m_meshParts[material_id + 1].m_vertices.emplace_back(vertex);
+                    // m_meshParts[material_id + 1].m_indices.emplace_back(m_meshParts[material_id + 1].m_indices.size());
+                    faceVerts.emplace_back(vertex);
                 }
+
+                // triangulate non-triangle face
+                for (int v = 1; v < ngon - 1; v++)
+                {
+                    VVertex triVerts[3] = {faceVerts[0], faceVerts[v], faceVerts[v + 1]};
+
+                    for (int k = 0; k < 3; k++)
+                    {
+                        VVertex &vv = triVerts[k];
+                        auto &mpMap = mapVec[partIndex];
+
+                        if (mpMap.find(vv) == mpMap.end())
+                        {
+                            uint32_t newIndex = static_cast<uint32_t>(m_meshParts[partIndex].m_vertices.size());
+                            mpMap[vv] = newIndex;
+                            m_meshParts[partIndex].m_vertices.emplace_back(vv);
+                            m_meshParts[partIndex].m_indices.emplace_back(newIndex);
+                        }
+                        else
+                        {
+                            m_meshParts[partIndex].m_indices.emplace_back(mpMap[vv]);
+                        }
+                    }
+                }
+
                 indexOffset += ngon;
             }
         }

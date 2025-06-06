@@ -47,6 +47,39 @@ namespace ElecNeko
 
             return attributeDescriptions;
         }
+
+        bool operator==(const VVertex& other)const
+        {
+            return position[0] == other.position[0] && position[1] == other.position[1] && position[2] == other.position[2] && uv[0] == other.uv[0] &&
+                   uv[1] == other.uv[1] && normal[0] == other.normal[0] && normal[1] == other.normal[1] && normal[2] == other.normal[2];
+        }
+    };
+
+    struct VVertexHash
+    {
+        size_t operator()(const VVertex& v)const noexcept
+        { 
+            size_t h = 0;
+            auto hashFloat = [](float f) {
+                // regard a float as an unsigned int to do hash
+                uint32_t u;
+                std::memcpy(&u, &f, sizeof(float));
+                return std::hash<uint32_t>()(u);
+            };
+
+            h ^= hashFloat(v.position[0]) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            h ^= hashFloat(v.position[1]) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            h ^= hashFloat(v.position[2]) + 0x9e3779b9 + (h << 6) + (h >> 2);
+
+            h ^= hashFloat(v.uv[0]) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            h ^= hashFloat(v.uv[1]) + 0x9e3779b9 + (h << 6) + (h >> 2);
+
+            h ^= hashFloat(v.normal[0]) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            h ^= hashFloat(v.normal[1]) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            h ^= hashFloat(v.normal[2]) + 0x9e3779b9 + (h << 6) + (h >> 2);
+
+            return h;
+        }
     };
 
     class MeshPart
