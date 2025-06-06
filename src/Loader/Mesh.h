@@ -52,7 +52,7 @@ namespace ElecNeko
     class MeshPart
     {
     public:
-        MeshPart() : m_isVBO(false) {}
+        MeshPart() : m_isVBO(false) ,albTexIndex(-1),norTexIndex(-1) {}
         ~MeshPart() = default;
 
         bool MakeVBO(DeviceContext *device);
@@ -65,7 +65,8 @@ namespace ElecNeko
         std::vector<VVertex> m_vertices;
         std::vector<uint32_t> m_indices;
 
-        uint32_t texMapIndex = -1;
+        int32_t albTexIndex;
+        int32_t norTexIndex;
 
         Buffer m_vertexBuffer;
         Buffer m_indexBuffer;

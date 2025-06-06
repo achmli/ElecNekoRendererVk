@@ -2,7 +2,7 @@
 
 #include "Mesh.h"
 
-
+#include <unordered_map>
 #include <cassert>
 
 #include "tiny_obj_loader.h"
@@ -86,28 +86,61 @@ namespace ElecNeko
 
         std::string texPath = readerConfig.mtl_search_path;
 
-        albedoMaps.resize(materials.size());
-        normalMaps.resize(materials.size());
-
         m_meshParts.resize(materials.size() + 1);
+
+        std::unordered_map<std::string, int32_t> matAlbTex;
+        std::unordered_map<std::string, int32_t> matNorTex;
         
         for (size_t i = 0; i < materials.size(); i++)
         {
-            // matid=-1 vectorIndex=0 ... matid=n index=n+1
-            m_meshParts[i + 1].texMapIndex = i;
-
+            // read albedo map
             if (materials[i].diffuse_texname != "")
             {
-                albedoMaps[i].LoadTexture(device, texPath + materials[i].diffuse_texname);
-            }
+                // if albedo map has been loaded
+                if (matAlbTex.find(materials[i].diffuse_texname) != matAlbTex.end())
+                {
+                    m_meshParts[i + 1].albTexIndex = matAlbTex[materials[i].diffuse_texname];
+                }
+                else
+                {
+                    m_meshParts[i + 1].albTexIndex = albedoMaps.size();
+                    matAlbTex[materials[i].diffuse_texname] = albedoMaps.size();
 
+                    albedoMaps.emplace_back();
+                    albedoMaps.back().LoadTexture(device, texPath + materials[i].diffuse_texname);
+                }
+            }
+            //read normal map
             if (materials[i].normal_texname != "")
             {
-                normalMaps[i].LoadTexture(device, texPath + materials[i].normal_texname);
+                // normalMaps[i].LoadTexture(device, texPath + materials[i].normal_texname);
+                if (matNorTex.find(materials[i].normal_texname) != matNorTex.end())
+                {
+                    m_meshParts[i + 1].norTexIndex = matNorTex[materials[i].normal_texname];
+                }
+                else
+                {
+                    m_meshParts[i + 1].norTexIndex = normalMaps.size();
+                    matNorTex[materials[i].normal_texname] = normalMaps.size();
+
+                    normalMaps.emplace_back();
+                    normalMaps.back().LoadTexture(device, texPath + materials[i].normal_texname);
+                }
             }
             else if (materials[i].bump_texname != "")
             {
-                normalMaps[i].LoadTexture(device, texPath + materials[i].bump_texname);
+                if (matNorTex.find(materials[i].bump_texname) != matNorTex.end())
+                {
+                    m_meshParts[i + 1].norTexIndex = matNorTex[materials[i].bump_texname];
+                }
+                else
+                {
+                    m_meshParts[i + 1].norTexIndex = normalMaps.size();
+                    matNorTex[materials[i].bump_texname] = normalMaps.size();
+
+                    normalMaps.emplace_back();
+                    normalMaps.back().LoadTexture(device, texPath + materials[i].bump_texname);
+                }
             }
         }
 
