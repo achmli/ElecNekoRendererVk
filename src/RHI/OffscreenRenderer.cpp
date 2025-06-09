@@ -26,6 +26,11 @@ Pipeline	g_shadowPipeline;
 Shader		g_shadowShader;
 Descriptors	g_shadowDescriptors;
 
+ElecNeko::GFrameBuffer g_GBufferFrameBuffer;
+Pipeline g_GBufferPipeline;
+Shader g_GBufferShader;
+Descriptors g_GBufferDescriptors;
+
 Pipeline g_meshShadowPipeline;
 Shader g_meshShadowShader;
 Descriptors g_meshShadowDescriptors;
@@ -109,6 +114,11 @@ bool InitOffscreen( DeviceContext * device, int width, int height ) {
 	//	Sky
 	//
 	{
+        ElecNeko::GFrameBuffer::CreateParms_t frameBufferParms;
+	    frameBufferParms.width = width;
+	    frameBufferParms.height = height;
+	    result=g_GBufferFrameBuffer.Create( device, frameBufferParms );
+	    
 		result = g_skyShader.Load( device, "sky" );
 		if ( !result ) {
 			printf( "ERROR: Failed to load shader\n" );
@@ -147,44 +157,31 @@ bool InitOffscreen( DeviceContext * device, int width, int height ) {
 		g_skyModel.MakeVBO( device );
 	}
 
-	//
-	//	CheckerBoard Shadow
-	//
+	// G-Buffer pass
 	{
-		/*result = g_checkerboardShadowShader.Load( device, "checkerboardShadowed2" );
-		if ( !result ) {
-			printf( "ERROR: Failed to load shader\n" );
-			assert( 0 );
-			return false;
-		}
+	    result = g_GBufferShader.Load( device, "GBuffer" );
+	    if(!result)
+	    {
+	        printf( "ERROR: Failed to load shader\n" );
+	        assert( 0 );
+	        return false;
+	    }
 
-		Descriptors::CreateParms_t descriptorParms;
-		memset( &descriptorParms, 0, sizeof( descriptorParms ) );
-		descriptorParms.numUniformsVertex = 3;
-		descriptorParms.numUniformsFragment = 1;
-		descriptorParms.numImageSamplers = 1;
-		result = g_checkerboardShadowDescriptors.Create( device, descriptorParms );
-		if ( !result ) {
-			printf( "ERROR: Failed to build descriptors\n" );
-			assert( 0 );
-			return false;
-		}
+	    Descriptors::CreateParms_t descriptorParms;
+	    memset( &descriptorParms, 0, sizeof( descriptorParms ) );
+	    descriptorParms.numUniformsVertex = 2;
+	    descriptorParms.numUniformsFragment = 3;
+	    descriptorParms.numImageSamplers = 1;
+	    result = g_GBufferDescriptors.Create( device, descriptorParms );
+	    if (!result)
+	    {
+	        printf( "ERROR: Failed to build descriptors\n" );
+	        assert( 0 );
+	        return false;
+	    }
 
-		Pipeline::CreateParms_t pipelineParms;
-		pipelineParms.framebuffer = &g_offscreenFrameBuffer;
-		pipelineParms.descriptors = &g_checkerboardShadowDescriptors;
-		pipelineParms.shader = &g_checkerboardShadowShader;
-		pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
-		pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-		pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
-		pipelineParms.depthTest = true;
-		pipelineParms.depthWrite = true;
-		result = g_checkerboardShadowPipeline.Create( device, pipelineParms );
-		if ( !result ) {
-			printf( "ERROR: Failed to build pipeline\n" );
-			assert( 0 );
-			return false;
-		}*/
+	    Pipeline::CreateParms_t pipelineParms;
+	    pipelineParms.framebuffer = &g_GBufferFrameBuffer;
 	}
 
 	{

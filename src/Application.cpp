@@ -117,7 +117,7 @@ void Application::Initialize()
             meshPart.MakeVBO(&m_deviceContext);
         }*/
         ElecNeko::Mesh *mesh = new ElecNeko::Mesh();
-        mesh->LoadFromFile(&m_deviceContext, "sponza");
+        mesh->LoadFromFile(&m_deviceContext, "lost_empire");
         mesh->MakeUBO(&m_deviceContext);
         for (auto& meshPart : mesh->m_meshParts)
         {
