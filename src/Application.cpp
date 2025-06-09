@@ -93,6 +93,10 @@ void Application::Initialize()
     m_scene->Initialize();
     m_scene->Reset();
 
+    
+
+    m_camera.Initialize(Vec3(-75.f, 97.f, 53.f), Vec3(.75f, -.6f, -.2f), 45.f, static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(WINDOW_WIDTH), .1f, 1000.f);
+
     /*m_models.reserve(m_scene->m_bodies.size());
     for (int i = 0; i < m_scene->m_bodies.size(); i++)
     {
@@ -117,7 +121,7 @@ void Application::Initialize()
             meshPart.MakeVBO(&m_deviceContext);
         }*/
         ElecNeko::Mesh *mesh = new ElecNeko::Mesh();
-        mesh->LoadFromFile(&m_deviceContext, "sponza");
+        mesh->LoadFromFile(&m_deviceContext, "lost_empire");
         mesh->MakeUBO(&m_deviceContext);
         for (auto& meshPart : mesh->m_meshParts)
         {
@@ -127,10 +131,6 @@ void Application::Initialize()
     }
 
     m_mousePosition = Vec2(0, 0);
-    m_cameraPositionTheta = acosf(-1.0f) / 2.0f;
-    m_cameraPositionPhi = 0;
-    m_cameraRadius = 15.0f;
-    m_cameraFocusPoint = Vec3(0, 0, 3);
 
     m_isPaused = true;
     m_stepFrame = false;
@@ -159,7 +159,7 @@ void Application::InitializeGLFW()
     glfwSetWindowUserPointer(m_glfwWindow, this);
     glfwSetWindowSizeCallback(m_glfwWindow, Application::OnWindowResized);
 
-    glfwSetInputMode(m_glfwWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(m_glfwWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     glfwSetInputMode(m_glfwWindow, GLFW_STICKY_KEYS, GLFW_TRUE);
     glfwSetCursorPosCallback(m_glfwWindow, Application::OnMouseMoved);
     glfwSetScrollCallback(m_glfwWindow, Application::OnMouseWheelScrolled);
@@ -528,7 +528,7 @@ Application::OnMouseMoved
 void Application::OnMouseMoved(GLFWwindow *window, double x, double y)
 {
     Application *application = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
-    //if (application->m_isMouseDown)
+    if (application->m_isMouseDown)
         application->MouseMoved((float) x, (float) y);
 }
 
@@ -543,36 +543,7 @@ void Application::MouseMoved(float x, float y)
     Vec2 ds = newPosition - m_mousePosition;
     m_mousePosition = newPosition;
 
-    /*float sensitivity = 0.01f;
-    m_cameraPositionTheta += ds.y * sensitivity;
-    m_cameraPositionPhi += ds.x * sensitivity;
-
-    if (m_cameraPositionTheta < 0.14f)
-    {
-        m_cameraPositionTheta = 0.14f;
-    }
-    if (m_cameraPositionTheta > 3.0f)
-    {
-        m_cameraPositionTheta = 3.0f;
-    }*/
-
-    ds *= m_mouseSensitivity;
-
-    m_cameraYaw -= ds.x;
-    m_cameraPitch -= ds.y;
-
-    // Clamp pitch to prevent flipping
-    if (m_cameraPitch > 89.0f)
-        m_cameraPitch = 89.0f;
-    if (m_cameraPitch < -89.0f)
-        m_cameraPitch = -89.0f;
-
-    float yawRad = ElecNeko::Radians(m_cameraYaw);
-    float pitchRad = ElecNeko::Radians(m_cameraPitch);
-
-    m_cameraFront = Vec3(cos(pitchRad) * cos(yawRad), cos(pitchRad) * sin(yawRad), sin(pitchRad)).Normalize();
-    m_cameraRight = m_cameraFront.Cross(Vec3(0, 0, 1)).Normalize();
-    m_cameraUp = m_cameraRight.Cross(m_cameraFront).Normalize();
+    m_camera.OffsetOrientation(ds.x, ds.y);
 }
 
 void Application::MouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
@@ -583,7 +554,12 @@ void Application::MouseButtonCallback(GLFWwindow *window, int button, int action
         if (action == GLFW_PRESS)
         {
             application->m_isMouseDown = true;
-        } else if (action == GLFW_RELEASE)
+
+            double x, y;
+            glfwGetCursorPos(window, &x, &y);
+            application->m_mousePosition = Vec2(static_cast<float>(x), static_cast<float>(y));
+        } 
+        else if (action == GLFW_RELEASE)
         {
             application->m_isMouseDown = false;
         }
@@ -608,12 +584,8 @@ Application::MouseScrolled
 ====================================================
 */
 void Application::MouseScrolled(float z)
-{
-    m_cameraRadius -= z;
-    if (m_cameraRadius < 0.5f)
-    {
-        m_cameraRadius = 0.5f;
-    }
+{ 
+    m_camera.position += m_camera.forward * z * m_cameraMoveSpeed; 
 }
 
 /*
@@ -657,17 +629,17 @@ void Application::ProcessKeyboard(float deltaTime)
     float velocity = m_cameraMoveSpeed * deltaTime;
 
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_W) == GLFW_PRESS)
-        m_cameraPosition += m_cameraFront * velocity;
+        m_camera.position += m_camera.forward * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_S) == GLFW_PRESS)
-        m_cameraPosition -= m_cameraFront * velocity;
+        m_camera.position -= m_camera.forward * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_A) == GLFW_PRESS)
-        m_cameraPosition -= m_cameraRight * velocity;
+        m_camera.position -= m_camera.right * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_D) == GLFW_PRESS)
-        m_cameraPosition += m_cameraRight * velocity;
+        m_camera.position += m_camera.right * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_SPACE) == GLFW_PRESS)
-        m_cameraPosition += m_cameraUp * velocity;
+        m_camera.position += m_camera.up * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-        m_cameraPosition -= m_cameraUp * velocity;
+        m_camera.position -= m_camera.up * velocity;
 }
 
 /*
@@ -781,34 +753,9 @@ void Application::UpdateUniforms()
         //
         // Update the uniform buffer with the camera information
         //
-        {
-            /*Vec3 camPos = Vec3(10, 0, 5) * 1.25f;
-            Vec3 camLookAt = Vec3(0, 0, 1);
-            Vec3 camUp = Vec3(0, 0, 1);
-
-            camPos.x = cosf(m_cameraPositionPhi) * sinf(m_cameraPositionTheta);
-            camPos.y = sinf(m_cameraPositionPhi) * sinf(m_cameraPositionTheta);
-            camPos.z = cosf(m_cameraPositionTheta);
-            camPos *= m_cameraRadius;
-
-            camPos += m_cameraFocusPoint;
-
-            camLookAt = m_cameraFocusPoint;*/
-
-            int windowWidth;
-            int windowHeight;
-            glfwGetWindowSize(m_glfwWindow, &windowWidth, &windowHeight);
-
-            const float zNear = 0.1f;
-            const float zFar = 1000.0f;
-            const float fovy = 45.0f;
-            const float aspect = (float) windowHeight / (float) windowWidth;
-            camera.matProj.PerspectiveVulkan(fovy, aspect, zNear, zFar);
-            camera.matProj = camera.matProj.Transpose();
-
-            // camera.matView.LookAt(camPos, camLookAt, camUp);
-            camera.matView.LookAt(m_cameraPosition, m_cameraPosition + m_cameraFront, m_cameraUp);
-            camera.matView = camera.matView.Transpose();
+        {   
+            camera.matProj = m_camera.ComputeProjectionMatrix();
+            camera.matView = m_camera.ComputeViewMatrix();
 
             // Update the uniform buffer for the camera matrices
             memcpy(mappedData + uboByteOffset, &camera, sizeof(camera));

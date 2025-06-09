@@ -21,6 +21,8 @@
 
 #include "Loader/Mesh.h"
 
+#include "Scene/Camera.h"
+
 /*
 ====================================================
 Application
@@ -95,6 +97,9 @@ private:
 
     std::vector<ElecNeko::Mesh *> m_meshes;
 
+    ElecNeko::Camera m_camera;
+    // ElecNeko::Camera m_shadowCam;
+
     //
     //	Pipeline for copying the offscreen framebuffer to the swapchain
     //
@@ -104,20 +109,11 @@ private:
 
     // User input
     Vec2 m_mousePosition;
-    Vec3 m_cameraFocusPoint;
-    float m_cameraPositionTheta;
-    float m_cameraPositionPhi;
-    float m_cameraRadius;
+    
     bool m_isPaused;
     bool m_stepFrame;
     bool m_isMouseDown = false;
 
-    Vec3 m_cameraPosition = Vec3(-.7f, -7, 3);
-    float m_cameraYaw = -90.f;
-    float m_cameraPitch = 0.f;
-    Vec3 m_cameraFront = Vec3(0, 1, 0);
-    Vec3 m_cameraUp = Vec3(0, 0, 1);
-    Vec3 m_cameraRight = Vec3(1, 0, 0);
     float m_cameraMoveSpeed = 5.0f;
     float m_mouseSensitivity = 0.1f;
 
