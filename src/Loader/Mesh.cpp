@@ -249,10 +249,8 @@ namespace ElecNeko
 
     bool Mesh::MakeUBO(DeviceContext *device)
     {
-        // VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[0];
-
-        Vec3 fwd = rot.RotatePoint(Vec3(1, 0, 0));
-        Vec3 up = rot.RotatePoint(Vec3(0, 0, 1));
+        Vec3 fwd = Vec3(1, 0, 0);
+        Vec3 up = Vec3(0, 0, 1);
 
         Mat4 matOrient;
         matOrient.Orient(pos, fwd, up);
@@ -287,6 +285,18 @@ namespace ElecNeko
         }
 
         uniformBuffer.Cleanup(device);
+
+        for (auto& map : albedoMaps)
+        {
+            map.Cleanup(device);
+        }
+        albedoMaps.clear();
+        
+        for (auto& map : normalMaps)
+        {
+            map.Cleanup(device);
+        }
+        normalMaps.clear();
     }
 }
 

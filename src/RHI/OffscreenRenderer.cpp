@@ -17,6 +17,10 @@ Shader		g_skyShader;
 Descriptors	g_skyDescriptors;
 Model		g_skyModel;
 
+Pipeline g_newSkyPipeline;
+Shader g_newSkyShader;
+Descriptors g_newSkyDescriptors;
+
 //Pipeline	g_checkerboardShadowPipeline;
 //Shader		g_checkerboardShadowShader;
 //Descriptors	g_checkerboardShadowDescriptors;
@@ -94,7 +98,7 @@ bool InitOffscreen( DeviceContext * device, int width, int height ) {
 		pipelineParms.shader = &g_shadowShader;
 		pipelineParms.width = frameBufferParms.width;
 		pipelineParms.height = frameBufferParms.height;
-		pipelineParms.cullMode = Pipeline::CULL_MODE_FRONT;
+		pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
 		pipelineParms.depthTest = true;
 		pipelineParms.depthWrite = true;
 		result = g_shadowPipeline.CreateForMesh( device, pipelineParms );
@@ -108,6 +112,7 @@ bool InitOffscreen( DeviceContext * device, int width, int height ) {
 	//
 	//	Sky
 	//
+    if (0)
 	{
 		result = g_skyShader.Load( device, "sky" );
 		if ( !result ) {
@@ -145,6 +150,46 @@ bool InitOffscreen( DeviceContext * device, int width, int height ) {
 		ShapeSphere sphereShape( 1.0f );
 		g_skyModel.BuildFromShape( &sphereShape );
 		g_skyModel.MakeVBO( device );
+	}
+
+	{
+        result = g_newSkyShader.Load(device, "newSky");
+		if (!result)
+		{
+            printf("ERROR: Failed to load shader\n");
+            assert(0);
+            return false;
+		}
+
+		Descriptors::CreateParms_t descriptorParms;
+        memset(&descriptorParms, 0, sizeof(descriptorParms));
+        descriptorParms.numUniformsVertex = 1;
+        descriptorParms.numUniformsFragment = 1;
+        descriptorParms.numImageSamplers = 1;
+        result = g_newSkyDescriptors.Create(device, descriptorParms);
+		if (!result)
+		{
+            printf("ERROR: Failed to build descriptors\n");
+            assert(0);
+            return false;
+		}
+
+		Pipeline::CreateParms_t pipelineParms;
+        pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+        pipelineParms.descriptors = &g_newSkyDescriptors;
+        pipelineParms.shader = &g_newSkyShader;
+        pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+        pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+        pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+        pipelineParms.depthTest = false;
+        pipelineParms.depthWrite = false;
+        result = g_newSkyPipeline.CreateForSkyBox(device, pipelineParms);
+        if (!result)
+        {
+            printf("ERROR: Failed to build pipeline\n");
+            assert(0);
+            return false;
+        }
 	}
 
 	//
@@ -237,15 +282,22 @@ CleanupOffscreen
 ====================================================
 */
 bool CleanupOffscreen( DeviceContext * device ) {
-	g_skyPipeline.Cleanup( device );
-	g_skyDescriptors.Cleanup( device );
-	g_skyShader.Cleanup( device );
-	g_offscreenFrameBuffer.Cleanup( device );
-	g_skyModel.Cleanup( *device );
+    if (0)
+	{
+        g_skyPipeline.Cleanup(device);
+        g_skyDescriptors.Cleanup(device);
+        g_skyShader.Cleanup(device);
+        g_skyModel.Cleanup(*device);
+    }
+        g_offscreenFrameBuffer.Cleanup(device);
 
 	/*g_checkerboardShadowPipeline.Cleanup( device );
 	g_checkerboardShadowShader.Cleanup( device );
 	g_checkerboardShadowDescriptors.Cleanup( device );*/
+
+	g_newSkyPipeline.Cleanup(device);
+    g_newSkyDescriptors.Cleanup(device);
+    g_newSkyShader.Cleanup(device);
 
 	g_meshShadowPipeline.Cleanup(device);
     g_meshShadowShader.Cleanup(device);
@@ -348,7 +400,7 @@ void DrawOffscreen( DeviceContext * device, int cmdBufferIndex, Buffer * uniform
 
 namespace ElecNeko
 {
-	void DrawOffscreen(DeviceContext* device, int cmdBufferIndex, Buffer* uniforms, std::vector<Mesh*> mesh)
+	void DrawOffscreen(DeviceContext* device, int cmdBufferIndex, Buffer* uniforms, SkyBox& skyBox, std::vector<Mesh*> mesh)
 	{
         VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
 
@@ -390,6 +442,7 @@ namespace ElecNeko
             //
             //	Draw the sky
             //
+            if (false)
             {
                 // Binding the pipeline is effectively the "use shader" we had back in our opengl apps
                 g_skyPipeline.BindPipeline(cmdBuffer);
@@ -400,6 +453,16 @@ namespace ElecNeko
                 descriptor.BindDescriptor(device, cmdBuffer, &g_skyPipeline);
                 g_skyModel.DrawIndexed(cmdBuffer);
             }
+
+			{
+                g_newSkyPipeline.BindPipeline(cmdBuffer);
+
+				Descriptor descriptor = g_newSkyPipeline.GetFreeDescriptor();
+                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, skyBox.m_cubeImage.m_vkImageView, ElecNeko::ElecNekoSampler::m_samplerCubemap, 0);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_newSkyPipeline);
+                vkCmdDraw(cmdBuffer, 36, 1, 0, 0);
+			}
 
 			// draw the model
 			{

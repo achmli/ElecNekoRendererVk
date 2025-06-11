@@ -22,6 +22,8 @@ namespace ElecNeko
 
         bool LoadTexture(DeviceContext *device, const std::string &filename);
 
+        void Cleanup(DeviceContext *device);
+
     public:
         int height;
         int width;
@@ -102,5 +104,15 @@ namespace ElecNeko
 
         isLoaded = true;
         return true;
+    }
+
+    inline void Texture::Cleanup(DeviceContext *device)
+    {
+        if (!isLoaded)
+            return;
+
+        m_image.Cleanup(device);
+
+        texData.clear();
     }
 }

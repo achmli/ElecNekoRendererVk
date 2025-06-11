@@ -1,6 +1,9 @@
 #include "Camera.h"
 
 #include "Math/LCP.h"
+#include <cmath>
+#include "Math/Matrix.h"
+#include "Math/Vector.h"
 
 #include <cassert>
 
@@ -86,20 +89,16 @@ namespace ElecNeko
         return *this;
     }
 
-    void Camera::Initialize(const Vec3 &eye, const Vec3 &lookAt, const float _fov, const float _aspect, const float near, const float far)
+    void Camera::Initialize(const Vec3& eye, const Vec3& lookAt, const float _fov, const float _aspect, const float near, const float far)
     {
         position = eye;
         pivot = lookAt;
         worldUp = (0, 1, 0);
 
-        /*Vec3 dir = (pivot - position).Normalize();
-        pitch = Degrees(asin(dir.y));
-        yaw = Degrees(atan2f(dir.z, dir.x));*/
-
-        forward = (lookAt - position).Normalize();
+        forward = (lookAt - eye).Normalize();
 
         yaw = Degrees(asin(forward.z));
-        pitch = Degrees(atanf(forward.y / forward.x));
+        pitch = Degrees(atan2f(forward.y, forward.x));
 
         radius = (eye - lookAt).GetMagnitude();
 
@@ -116,10 +115,12 @@ namespace ElecNeko
 
     void Camera::OffsetOrientation(const float dx, const float dy)
     { 
-        yaw -= dx;
+        // yaw -= dx;
+
+        yaw = fmod(yaw + dx, 360.f);
         pitch -= dy;
 
-        pitch=std::clamp(pitch, -89.f, 89.f);
+        pitch=std::clamp(pitch, -89.9f, 89.9f);
 
         UpdateCamera();
     }
@@ -141,11 +142,11 @@ namespace ElecNeko
         float yawRad = Radians(yaw);
         float pitchRad = Radians(pitch);
 
-        forward = Vec3(cos(pitchRad) * cos(yawRad), cos(pitchRad) * sin(yawRad), sin(pitchRad)).Normalize();
-        right = forward.Cross(Vec3(0, 0, 1)).Normalize();
-        up = right.Cross(forward).Normalize();
+        // Vec3 lookat = forward + position;
 
-        // position = pivot + (forward * -1.f) * radius;
+        forward = Vec3(cos(pitchRad) * cos(yawRad), sin(pitchRad), cos(pitchRad) * sin(yawRad)).Normalize();
+        right = forward.Cross(Vec3(0, 1, 0)).Normalize();
+        up = right.Cross(forward).Normalize();
     }
 
     Mat4 Camera::ComputeViewMatrix()
@@ -165,5 +166,67 @@ namespace ElecNeko
         matProj.PerspectiveVulkan(fov, aspect, zNear, zFar);
         
         return matProj.Transpose();
+    }
+
+    void OrthoCamera::Initialize(const Vec3& eye, const Vec3& lookAt, const float _width, const float _height, const float near, const float far)
+    {
+        position = eye;
+
+        forward = (lookAt - eye).Normalize();
+
+        zNear = near;
+        zFar = far;
+
+        yaw = asin(forward.z);
+        pitch = atan2f(forward.y, forward.x);
+
+        zNear = near;
+        zFar = far;
+
+        width = _width;
+        height = _height;
+
+        // forward = Vec3(cos(pitch) * cos(yaw), sin(pitch), cos(pitch) * sin(yaw)).Normalize();
+        right = forward.Cross(Vec3(0, 1, 0)).Normalize();
+        up = right.Cross(forward).Normalize();
+    }
+
+    Mat4 OrthoCamera::ComputeViewMatrix()
+    {
+        Mat4 matView;
+
+        matView.LookAt(position, position + forward, up);
+
+        return matView.Transpose();
+    }
+
+    Mat4 OrthoCamera::ComputeProjctionMatrix()
+    { 
+        float halfWidth = 60.f;
+
+        Mat4 matProj;
+
+        matProj.OrthoVulkan(-halfWidth, halfWidth, -halfWidth, halfWidth, zNear, zFar);
+
+        return matProj.Transpose();
+    }
+
+    void OrthoCamera::UpdateCamera()
+    {
+        forward = Vec3(cos(pitch) * cos(yaw), sin(pitch), cos(pitch) * sin(yaw)).Normalize();
+        right = forward.Cross(Vec3(0, 1, 0)).Normalize();
+        up = right.Cross(forward).Normalize();
+    }
+
+    void OrthoCamera::OffsetOrientation(const float dx, const float dy)
+    {
+        // yaw -= dx;
+
+        yaw = fmod(yaw + dx, 360.f);
+        pitch -= dy;
+
+        pitch = std::clamp(pitch, -89.9f, 89.9f);
+
+        UpdateCamera();
     }
 }

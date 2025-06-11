@@ -229,3 +229,141 @@ void Image::TransitionLayout( VkCommandBuffer cmdBuffer, VkImageLayout newLayout
 
 	m_vkImageLayout = newLayout;
 }
+
+namespace ElecNeko
+{
+	bool CubeImage::Create(DeviceContext* device, const int width, const int height)
+	{ 
+		// Create Image
+        VkImageCreateInfo imageCI{};
+        imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageCI.imageType = VK_IMAGE_TYPE_2D;
+        imageCI.format = VK_FORMAT_R8G8B8A8_UNORM;
+        imageCI.extent.width = width;
+        imageCI.extent.height = height;
+        imageCI.extent.depth = 1;
+        imageCI.mipLevels = 1;
+        imageCI.arrayLayers = 6;
+        imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageCI.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        imageCI.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+        imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+		if (vkCreateImage(device->m_vkDevice, &imageCI, nullptr, &m_vkImage) != VK_SUCCESS)
+		{
+            printf("ERROR: Failed to Create Cube Image! \n");
+            assert(0);
+            return false;
+		}
+
+		//	Allocate memory on the GPU and attach it to the 
+		VkMemoryAllocateInfo memAlloc = {};
+        memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        VkMemoryRequirements memReqs;
+        vkGetImageMemoryRequirements(device->m_vkDevice, m_vkImage, &memReqs);
+        memAlloc.allocationSize = memReqs.size;
+        memAlloc.memoryTypeIndex = device->FindMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        if (vkAllocateMemory(device->m_vkDevice, &memAlloc, nullptr, &m_vkDeviceMemory) != VK_SUCCESS)
+        {
+            printf("ERROR: Failed to allocate memory\n");
+            assert(0);
+            return false;
+        }
+
+        if (vkBindImageMemory(device->m_vkDevice, m_vkImage, m_vkDeviceMemory, 0) != VK_SUCCESS)
+        {
+            printf("ERROR: Failed to bind image memory\n");
+            assert(0);
+            return false;
+        }
+
+		// Create Image View
+        VkImageViewCreateInfo viewCI{};
+        viewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewCI.image = m_vkImage;
+        viewCI.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+        viewCI.format = imageCI.format;
+        viewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewCI.subresourceRange.baseMipLevel = 0;
+        viewCI.subresourceRange.levelCount = 1;
+        viewCI.subresourceRange.baseArrayLayer = 0;
+        viewCI.subresourceRange.layerCount = 6;
+
+		if (vkCreateImageView(device->m_vkDevice, &viewCI, nullptr, &m_vkImageView) != VK_SUCCESS)
+		{
+            printf("ERROR: Failed to Create Cube Image View! \n");
+            assert(0);
+            return false;
+		}
+
+		return true;
+	}
+
+	void CubeImage::Cleanup(DeviceContext *device)
+    {
+        vkDestroyImageView(device->m_vkDevice, m_vkImageView, nullptr);
+        vkDestroyImage(device->m_vkDevice, m_vkImage, nullptr);
+        vkFreeMemory(device->m_vkDevice, m_vkDeviceMemory, nullptr);
+    }
+
+	void CubeImage::TransitionLayout(DeviceContext* device) 
+	{ 
+		VkCommandBuffer cmdBuffer = device->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+
+		VkImageMemoryBarrier barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = m_vkImage;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 6;
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+        vkCmdPipelineBarrier(cmdBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        device->FlushCommandBuffer(cmdBuffer, device->m_vkGraphicsQueue);
+
+        m_vkImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	}
+
+	void CubeImage::TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout)
+    {
+        if (m_vkImageLayout == newLayout)
+        {
+            return;
+        }
+
+        VkImageMemoryBarrier barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = m_vkImageLayout;
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = m_vkImage;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 6;
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+        vkCmdPipelineBarrier(cmdBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        m_vkImageLayout = newLayout;
+    }
+}

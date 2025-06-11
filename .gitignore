@@ -12,3 +12,7 @@ cmake-build-release/*
 build/*
 .idea/*
 res/models/rungholt/*
+res/CubeMaps/CornellBox/*
+res/CubeMaps/GraceCathedral/*
+res/CubeMaps/Indoor/*
+res/CubeMaps/Skybox/*.txt

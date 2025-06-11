@@ -95,7 +95,10 @@ void Application::Initialize()
 
     
 
-    m_camera.Initialize(Vec3(-75.f, 97.f, 53.f), Vec3(.75f, -.6f, -.2f), 45.f, static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(WINDOW_WIDTH), .1f, 1000.f);
+    m_camera.Initialize(Vec3(75.f, 75.f, 75.f), Vec3(32.5f, -6.6f, -49.3f), 80.f, static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(WINDOW_WIDTH), .1f, 1000.f);
+    m_shadowCamera.Initialize(Vec3(92.5f, 50.6f, 40.7f), Vec3(32.5f, 26.6f, -49.3f), static_cast<float>(WINDOW_WIDTH), static_cast<float>(WINDOW_HEIGHT), 25, 175);
+
+    m_skyBox.LoadFromFile(&m_deviceContext, "Skybox");
 
     /*m_models.reserve(m_scene->m_bodies.size());
     for (int i = 0; i < m_scene->m_bodies.size(); i++)
@@ -447,6 +450,8 @@ void Application::Cleanup()
     }
     m_models.clear();*/
 
+    m_skyBox.Cleanup(&m_deviceContext);
+
     for (auto& mesh : m_meshes)
     {
         mesh->Cleanup(&m_deviceContext);
@@ -530,6 +535,11 @@ void Application::OnMouseMoved(GLFWwindow *window, double x, double y)
     Application *application = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
     if (application->m_isMouseDown)
         application->MouseMoved((float) x, (float) y);
+
+    if (application->m_isRightButtonDown)
+    {
+        application->LeftMouseMoved((float) x, (float) y);
+    }
 }
 
 /*
@@ -544,6 +554,15 @@ void Application::MouseMoved(float x, float y)
     m_mousePosition = newPosition;
 
     m_camera.OffsetOrientation(ds.x, ds.y);
+}
+
+void Application::LeftMouseMoved(float x, float y)
+{
+    Vec2 newPosition = Vec2(x, y);
+    Vec2 ds = newPosition - m_mousePosition;
+    m_mousePosition = newPosition;
+
+    m_shadowCamera.OffsetOrientation(ds.x, ds.y);
 }
 
 void Application::MouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
@@ -562,6 +581,22 @@ void Application::MouseButtonCallback(GLFWwindow *window, int button, int action
         else if (action == GLFW_RELEASE)
         {
             application->m_isMouseDown = false;
+        }
+    }
+
+    if (button == GLFW_MOUSE_BUTTON_RIGHT)
+    {
+        if (action == GLFW_PRESS)
+        {
+            application->m_isRightButtonDown = true;
+
+            double x, y;
+            glfwGetCursorPos(window, &x, &y);
+            application->m_mousePosition = Vec2(static_cast<float>(x), static_cast<float>(y));
+        }
+        else if (action == GLFW_RELEASE)
+        {
+            application->m_isRightButtonDown = false;
         }
     }
 }
@@ -739,7 +774,7 @@ void Application::UpdateUniforms()
     {
         Mat4 matView;
         Mat4 matProj;
-        Mat4 pad0;
+        Mat4 viewNoTrans;
         Mat4 pad1;
     };
     camera_t camera;
@@ -757,6 +792,12 @@ void Application::UpdateUniforms()
             camera.matProj = m_camera.ComputeProjectionMatrix();
             camera.matView = m_camera.ComputeViewMatrix();
 
+            camera.viewNoTrans = camera.matView;
+            camera.viewNoTrans.rows[0].w = 0.0f;
+            camera.viewNoTrans.rows[1].w = 0.0f;
+            camera.viewNoTrans.rows[2].w = 0.0f;
+            camera.viewNoTrans.rows[3] = Vec4(0, 0, 0, 1);
+
             // Update the uniform buffer for the camera matrices
             memcpy(mappedData + uboByteOffset, &camera, sizeof(camera));
 
@@ -770,29 +811,8 @@ void Application::UpdateUniforms()
         // Update the uniform buffer with the shadow camera information
         //
         {
-            Vec3 camPos = Vec3(1, 1, 1) * 75.0f;
-            Vec3 camLookAt = Vec3(0, 0, 0);
-            Vec3 camUp = Vec3(0, 0, 1);
-            Vec3 tmp = camPos.Cross(camUp);
-            camUp = tmp.Cross(camPos);
-            camUp.Normalize();
-
-            extern FrameBuffer g_shadowFrameBuffer;
-            const int windowWidth = g_shadowFrameBuffer.m_parms.width;
-            const int windowHeight = g_shadowFrameBuffer.m_parms.height;
-
-            const float halfWidth = 60.0f;
-            const float xmin = -halfWidth;
-            const float xmax = halfWidth;
-            const float ymin = -halfWidth;
-            const float ymax = halfWidth;
-            const float zNear = 25.0f;
-            const float zFar = 175.0f;
-            camera.matProj.OrthoVulkan(xmin, xmax, ymin, ymax, zNear, zFar);
-            camera.matProj = camera.matProj.Transpose();
-
-            camera.matView.LookAt(camPos, camLookAt, camUp);
-            camera.matView = camera.matView.Transpose();
+            camera.matView = m_shadowCamera.ComputeViewMatrix();
+            camera.matProj = m_shadowCamera.ComputeProjctionMatrix();
 
             // Update the uniform buffer for the camera matrices
             memcpy(mappedData + uboByteOffset, &camera, sizeof(camera));
@@ -870,7 +890,7 @@ void Application::DrawFrame()
 
     // Draw everything in an offscreen buffer
     //DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
-    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_meshes);
+    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes);
     //
     //	Draw the offscreen framebuffer to the swap chain frame buffer
     //
@@ -899,6 +919,7 @@ void Application::DrawFrame()
         ImGui::Text(m_deviceContext.m_physicalDevices[m_deviceContext.m_deviceIndex].m_vkDeviceProperties.deviceName);
         ImGui::Text("FPS: %.1f", fps);
         ImGui::End();
+
 
         ImGui::Render();
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuffer);

@@ -22,6 +22,7 @@
 #include "Loader/Mesh.h"
 
 #include "Scene/Camera.h"
+#include "Scene/SkyBox.h"
 
 /*
 ====================================================
@@ -57,6 +58,8 @@ private:
     void ResizeWindow(int windowWidth, int windowHeight);
 
     void MouseMoved(float x, float y);
+
+    void LeftMouseMoved(float x, float y);
 
     void MouseScrolled(float z);
 
@@ -96,8 +99,10 @@ private:
     std::vector<Model *> m_models; // models for the bodies
 
     std::vector<ElecNeko::Mesh *> m_meshes;
+    ElecNeko::SkyBox m_skyBox;
 
     ElecNeko::Camera m_camera;
+    ElecNeko::OrthoCamera m_shadowCamera;
     // ElecNeko::Camera m_shadowCam;
 
     //
@@ -113,6 +118,7 @@ private:
     bool m_isPaused;
     bool m_stepFrame;
     bool m_isMouseDown = false;
+    bool m_isRightButtonDown = false;
 
     float m_cameraMoveSpeed = 5.0f;
     float m_mouseSensitivity = 0.1f;
@@ -123,6 +129,8 @@ private:
     static const int WINDOW_HEIGHT = 1440;
 
     static const bool m_enableLayers = true;
+
+    
 };
 
 extern Application *g_application;

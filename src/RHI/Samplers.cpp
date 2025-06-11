@@ -8,6 +8,7 @@
 VkSampler Samplers::m_samplerStandard;
 VkSampler Samplers::m_samplerDepth;
 VkSampler ElecNeko::ElecNekoSampler::m_samplerTexture;
+VkSampler ElecNeko::ElecNekoSampler::m_samplerCubemap;
 
 /*
 ====================================================
@@ -83,6 +84,7 @@ namespace ElecNeko
 	bool ElecNekoSampler::InitializeSampler(DeviceContext* device)
 	{
         VkSamplerCreateInfo samplerInfo = {};
+        memset(&samplerInfo, 0, sizeof(samplerInfo));
 		samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
         samplerInfo.minFilter = VK_FILTER_LINEAR;
@@ -103,10 +105,37 @@ namespace ElecNeko
             assert(0);
             return false;
 		}
+
+		memset(&samplerInfo, 0, sizeof(samplerInfo));
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+        samplerInfo.mipLodBias = 0.0f;
+
+		if (vkCreateSampler(device->m_vkDevice, &samplerInfo, nullptr, &m_samplerCubemap))
+        {
+            printf("failed to create m_samplerCubemap!\n");
+            assert(0);
+            return false;
+        }
+
+		return true;
 	}
 
 	void ElecNekoSampler::Cleanup(DeviceContext* device) 
 	{
 		vkDestroySampler(device->m_vkDevice, m_samplerTexture, nullptr);
+        vkDestroySampler(device->m_vkDevice, m_samplerCubemap, nullptr);
 	}
 }

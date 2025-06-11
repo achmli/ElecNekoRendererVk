@@ -16,6 +16,7 @@ void DrawOffscreen( DeviceContext * device, int cmdBufferIndex, Buffer * uniform
 namespace ElecNeko
 {
     class Mesh;
+    class SkyBox;
 
-    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, std::vector<Mesh*> mesh);
+    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox& skyBox, std::vector<Mesh*> mesh);
 }

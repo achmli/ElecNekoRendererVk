@@ -35,3 +35,25 @@ public:
 
 	VkImageLayout	m_vkImageLayout;
 };
+
+namespace ElecNeko
+{
+	class CubeImage
+	{
+    public:
+        CubeImage() = default;
+        ~CubeImage() = default;
+
+		bool Create(DeviceContext *device, const int width, const int height);
+        void Cleanup(DeviceContext *device);
+        void TransitionLayout(DeviceContext* device);
+        void TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
+
+    public:
+        VkImage m_vkImage;
+        VkImageView m_vkImageView;
+        VkDeviceMemory m_vkDeviceMemory;
+
+		VkImageLayout m_vkImageLayout;
+	};
+}

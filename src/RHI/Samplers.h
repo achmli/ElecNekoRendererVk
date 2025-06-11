@@ -28,5 +28,6 @@ namespace ElecNeko
         static void Cleanup(DeviceContext *device);
 
 		static VkSampler m_samplerTexture;
+        static VkSampler m_samplerCubemap;
 	};
 }

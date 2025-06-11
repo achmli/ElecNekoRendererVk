@@ -20,7 +20,7 @@ namespace ElecNeko
         Camera(const Camera &other);
         Camera &operator=(const Camera &other);
 
-        void Initialize(const Vec3 &eye, const Vec3 &looKAt, const float _fov, const float _aspect, const float near, const float far);
+        void Initialize(const Vec3 &eye, const Vec3 &lookAt, const float _fov, const float _aspect, const float near, const float far);
 
         void OffsetOrientation(const float dx, const float dy);
         void Strafe(const float dx, const float dy);
@@ -52,4 +52,34 @@ namespace ElecNeko
         float pitch;
         float radius;
 	};
+
+    class OrthoCamera
+    {
+    public:
+        OrthoCamera() = default;
+
+        void Initialize(const Vec3 &eye, const Vec3 &lookAt, const float _width, const float _height, const float near, const float far);
+
+        Mat4 ComputeViewMatrix();
+        Mat4 ComputeProjctionMatrix();
+
+        void UpdateCamera();
+        void OffsetOrientation(const float dx, const float dy);
+
+    public:
+        Vec3 position;
+        Vec3 up;
+        Vec3 right;
+        Vec3 forward;
+
+        float zNear;
+        float zFar;
+
+        float width;
+        float height;
+
+    private:
+        float yaw;
+        float pitch;
+    };
 }
