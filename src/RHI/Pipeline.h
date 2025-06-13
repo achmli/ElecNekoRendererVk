@@ -11,6 +11,11 @@ class FrameBuffer;
 class Descriptors;
 class Shader;
 
+namespace ElecNeko
+{
+    class GFrameBuffer;
+}
+
 /*
 ====================================================
 Pipeline
@@ -28,6 +33,28 @@ public:
 		CULL_MODE_BACK,
 		CULL_MODE_NONE
 	};
+
+    struct ElecNekoCreateParms_t
+    {
+        ElecNekoCreateParms_t() {
+            memset( this, 0, sizeof( ElecNekoCreateParms_t ) );
+        }
+        VkRenderPass renderPass;
+        ElecNeko::GFrameBuffer * framebuffer;
+        Descriptors * descriptors;
+        Shader * shader;
+
+        int width;
+        int height;
+
+        CullMode_t cullMode;
+
+        bool depthTest;
+        bool depthWrite;
+
+        int pushConstantSize;
+        VkShaderStageFlagBits pushConstantShaderStages;
+    };
 
 	struct CreateParms_t {
 		CreateParms_t() {
