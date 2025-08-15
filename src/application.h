@@ -24,6 +24,8 @@
 #include "Scene/Camera.h"
 #include "Scene/SkyBox.h"
 
+#include "RenderOption.h"
+
 /*
 ====================================================
 Application
@@ -104,6 +106,8 @@ private:
     ElecNeko::Camera m_camera;
     ElecNeko::OrthoCamera m_shadowCamera;
     // ElecNeko::Camera m_shadowCam;
+
+    ElecNeko::RenderOption renderOption;
 
     //
     //	Pipeline for copying the offscreen framebuffer to the swapchain

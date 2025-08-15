@@ -7,6 +7,7 @@
 class DeviceContext;
 class Buffer;
 struct RenderModel;
+struct RenderOption;
 
 bool InitOffscreen( DeviceContext * device, int width, int height );
 bool CleanupOffscreen( DeviceContext * device );
@@ -18,5 +19,10 @@ namespace ElecNeko
     class Mesh;
     class SkyBox;
 
-    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox& skyBox, std::vector<Mesh*> mesh);
+    bool InitOffscreen(DeviceContext *device, const RenderOption &renderOption, int width, int height);
+    bool CleanupOffscreen(DeviceContext *device, const RenderOption &renderOption);
+
+    bool ReinitializeSky(DeviceContext *device, const RenderOption &renderOption);
+
+    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, std::vector<Mesh *> mesh, const RenderOption &renderOption);
 }

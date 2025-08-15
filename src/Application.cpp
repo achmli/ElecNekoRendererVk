@@ -275,7 +275,7 @@ bool Application::InitializeVulkan()
     //
     //	Offscreen rendering
     //
-    InitOffscreen(&m_deviceContext, m_deviceContext.m_swapChain.m_windowWidth,
+    ElecNeko::InitOffscreen(&m_deviceContext, renderOption, m_deviceContext.m_swapChain.m_windowWidth,
                   m_deviceContext.m_swapChain.m_windowHeight);
 
     //
@@ -424,7 +424,7 @@ Application::Cleanup
 */
 void Application::Cleanup()
 {
-    CleanupOffscreen(&m_deviceContext);
+    ElecNeko::CleanupOffscreen(&m_deviceContext, renderOption);
 
     m_copyShader.Cleanup(&m_deviceContext);
     m_copyDescriptors.Cleanup(&m_deviceContext);
@@ -706,6 +706,16 @@ void Application::MainLoop()
         // Get User Input
         glfwPollEvents();
 
+        int currentWidth = 0, currentHeight = 0;
+        glfwGetFramebufferSize(m_glfwWindow, &currentWidth, &currentHeight);
+
+        if (currentWidth == 0 || currentHeight == 0)
+        {
+            // stop rendering when window minimalized
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+
         // If the time is greater than 33ms (30fps)
         // then force the time difference to smaller
         // to prevent super large simulation steps.
@@ -890,7 +900,7 @@ void Application::DrawFrame()
 
     // Draw everything in an offscreen buffer
     //DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
-    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes);
+    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes, renderOption);
     //
     //	Draw the offscreen framebuffer to the swap chain frame buffer
     //
@@ -918,6 +928,14 @@ void Application::DrawFrame()
         ImGui::Begin("Settings");
         ImGui::Text(m_deviceContext.m_physicalDevices[m_deviceContext.m_deviceIndex].m_vkDeviceProperties.deviceName);
         ImGui::Text("FPS: %.1f", fps);
+
+        if (ImGui::CollapsingHeader("Sky"))
+        {
+            if (ImGui::Checkbox("SkyBox", &renderOption.skyBox))
+            {
+                ElecNeko::ReinitializeSky(&m_deviceContext, renderOption);
+            }
+        }
         ImGui::End();
 
 

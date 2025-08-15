@@ -5,6 +5,7 @@
 #include "model.h"
 #include "Samplers.h"
 #include "Loader/Mesh.h"
+#include "RenderOption.h"
 
 #include "../application.h"
 #include <assert.h>
@@ -400,7 +401,344 @@ void DrawOffscreen( DeviceContext * device, int cmdBufferIndex, Buffer * uniform
 
 namespace ElecNeko
 {
-	void DrawOffscreen(DeviceContext* device, int cmdBufferIndex, Buffer* uniforms, SkyBox& skyBox, std::vector<Mesh*> mesh)
+    bool InitOffscreen(DeviceContext *device, const RenderOption& renderOption,int width, int height)
+    {
+        bool result;
+
+        //
+        //	Build the frame buffer to render into
+        //
+        {
+            FrameBuffer::CreateParms_t frameBufferParms;
+            frameBufferParms.width = width;
+            frameBufferParms.height = height;
+            frameBufferParms.hasColor = true;
+            frameBufferParms.hasDepth = true;
+            result = g_offscreenFrameBuffer.Create(device, frameBufferParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to create off screen buffer\n");
+                assert(0);
+                return false;
+            }
+        }
+
+        //
+        //	Shadow
+        //
+        {
+            FrameBuffer::CreateParms_t frameBufferParms;
+            frameBufferParms.width = 4096;
+            frameBufferParms.height = 4096;
+            frameBufferParms.hasColor = false;
+            frameBufferParms.hasDepth = true;
+            result = g_shadowFrameBuffer.Create(device, frameBufferParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to create off screen buffer\n");
+                assert(0);
+                return false;
+            }
+
+            result = g_shadowShader.Load(device, "shadow2");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 2;
+            result = g_shadowDescriptors.Create(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_shadowFrameBuffer;
+            pipelineParms.descriptors = &g_shadowDescriptors;
+            pipelineParms.shader = &g_shadowShader;
+            pipelineParms.width = frameBufferParms.width;
+            pipelineParms.height = frameBufferParms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.depthTest = true;
+            pipelineParms.depthWrite = true;
+            result = g_shadowPipeline.CreateForMesh(device, pipelineParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+        }
+
+        //
+        //	Sky
+        //
+        if (!renderOption.skyBox)
+        {
+            result = g_skyShader.Load(device, "sky");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 1;
+            result = g_skyDescriptors.Create(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+            pipelineParms.descriptors = &g_skyDescriptors;
+            pipelineParms.shader = &g_skyShader;
+            pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+            pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.depthTest = false;
+            pipelineParms.depthWrite = false;
+            result = g_skyPipeline.Create(device, pipelineParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+
+            ShapeSphere sphereShape(1.0f);
+            g_skyModel.BuildFromShape(&sphereShape);
+            g_skyModel.MakeVBO(device);
+        }
+        else
+        {
+            result = g_newSkyShader.Load(device, "newSky");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 1;
+            descriptorParms.numUniformsFragment = 1;
+            descriptorParms.numImageSamplers = 1;
+            result = g_newSkyDescriptors.Create(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+            pipelineParms.descriptors = &g_newSkyDescriptors;
+            pipelineParms.shader = &g_newSkyShader;
+            pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+            pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.depthTest = false;
+            pipelineParms.depthWrite = false;
+            result = g_newSkyPipeline.CreateForSkyBox(device, pipelineParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+        }
+
+        {
+            result = g_meshShadowShader.Load(device, "meshShadowed");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 4;
+            descriptorParms.numUniformsFragment = 2;
+            descriptorParms.numImageSamplers = 2;
+            result = g_meshShadowDescriptors.Create(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+            pipelineParms.descriptors = &g_meshShadowDescriptors;
+            pipelineParms.shader = &g_meshShadowShader;
+            pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+            pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
+            pipelineParms.depthTest = true;
+            pipelineParms.depthWrite = true;
+
+            result = g_meshShadowPipeline.CreateForMesh(device, pipelineParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool CleanupOffscreen(DeviceContext *device, const RenderOption& renderOption)
+    {
+        if (!renderOption.skyBox)
+        {
+            g_skyPipeline.Cleanup(device);
+            g_skyDescriptors.Cleanup(device);
+            g_skyShader.Cleanup(device);
+            g_skyModel.Cleanup(*device);
+        }
+        else
+        {
+            g_newSkyPipeline.Cleanup(device);
+            g_newSkyDescriptors.Cleanup(device);
+            g_newSkyShader.Cleanup(device);
+        }
+
+        g_offscreenFrameBuffer.Cleanup(device);
+
+        g_meshShadowPipeline.Cleanup(device);
+        g_meshShadowShader.Cleanup(device);
+        g_meshShadowDescriptors.Cleanup(device);
+
+        g_shadowPipeline.Cleanup(device);
+        g_shadowShader.Cleanup(device);
+        g_shadowDescriptors.Cleanup(device);
+        g_shadowFrameBuffer.Cleanup(device);
+        return true;
+    }
+
+    bool ReinitializeSky(DeviceContext* device, const RenderOption& renderOption)
+    {
+        if (!renderOption.skyBox)
+        {
+            g_skyPipeline.Cleanup(device);
+            g_skyDescriptors.Cleanup(device);
+            g_skyShader.Cleanup(device);
+            g_skyModel.Cleanup(*device);
+        }
+        else
+        {
+            g_newSkyPipeline.Cleanup(device);
+            g_newSkyDescriptors.Cleanup(device);
+            g_newSkyShader.Cleanup(device);
+        }
+
+        bool result;
+
+        if (!renderOption.skyBox)
+        {
+            result = g_skyShader.Load(device, "sky");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 1;
+            result = g_skyDescriptors.Create(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+            pipelineParms.descriptors = &g_skyDescriptors;
+            pipelineParms.shader = &g_skyShader;
+            pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+            pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.depthTest = false;
+            pipelineParms.depthWrite = false;
+            result = g_skyPipeline.Create(device, pipelineParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+
+            ShapeSphere sphereShape(1.0f);
+            g_skyModel.BuildFromShape(&sphereShape);
+            g_skyModel.MakeVBO(device);
+        }
+        else
+        {
+            result = g_newSkyShader.Load(device, "newSky");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 1;
+            descriptorParms.numUniformsFragment = 1;
+            descriptorParms.numImageSamplers = 1;
+            result = g_newSkyDescriptors.Create(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+            pipelineParms.descriptors = &g_newSkyDescriptors;
+            pipelineParms.shader = &g_newSkyShader;
+            pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+            pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.depthTest = false;
+            pipelineParms.depthWrite = false;
+            result = g_newSkyPipeline.CreateForSkyBox(device, pipelineParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+        }
+    }
+
+	void DrawOffscreen(DeviceContext* device, int cmdBufferIndex, Buffer* uniforms, SkyBox& skyBox, std::vector<Mesh*> mesh, const RenderOption& renderOption)
 	{
         VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
 
@@ -442,7 +780,7 @@ namespace ElecNeko
             //
             //	Draw the sky
             //
-            if (false)
+            if (!renderOption.skyBox)
             {
                 // Binding the pipeline is effectively the "use shader" we had back in our opengl apps
                 g_skyPipeline.BindPipeline(cmdBuffer);
@@ -453,7 +791,7 @@ namespace ElecNeko
                 descriptor.BindDescriptor(device, cmdBuffer, &g_skyPipeline);
                 g_skyModel.DrawIndexed(cmdBuffer);
             }
-
+            else
 			{
                 g_newSkyPipeline.BindPipeline(cmdBuffer);
 
