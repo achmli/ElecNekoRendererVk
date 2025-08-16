@@ -415,6 +415,7 @@ void SwapChain::EndFrame( DeviceContext * device ) {
 	result = vkQueueSubmit( device->m_vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE );
 	if ( VK_SUCCESS != result ) {
 		printf( "ERROR: Failed to submit queue\n" );
+        printf("VkResult: %d\n", result);
 		assert( 0 );
 	}
 

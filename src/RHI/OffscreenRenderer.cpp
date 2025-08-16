@@ -636,6 +636,54 @@ namespace ElecNeko
         return true;
     }
 
+    bool ReinitializeModel(DeviceContext *device)
+    {
+        g_meshShadowPipeline.Cleanup(device);
+        g_meshShadowShader.Cleanup(device);
+        g_meshShadowDescriptors.Cleanup(device);
+
+        bool result;
+
+        result = g_meshShadowShader.Load(device, "meshShadowed");
+        if (!result)
+        {
+            printf("ERROR: Failed to load shader\n");
+            assert(0);
+            return false;
+        }
+
+        Descriptors::CreateParms_t descriptorParms;
+        memset(&descriptorParms, 0, sizeof(descriptorParms));
+        descriptorParms.numUniformsVertex = 4;
+        descriptorParms.numUniformsFragment = 2;
+        descriptorParms.numImageSamplers = 2;
+        result = g_meshShadowDescriptors.Create(device, descriptorParms);
+        if (!result)
+        {
+            printf("ERROR: Failed to build descriptors\n");
+            assert(0);
+            return false;
+        }
+
+        Pipeline::CreateParms_t pipelineParms;
+        pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+        pipelineParms.descriptors = &g_meshShadowDescriptors;
+        pipelineParms.shader = &g_meshShadowShader;
+        pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+        pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+        pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
+        pipelineParms.depthTest = true;
+        pipelineParms.depthWrite = true;
+
+        result = g_meshShadowPipeline.CreateForMesh(device, pipelineParms);
+        if (!result)
+        {
+            printf("ERROR: Failed to build pipeline\n");
+            assert(0);
+            return false;
+        }
+    }
+
     bool ReinitializeSky(DeviceContext* device, const RenderOption& renderOption)
     {
         if (!renderOption.skyBox)

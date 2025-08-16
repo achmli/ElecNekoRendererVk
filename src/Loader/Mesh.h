@@ -131,4 +131,26 @@ namespace ElecNeko
         Vec3 scale;
         bool isUBO;
     };
+
+    struct PendingMeshDeletion
+    {
+        Mesh *mesh;
+        uint64_t loopTime;
+        uint64_t currentLoop;
+
+        PendingMeshDeletion(Mesh *model, uint64_t loopTotal) : mesh(model), loopTime(loopTotal), currentLoop(0) {}
+
+        void DeferedCleanup(DeviceContext* device)
+        { 
+            if (currentLoop >= loopTime)
+            {
+                mesh->Cleanup(device);
+            }
+
+            else
+            {
+                currentLoop++;
+            }
+        }
+    };
 }

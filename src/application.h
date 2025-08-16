@@ -101,6 +101,8 @@ private:
     std::vector<Model *> m_models; // models for the bodies
 
     std::vector<ElecNeko::Mesh *> m_meshes;
+    std::vector<ElecNeko::PendingMeshDeletion> m_toDeleteMeshes;
+
     ElecNeko::SkyBox m_skyBox;
 
     ElecNeko::Camera m_camera;

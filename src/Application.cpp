@@ -29,6 +29,8 @@ static bool gIsInitialized(false);
 static unsigned __int64 gTicksPerSecond;
 static unsigned __int64 gStartTicks;
 
+int sampleSceneIdx = 0;
+
 /*
 ====================================
 GetTimeSeconds
@@ -123,6 +125,7 @@ void Application::Initialize()
         {
             meshPart.MakeVBO(&m_deviceContext);
         }*/
+
         ElecNeko::Mesh *mesh = new ElecNeko::Mesh();
         mesh->LoadFromFile(&m_deviceContext, "lost_empire");
         mesh->MakeUBO(&m_deviceContext);
@@ -762,6 +765,25 @@ void Application::MainLoop()
             printf("frame dt_ms: %.2f %.2f %.2f", avgTime * 0.001f, maxTime * 0.001f, dt_us * 0.001f);
         }
 
+        if (!m_toDeleteMeshes.empty())
+        {
+            int deletingNums = m_toDeleteMeshes.size();
+            for (int i = 0; i < deletingNums; i++)
+            {
+                m_toDeleteMeshes[i].DeferedCleanup(&m_deviceContext);
+
+                if (m_toDeleteMeshes[i].currentLoop >= m_toDeleteMeshes[i].loopTime)
+                {
+                    if (i < (deletingNums - 1))
+                    {
+                        std::swap(m_toDeleteMeshes[i], m_toDeleteMeshes[deletingNums - 1]);
+                    }
+
+                    m_toDeleteMeshes.pop_back();
+                }
+            }
+        }
+
         // Draw the Scene
         DrawFrame();
     }
@@ -928,6 +950,38 @@ void Application::DrawFrame()
         ImGui::Begin("Settings");
         ImGui::Text(m_deviceContext.m_physicalDevices[m_deviceContext.m_deviceIndex].m_vkDeviceProperties.deviceName);
         ImGui::Text("FPS: %.1f", fps);
+
+        std::vector<const char*> sceneNames = {"lost_empire", "rungholt", "sponza"};
+
+        std::string sceneName = sceneNames[sampleSceneIdx];
+
+        if (ImGui::Combo("Scene", &sampleSceneIdx, sceneNames.data(), sceneNames.size()))
+        {
+            if (!(sceneName == sceneNames[sampleSceneIdx]))
+            {
+                for (auto m_mesh: m_meshes)
+                {
+                    // m_mesh->Cleanup(&m_deviceContext);
+                    m_toDeleteMeshes.emplace_back(m_mesh, 100);
+                }
+                m_meshes.clear();
+
+                ElecNeko::Mesh *mesh = new ElecNeko::Mesh();
+                mesh->LoadFromFile(&m_deviceContext, sceneNames[sampleSceneIdx]);
+                if (sampleSceneIdx == 2)
+                {
+                    mesh->scale = Vec3(.05f, .05f, .05f);
+                }
+
+                mesh->MakeUBO(&m_deviceContext);
+                for (auto &meshPart: mesh->m_meshParts)
+                {
+                    meshPart.MakeVBO(&m_deviceContext);
+                }
+                
+                m_meshes.emplace_back(mesh);
+            }
+        }
 
         if (ImGui::CollapsingHeader("Sky"))
         {
