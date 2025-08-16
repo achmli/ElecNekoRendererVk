@@ -772,7 +772,7 @@ void Application::MainLoop()
             {
                 m_toDeleteMeshes[i].DeferedCleanup(&m_deviceContext);
 
-                if (m_toDeleteMeshes[i].currentLoop >= m_toDeleteMeshes[i].loopTime)
+                if (m_toDeleteMeshes[i].currentLoop > m_toDeleteMeshes[i].loopTime)
                 {
                     if (i < (deletingNums - 1))
                     {

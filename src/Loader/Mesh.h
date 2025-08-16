@@ -147,10 +147,7 @@ namespace ElecNeko
                 mesh->Cleanup(device);
             }
 
-            else
-            {
-                currentLoop++;
-            }
+            currentLoop++;
         }
     };
 }
