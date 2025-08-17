@@ -58,6 +58,7 @@ public:
 	CreateParms_t m_parms;
 
 	bool Create( DeviceContext * device, const CreateParms_t & parms );
+    bool ElecNekoCreate(DeviceContext *device, const CreateParms_t &parms);
 	void Cleanup( DeviceContext * device );
 
 	static const int MAX_DESCRIPTOR_SETS = 256;

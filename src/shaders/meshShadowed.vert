@@ -10,6 +10,14 @@ uniforms
 layout(binding = 0) uniform uboCamera {
     mat4 view;
     mat4 proj;
+    mat4 viewNoTrans;
+    mat4 invView;
+    mat4 invProj;
+    vec2 viewport;
+    vec2 _pad0;
+    vec3 sunDir;
+    float sunIntensity;
+    vec3 sunColor;
 } camera;
 layout(binding = 1) uniform uboModel {
     mat4 model;
@@ -44,7 +52,10 @@ layout(location = 1) out vec4 modelPos;
 layout(location = 2) out vec3 modelNormal;
 layout(location = 3) out vec4 shadowPos;
 layout(location = 4) out vec2 texCoord;
-layout(location =5) out ivec2 hasTexture;
+layout(location = 5) out ivec2 hasTexture;
+layout(location = 6) out vec2 viewPort;
+layout(location = 7) out vec3 sunDirenction;
+layout(location = 8) out vec3 sunAlbedo;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -56,12 +67,14 @@ main
     ==========================================
 */
 void main() {
-    vec3 normal = 2.0 * (inNormal.xyz - vec3(0.5));
+    // vec3 normal = 2.0 * (inNormal.xyz - vec3(0.5));
+    vec3 normal = normalize(inNormal);
     modelNormal = normal;
     modelPos = vec4(inPosition, 1.0);
 
     // Get the tangent space in world coordinates
-    worldNormal = model.model * vec4(normal.xyz, 0.0);
+    worldNormal = model.model * vec4(normal, 0.0);
+    // worldNormal = vec4(transpose(inverse(mat3(model.model))) * normal, 0.0);
 
     // Project coordinate to screen
     gl_Position = camera.proj * camera.view * model.model * vec4(inPosition, 1.0);
@@ -71,4 +84,8 @@ void main() {
 
     texCoord=inTexCoord;
     hasTexture=ivec2(hasTex.hasAlbedoMap, hasTex.hasNormalMap);
+
+    viewPort = camera.viewport;
+    sunDirenction = camera.sunDir;
+    sunAlbedo = camera.sunColor;
 }

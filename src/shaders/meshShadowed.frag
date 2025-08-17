@@ -20,6 +20,9 @@ layout(location = 2) in vec3 modelNormal;
 layout(location = 3) in vec4 shadowPos;
 layout(location = 4) in vec2 texCoord;
 layout(location = 5) flat in ivec2 hasTexture;
+layout(location = 6) in vec2 viewport;
+layout(location = 7) in vec3 sunDir;
+layout(location = 8) in vec3 sunColor;
 
 /*
     ==========================================
@@ -42,7 +45,10 @@ main
     ==========================================
 */
 void main() {
-    vec3 dirToLight = normalize(vec3(1, 1, 1));
+    vec3 dirToLight = normalize(sunDir);
+
+    vec3 N = normalize(worldNormal.xyz);
+    vec3 L = dirToLight;
 
     vec4 finalColor=texture(texAlbedo, texCoord);
 
@@ -57,11 +63,25 @@ void main() {
     //
     //  Shadow Mapping
     //
-    float shadowDepth = shadowPos.z / shadowPos.w;
-    vec2 shadowCoord = shadowPos.xy / shadowPos.w;
-    shadowCoord *= 0.5;
-    shadowCoord += vec2(0.5);
-    vec3 shadowSample = texture(texShadow, shadowCoord.xy).rgb;
+    // float shadowDepth = shadowPos.z / shadowPos.w;
+    // vec2 shadowCoord = shadowPos.xy / shadowPos.w;
+    // shadowCoord *= 0.5;
+    // shadowCoord += vec2(0.5);
+    vec4 sp = shadowPos;
+    vec3 proj = sp.xyz / sp.w;
+    vec2 shadowUV = proj.xy * 0.5 + vec2(0.5);
+    float shadowDepth = proj.z;
+
+    // if(shadowUV.x < 0.0 || shadowUV.x > 1.0 || shadowUV.y < 0.0 || shadowUV.y > 1.0 || shadowDepth < 0.0 || shadowDepth > 1.0) {
+    //     float ambient = 0.5;
+    //     float lambert = clamp(dot(N, L), 0.0, 1.0 - ambient);
+    //     float flux = lambert + ambient;
+    //     finalColor.rgb *= flux;
+    //     outColor = finalColor;
+    //     return;
+    // }
+
+    vec3 shadowSample = texture(texShadow, shadowUV.xy).rgb;
     float depthDifference = shadowDepth - shadowSample.r;   // positive if in shadow
     depthDifference = max(0.0, depthDifference) * 1000.0;
 
@@ -88,9 +108,9 @@ void main() {
     rotator[1][0] = -sin(angle);
     rotator[1][1] = cos(angle);
     for (int i = 0; i < 9; i++) {
-        vec2 uv = shadowCoord.xy + rotator * sampleArray[i] * ds;
+        vec2 uv = shadowUV.xy + rotator * sampleArray[i] * ds;
         vec3 shadowSample = texture(texShadow, uv).rgb;
-        if (shadowDepth > shadowSample.r) {
+        if (shadowDepth > (shadowSample.r + 0.005)) {
             shadowFactor += 1.0;    // in shadow
         }
         sampleCount += 1.0;
@@ -100,8 +120,30 @@ void main() {
     shadowFactor = 1.0 - shadowFactor;
 
     float ambient = 0.5;
-    float flux = clamp(dot(worldNormal.xyz, dirToLight.xyz), 0.0, 1.0 - ambient) * shadowFactor + ambient;
+    float flux = clamp(dot(N, L), 0.0, 1.0 - ambient) * shadowFactor + ambient;
+    //float flux = max(dot(N, L), 0.0) * shadowFactor + ambient;
     finalColor.rgb *= flux;
 
     outColor = finalColor;
+    // bool oob = (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0);
+
+    // // sample (guard oob)
+    // float sampledDepth = 0.0;
+    // if (!oob) sampledDepth = texture(texShadow, uv).r;
+
+    // // bias test
+    // float ndotl = clamp(dot(N, L), 0.0, 1.0);
+    // float bias = max(0.0005 * (1.0 - ndotl), 0.00005);
+
+    // // compute diff
+    // float diff = shadowDepth - sampledDepth; // positive -> fragment further than shadow map (occluded)
+    // bool occluded = (!oob) && (diff > bias);
+
+    // // Map to colors:
+    // // R = shadowDepth (0..1) -> red ramp
+    // // G = sampledDepth (0..1) -> green ramp
+    // // B = occluded?1:0 (blue marks occlusion)
+    // // A = oob ? 1 : 0 (alpha shows out-of-range)
+    // vec3 col = vec3(clamp(shadowDepth,0.0,1.0), clamp(sampledDepth,0.0,1.0), occluded ? 1.0 : 0.0);
+    // outColor = vec4(col, oob ? 1.0 : 0.0);
 }

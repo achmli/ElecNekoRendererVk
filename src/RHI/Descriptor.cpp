@@ -32,7 +32,7 @@ bool Descriptors::Create( DeviceContext * device, const CreateParms_t & parms ) 
 	//	Create the non-global pool
 	//
 	std::vector< VkDescriptorPoolSize > poolSizes;
-	const int numUniforms = parms.numUniformsFragment + parms.numUniformsVertex;
+    const int numUniforms = parms.numUniformsFragment + parms.numUniformsVertex;
 	if ( numUniforms > 0 ) {
 		VkDescriptorPoolSize poolSize;
 		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -233,4 +233,125 @@ void Descriptor::BindDescriptor( DeviceContext * device, VkCommandBuffer vkComma
 
 	vkUpdateDescriptorSets( device->m_vkDevice, (uint32_t)numDescriptors, descriptorWrites, 0, nullptr );
 	vkCmdBindDescriptorSets( vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pso->m_vkPipelineLayout, 0, 1, &m_parent->m_vkDescriptorSets[ m_id ], 0, nullptr );
+}
+
+
+bool Descriptors::ElecNekoCreate(DeviceContext *device, const CreateParms_t &parms)
+{
+    VkResult result;
+
+    m_parms = parms;
+
+    //
+    //	Create the non-global pool
+    //
+    std::vector<VkDescriptorPoolSize> poolSizes;
+    const int numUniforms = parms.numUniformsFragment + parms.numUniformsVertex + parms.numImageSamplers;
+    if (numUniforms - parms.numImageSamplers > 0)
+    {
+        VkDescriptorPoolSize poolSize;
+        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSize.descriptorCount = numUniforms * MAX_DESCRIPTOR_SETS;
+        poolSizes.push_back(poolSize);
+    }
+    if (parms.numImageSamplers > 0)
+    {
+        VkDescriptorPoolSize poolSize;
+        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSize.descriptorCount = parms.numImageSamplers * MAX_DESCRIPTOR_SETS;
+        poolSizes.push_back(poolSize);
+    }
+
+    VkDescriptorPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = (uint32_t) poolSizes.size();
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = MAX_DESCRIPTOR_SETS;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+
+    result = vkCreateDescriptorPool(device->m_vkDevice, &poolInfo, nullptr, &m_vkDescriptorPool);
+    if (VK_SUCCESS != result)
+    {
+        printf("ERROR: Failed to create descriptor pool\n");
+        assert(0);
+        return false;
+    }
+
+    //
+    // Create Descriptor Set Layout
+    //
+    VkDescriptorSetLayoutBinding *uniformBindings = (VkDescriptorSetLayoutBinding *) alloca(sizeof(VkDescriptorSetLayoutBinding) * (numUniforms));
+    memset(uniformBindings, 0, sizeof(VkDescriptorSetLayoutBinding) * numUniforms);
+
+    int idx = 0;
+
+    for (int i = 0; i < parms.numUniformsVertex; i++)
+    {
+        uniformBindings[idx].binding = idx;
+        uniformBindings[idx].descriptorCount = 1;
+        uniformBindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uniformBindings[idx].pImmutableSamplers = nullptr;
+        uniformBindings[idx].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        idx++;
+    }
+
+    for (int i = 0; i < parms.numUniformsFragment; i++)
+    {
+        uniformBindings[idx].binding = idx;
+        uniformBindings[idx].descriptorCount = 1;
+        uniformBindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uniformBindings[idx].pImmutableSamplers = nullptr;
+        uniformBindings[idx].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        idx++;
+    }
+
+	for (int i = 0; i < parms.numImageSamplers; i++)
+    {
+        uniformBindings[idx].binding = idx;
+        uniformBindings[idx].descriptorCount = 1;
+        uniformBindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        uniformBindings[idx].pImmutableSamplers = nullptr;
+        uniformBindings[idx].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        idx++;
+    }
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = numUniforms;
+    layoutInfo.pBindings = uniformBindings;
+
+    result = vkCreateDescriptorSetLayout(device->m_vkDevice, &layoutInfo, nullptr, &m_vkDescriptorSetLayout);
+    if (VK_SUCCESS != result)
+    {
+        printf("ERROR: Failed to create descriptor set layout\n");
+        assert(0);
+        return false;
+    }
+
+    //
+    //	Create Descriptor Sets
+    //
+    VkDescriptorSetLayout layouts[MAX_DESCRIPTOR_SETS];
+    for (int i = 0; i < MAX_DESCRIPTOR_SETS; i++)
+    {
+        layouts[i] = m_vkDescriptorSetLayout;
+    }
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_vkDescriptorPool;
+    allocInfo.descriptorSetCount = MAX_DESCRIPTOR_SETS;
+    allocInfo.pSetLayouts = layouts;
+
+    result = vkAllocateDescriptorSets(device->m_vkDevice, &allocInfo, m_vkDescriptorSets);
+    if (VK_SUCCESS != result)
+    {
+        printf("ERROR: Failed to allocate descriptor set\n");
+        assert(0);
+        return false;
+    }
+
+    return true;
 }

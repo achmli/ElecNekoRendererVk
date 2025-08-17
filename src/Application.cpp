@@ -536,12 +536,12 @@ Application::OnMouseMoved
 void Application::OnMouseMoved(GLFWwindow *window, double x, double y)
 {
     Application *application = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
-    if (application->m_isMouseDown)
-        application->MouseMoved((float) x, (float) y);
+    //if (application->m_isMouseDown)
+        //application->MouseMoved((float) x, (float) y);
 
     if (application->m_isRightButtonDown)
     {
-        application->LeftMouseMoved((float) x, (float) y);
+        application->MouseMoved((float) x, (float) y);
     }
 }
 
@@ -704,7 +704,7 @@ void Application::MainLoop()
         //     time = GetTimeMicroseconds();
         // }
         timeLastFrame = time;
-        printf("\ndt_ms: %.1f    ", dt_us * 0.001f);
+        //printf("\ndt_ms: %.1f    ", dt_us * 0.001f);
 
         // Get User Input
         glfwPollEvents();
@@ -807,9 +807,20 @@ void Application::UpdateUniforms()
         Mat4 matView;
         Mat4 matProj;
         Mat4 viewNoTrans;
-        Mat4 pad1;
+        Mat4 invView;
+        Mat4 invProj;
+        float viewPort[2];
+        float pad0[2];
+        float sunDir[3];
+        float sunIntensity;
+        float sunColor[3];
+        float sunAngularRadius;
+        float sunGlowSpread;
+        float exposure;
+        float pad1[2];
     };
     camera_t camera;
+    camera_t scamera;
 
     //
     //	Update the uniform buffers
@@ -830,6 +841,32 @@ void Application::UpdateUniforms()
             camera.viewNoTrans.rows[2].w = 0.0f;
             camera.viewNoTrans.rows[3] = Vec4(0, 0, 0, 1);
 
+            camera.invView = camera.matView.Inverse();
+            camera.invProj = camera.matProj.Inverse();
+
+            camera.viewPort[0] = WINDOW_WIDTH;
+            camera.viewPort[1] = WINDOW_HEIGHT;
+
+            camera.pad0[0] = 0.f;
+            camera.pad0[1] = 0.f;
+
+            camera.sunDir[0] = renderOption.sunDirection[0];
+            camera.sunDir[1] = renderOption.sunDirection[1];
+            camera.sunDir[2] = renderOption.sunDirection[2];
+
+            camera.sunIntensity = renderOption.sunIntensity;
+
+            camera.sunColor[0] = renderOption.sunColor[0];
+            camera.sunColor[1] = renderOption.sunColor[1];
+            camera.sunColor[2] = renderOption.sunColor[2];
+
+            camera.sunAngularRadius = ElecNeko::Radians(renderOption.sunAngularRadius);
+            camera.sunGlowSpread = renderOption.sunGlowSpread;
+            camera.exposure = renderOption.explosure;
+
+            camera.pad1[0] = 0.f;
+            camera.pad1[1] = 0.f;
+
             // Update the uniform buffer for the camera matrices
             memcpy(mappedData + uboByteOffset, &camera, sizeof(camera));
 
@@ -843,16 +880,50 @@ void Application::UpdateUniforms()
         // Update the uniform buffer with the shadow camera information
         //
         {
-            camera.matView = m_shadowCamera.ComputeViewMatrix();
-            camera.matProj = m_shadowCamera.ComputeProjctionMatrix();
+            m_shadowCamera.forward = Vec3(0 - renderOption.sunDirection[0] * 30, 0 - renderOption.sunDirection[1] * 30, 0 - renderOption.sunDirection[2] * 30);
+
+            scamera.matView = m_shadowCamera.ComputeViewMatrix();
+            scamera.matProj = m_shadowCamera.ComputeProjctionMatrix();
+
+            scamera.viewNoTrans = scamera.matView;
+            scamera.viewNoTrans.rows[0].w = 0.0f;
+            scamera.viewNoTrans.rows[1].w = 0.0f;
+            scamera.viewNoTrans.rows[2].w = 0.0f;
+            scamera.viewNoTrans.rows[3] = Vec4(0, 0, 0, 1);
+
+            scamera.invView = scamera.matView.Inverse();
+            scamera.invProj = scamera.matProj.Inverse();
+
+            scamera.viewPort[0] = 4096;
+            scamera.viewPort[1] = 4096;
+
+            scamera.pad0[0] = 0.f;
+            scamera.pad0[1] = 0.f;
+
+            scamera.sunDir[0] = renderOption.sunDirection[0];
+            scamera.sunDir[1] = renderOption.sunDirection[1];
+            scamera.sunDir[2] = renderOption.sunDirection[2];
+
+            scamera.sunIntensity = 0.f;
+
+            scamera.sunColor[0] = 0;
+            scamera.sunColor[1] = 0;
+            scamera.sunColor[2] = 0;
+
+            scamera.sunAngularRadius = 0;
+            scamera.sunGlowSpread = 0;
+            scamera.exposure = 0;
+
+            scamera.pad1[0] = 0.f;
+            scamera.pad1[1] = 0.f;
 
             // Update the uniform buffer for the camera matrices
-            memcpy(mappedData + uboByteOffset, &camera, sizeof(camera));
+            memcpy(mappedData + uboByteOffset, &scamera, sizeof(scamera));
 
             shadowByteOffset = uboByteOffset;
 
             // update offset into the buffer
-            uboByteOffset += m_deviceContext.GetAligendUniformByteOffset(sizeof(camera));
+            uboByteOffset += m_deviceContext.GetAligendUniformByteOffset(sizeof(scamera));
         }
 
         //
@@ -989,7 +1060,29 @@ void Application::DrawFrame()
             {
                 ElecNeko::ReinitializeSky(&m_deviceContext, renderOption);
             }
+
+            if (!renderOption.skyBox)
+            {
+                if (ImGui::Checkbox("SimpleRealSky", &renderOption.simpleRealSky))
+                {
+                    ElecNeko::ReinitializeSky(&m_deviceContext, renderOption);
+                }
+            }
         }
+
+        if (renderOption.simpleRealSky)
+        {
+            if (ImGui::CollapsingHeader("Sun Parameters"))
+            {
+                ImGui::ColorEdit3("SunColor", renderOption.sunColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+                ImGui::DragFloat3("SunDirection", renderOption.sunDirection, 0.01f, -1.f, 1.f);
+                ImGui::SliderFloat("SunIntensity", &renderOption.sunIntensity, 1.f, 20.f);
+                ImGui::SliderFloat("SunAngularRadius", &renderOption.sunAngularRadius, .28f, 1.14f);
+                ImGui::SliderFloat("SunGlowSpread", &renderOption.sunGlowSpread, 0.02f, 0.12f);
+                ImGui::SliderFloat("Explosure", &renderOption.explosure, 0.8f, 1.6f);
+            }
+        }
+
         ImGui::End();
 
 

@@ -401,6 +401,10 @@ void DrawOffscreen( DeviceContext * device, int cmdBufferIndex, Buffer * uniform
 
 namespace ElecNeko
 {
+    Pipeline g_simpleSkyPipeline;
+    Shader g_simpleSkyShader;
+    Descriptors g_simpleSkyDescriptors;
+
     bool InitOffscreen(DeviceContext *device, const RenderOption& renderOption,int width, int height)
     {
         bool result;
@@ -440,7 +444,7 @@ namespace ElecNeko
                 return false;
             }
 
-            result = g_shadowShader.Load(device, "shadow2");
+            result = g_shadowShader.Load(device, "shadowTest");
             if (!result)
             {
                 printf("ERROR: Failed to load shader\n");
@@ -450,8 +454,10 @@ namespace ElecNeko
 
             Descriptors::CreateParms_t descriptorParms;
             memset(&descriptorParms, 0, sizeof(descriptorParms));
-            descriptorParms.numUniformsVertex = 2;
-            result = g_shadowDescriptors.Create(device, descriptorParms);
+            descriptorParms.numUniformsVertex = 3;
+            descriptorParms.numUniformsFragment = 0;
+            descriptorParms.numImageSamplers = 1;
+            result = g_shadowDescriptors.ElecNekoCreate(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -480,7 +486,7 @@ namespace ElecNeko
         //
         //	Sky
         //
-        if (!renderOption.skyBox)
+        if (!renderOption.skyBox && !renderOption.simpleRealSky)
         {
             result = g_skyShader.Load(device, "sky");
             if (!result)
@@ -493,7 +499,7 @@ namespace ElecNeko
             Descriptors::CreateParms_t descriptorParms;
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 1;
-            result = g_skyDescriptors.Create(device, descriptorParms);
+            result = g_skyDescriptors.ElecNekoCreate(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -522,6 +528,48 @@ namespace ElecNeko
             g_skyModel.BuildFromShape(&sphereShape);
             g_skyModel.MakeVBO(device);
         }
+        else if (!renderOption.skyBox)
+        {
+            // maybe because of parameters is not right, so its not really real....
+            result = g_simpleSkyShader.Load(device, "SecondSky");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 0;
+            descriptorParms.numUniformsFragment = 1;
+            descriptorParms.numImageSamplers = 0;
+            result = g_simpleSkyDescriptors.ElecNekoCreate(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+            pipelineParms.descriptors = &g_simpleSkyDescriptors;
+            pipelineParms.shader = &g_simpleSkyShader;
+            pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+            pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.depthTest = false;
+            pipelineParms.depthWrite = false;
+            result = g_simpleSkyPipeline.CreateForSkyBox(device, pipelineParms);
+
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+        }
         else
         {
             result = g_newSkyShader.Load(device, "newSky");
@@ -537,7 +585,7 @@ namespace ElecNeko
             descriptorParms.numUniformsVertex = 1;
             descriptorParms.numUniformsFragment = 1;
             descriptorParms.numImageSamplers = 1;
-            result = g_newSkyDescriptors.Create(device, descriptorParms);
+            result = g_newSkyDescriptors.ElecNekoCreate(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -575,9 +623,9 @@ namespace ElecNeko
             Descriptors::CreateParms_t descriptorParms;
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 4;
-            descriptorParms.numUniformsFragment = 2;
+            descriptorParms.numUniformsFragment = 0;
             descriptorParms.numImageSamplers = 2;
-            result = g_meshShadowDescriptors.Create(device, descriptorParms);
+            result = g_meshShadowDescriptors.ElecNekoCreate(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -609,12 +657,18 @@ namespace ElecNeko
 
     bool CleanupOffscreen(DeviceContext *device, const RenderOption& renderOption)
     {
-        if (!renderOption.skyBox)
+        if (!renderOption.skyBox && !renderOption.simpleRealSky)
         {
             g_skyPipeline.Cleanup(device);
             g_skyDescriptors.Cleanup(device);
             g_skyShader.Cleanup(device);
             g_skyModel.Cleanup(*device);
+        }
+        else if (!renderOption.skyBox)
+        {
+            g_simpleSkyPipeline.Cleanup(device);
+            g_simpleSkyDescriptors.Cleanup(device);
+            g_simpleSkyShader.Cleanup(device);
         }
         else
         {
@@ -655,9 +709,9 @@ namespace ElecNeko
         Descriptors::CreateParms_t descriptorParms;
         memset(&descriptorParms, 0, sizeof(descriptorParms));
         descriptorParms.numUniformsVertex = 4;
-        descriptorParms.numUniformsFragment = 2;
+        descriptorParms.numUniformsFragment = 0;
         descriptorParms.numImageSamplers = 2;
-        result = g_meshShadowDescriptors.Create(device, descriptorParms);
+        result = g_meshShadowDescriptors.ElecNekoCreate(device, descriptorParms);
         if (!result)
         {
             printf("ERROR: Failed to build descriptors\n");
@@ -686,12 +740,18 @@ namespace ElecNeko
 
     bool ReinitializeSky(DeviceContext* device, const RenderOption& renderOption)
     {
-        if (!renderOption.skyBox)
+        if (!renderOption.skyBox && !renderOption.simpleRealSky)
         {
             g_skyPipeline.Cleanup(device);
             g_skyDescriptors.Cleanup(device);
             g_skyShader.Cleanup(device);
             g_skyModel.Cleanup(*device);
+        }
+        else if (!renderOption.skyBox)
+        {
+            g_simpleSkyPipeline.Cleanup(device);
+            g_simpleSkyDescriptors.Cleanup(device);
+            g_simpleSkyShader.Cleanup(device);
         }
         else
         {
@@ -702,7 +762,7 @@ namespace ElecNeko
 
         bool result;
 
-        if (!renderOption.skyBox)
+        if (!renderOption.skyBox && !renderOption.simpleRealSky)
         {
             result = g_skyShader.Load(device, "sky");
             if (!result)
@@ -715,7 +775,7 @@ namespace ElecNeko
             Descriptors::CreateParms_t descriptorParms;
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 1;
-            result = g_skyDescriptors.Create(device, descriptorParms);
+            result = g_skyDescriptors.ElecNekoCreate(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -744,6 +804,47 @@ namespace ElecNeko
             g_skyModel.BuildFromShape(&sphereShape);
             g_skyModel.MakeVBO(device);
         }
+        else if (!renderOption.skyBox)
+        {
+            result = g_simpleSkyShader.Load(device, "SecondSky");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 0;
+            descriptorParms.numUniformsFragment = 1;
+            descriptorParms.numImageSamplers = 0;
+            result = g_simpleSkyDescriptors.ElecNekoCreate(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+            pipelineParms.descriptors = &g_simpleSkyDescriptors;
+            pipelineParms.shader = &g_simpleSkyShader;
+            pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+            pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.depthTest = false;
+            pipelineParms.depthWrite = false;
+            result = g_simpleSkyPipeline.CreateForSkyBox(device, pipelineParms);
+
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+        }
         else
         {
             result = g_newSkyShader.Load(device, "newSky");
@@ -759,7 +860,7 @@ namespace ElecNeko
             descriptorParms.numUniformsVertex = 1;
             descriptorParms.numUniformsFragment = 1;
             descriptorParms.numImageSamplers = 1;
-            result = g_newSkyDescriptors.Create(device, descriptorParms);
+            result = g_newSkyDescriptors.ElecNekoCreate(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -791,7 +892,7 @@ namespace ElecNeko
         VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
 
         const int camOffset = 0;
-        const int camSize = sizeof(float) * 16 * 4;
+        const int camSize = sizeof(float) * 16 * 6;
 
         const int shadowCamOffset = device->GetAligendUniformByteOffset(camOffset + camSize);
         const int shadowCamSize = camSize;
@@ -812,6 +913,13 @@ namespace ElecNeko
                     Descriptor descriptor = g_shadowPipeline.GetFreeDescriptor();
                     descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
                     descriptor.BindBuffer(&mesh[i]->uniformBuffer, 0, mesh[i]->uniformBuffer.m_vkBufferSize, 1);
+                    descriptor.BindBuffer(&mesh[i]->m_meshParts[j].m_uniformBuffer, 0, mesh[i]->m_meshParts[j].m_uniformBuffer.m_vkBufferSize, 2);
+                    if (mesh[i]->m_meshParts[j].albTexIndex >= 0)
+                    {
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                             mesh[i]->albedoMaps[mesh[i]->m_meshParts[j].albTexIndex].m_image.m_vkImageView,
+                                             ElecNeko::ElecNekoSampler::m_samplerTexture, 0);
+                    }
                     descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipeline);
                     mesh[i]->m_meshParts[j].DrawIndexed(cmdBuffer);
 				}
@@ -828,7 +936,7 @@ namespace ElecNeko
             //
             //	Draw the sky
             //
-            if (!renderOption.skyBox)
+            if (!renderOption.skyBox && !renderOption.simpleRealSky)
             {
                 // Binding the pipeline is effectively the "use shader" we had back in our opengl apps
                 g_skyPipeline.BindPipeline(cmdBuffer);
@@ -838,6 +946,15 @@ namespace ElecNeko
                 descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
                 descriptor.BindDescriptor(device, cmdBuffer, &g_skyPipeline);
                 g_skyModel.DrawIndexed(cmdBuffer);
+            }
+            else if (!renderOption.skyBox)
+            {
+                g_simpleSkyPipeline.BindPipeline(cmdBuffer);
+
+                Descriptor descriptor = g_simpleSkyPipeline.GetFreeDescriptor();
+                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_simpleSkyPipeline);
+                vkCmdDraw(cmdBuffer, 3, 1, 0, 0);
             }
             else
 			{
