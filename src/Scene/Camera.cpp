@@ -218,6 +218,15 @@ namespace ElecNeko
         up = right.Cross(forward).Normalize();
     }
 
+    void OrthoCamera::UpdateCamera(const Vec3& lookAt, const Vec3& lightDir)
+    { 
+        position = lookAt + lightDir * 50;
+        forward = lookAt - position;
+        right = forward.Cross(Vec3(0, 1, 0)).Normalize();
+        up = right.Cross(forward).Normalize();
+        right = forward.Cross(up).Normalize();
+    }
+
     void OrthoCamera::OffsetOrientation(const float dx, const float dy)
     {
         // yaw -= dx;

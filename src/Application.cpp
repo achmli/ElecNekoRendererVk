@@ -98,7 +98,8 @@ void Application::Initialize()
     
 
     m_camera.Initialize(Vec3(75.f, 75.f, 75.f), Vec3(32.5f, -6.6f, -49.3f), 80.f, static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(WINDOW_WIDTH), .1f, 1000.f);
-    m_shadowCamera.Initialize(Vec3(92.5f, 50.6f, 40.7f), Vec3(32.5f, 26.6f, -49.3f), static_cast<float>(WINDOW_WIDTH), static_cast<float>(WINDOW_HEIGHT), 25, 175);
+    m_shadowCamera.Initialize(m_camera.position + Vec3(renderOption.sunDirection) * 30, m_camera.position, static_cast<float>(WINDOW_WIDTH),
+                              static_cast<float>(WINDOW_HEIGHT), 25, 175);
 
     m_skyBox.LoadFromFile(&m_deviceContext, "Skybox");
 
@@ -784,6 +785,8 @@ void Application::MainLoop()
             }
         }
 
+        m_shadowCamera.UpdateCamera(m_camera.position, renderOption.sunDirection);
+
         // Draw the Scene
         DrawFrame();
     }
@@ -801,6 +804,8 @@ void Application::UpdateUniforms()
     uint32_t uboByteOffset = 0;
     uint32_t cameraByteOFfset = 0;
     uint32_t shadowByteOffset = 0;
+    uint32_t lightParmsByteOffset = 0;
+    uint32_t skyParmsByteOffset = 0;
 
     struct camera_t
     {
@@ -809,18 +814,40 @@ void Application::UpdateUniforms()
         Mat4 viewNoTrans;
         Mat4 invView;
         Mat4 invProj;
+    };
+    camera_t camera;
+
+    struct lightParms_t
+    {
         float viewPort[2];
-        float pad0[2];
+        uint32_t tonemap;
+        uint32_t enableExplosure;
         float sunDir[3];
         float sunIntensity;
         float sunColor[3];
         float sunAngularRadius;
         float sunGlowSpread;
-        float exposure;
-        float pad1[2];
+        float explosure;
+        uint32_t aces;
+        uint32_t simpleAces;
     };
-    camera_t camera;
-    camera_t scamera;
+    lightParms_t lightParms;
+
+    struct skyParms_t
+    {
+        float skyColor[3];
+        float zenithBrightenA;
+        float horizonBrightenB;
+        float baseSkyBrightnessC;
+        float exponentialScatteringD;
+        float circumsolarGlowE;
+        float angularScatteringF;
+        float HG;
+        float HGParmH;
+        float horizonFalloffI;
+        float lm;
+        float pad0[3];
+    } skyParms;
 
     //
     //	Update the uniform buffers
@@ -844,29 +871,6 @@ void Application::UpdateUniforms()
             camera.invView = camera.matView.Inverse();
             camera.invProj = camera.matProj.Inverse();
 
-            camera.viewPort[0] = WINDOW_WIDTH;
-            camera.viewPort[1] = WINDOW_HEIGHT;
-
-            camera.pad0[0] = 0.f;
-            camera.pad0[1] = 0.f;
-
-            camera.sunDir[0] = renderOption.sunDirection[0];
-            camera.sunDir[1] = renderOption.sunDirection[1];
-            camera.sunDir[2] = renderOption.sunDirection[2];
-
-            camera.sunIntensity = renderOption.sunIntensity;
-
-            camera.sunColor[0] = renderOption.sunColor[0];
-            camera.sunColor[1] = renderOption.sunColor[1];
-            camera.sunColor[2] = renderOption.sunColor[2];
-
-            camera.sunAngularRadius = ElecNeko::Radians(renderOption.sunAngularRadius);
-            camera.sunGlowSpread = renderOption.sunGlowSpread;
-            camera.exposure = renderOption.explosure;
-
-            camera.pad1[0] = 0.f;
-            camera.pad1[1] = 0.f;
-
             // Update the uniform buffer for the camera matrices
             memcpy(mappedData + uboByteOffset, &camera, sizeof(camera));
 
@@ -880,50 +884,86 @@ void Application::UpdateUniforms()
         // Update the uniform buffer with the shadow camera information
         //
         {
-            m_shadowCamera.forward = Vec3(0 - renderOption.sunDirection[0] * 30, 0 - renderOption.sunDirection[1] * 30, 0 - renderOption.sunDirection[2] * 30);
+            /*m_shadowCamera.forward = Vec3(0 - renderOption.sunDirection[0] * 30, 0 - renderOption.sunDirection[1] * 30, 0 - renderOption.sunDirection[2] * 30);
+            m_shadowCamera.position = m_camera.position + Vec3(renderOption.sunDirection) * 30;*/
 
-            scamera.matView = m_shadowCamera.ComputeViewMatrix();
-            scamera.matProj = m_shadowCamera.ComputeProjctionMatrix();
+            camera.matView = m_shadowCamera.ComputeViewMatrix();
+            camera.matProj = m_shadowCamera.ComputeProjctionMatrix();
 
-            scamera.viewNoTrans = scamera.matView;
-            scamera.viewNoTrans.rows[0].w = 0.0f;
-            scamera.viewNoTrans.rows[1].w = 0.0f;
-            scamera.viewNoTrans.rows[2].w = 0.0f;
-            scamera.viewNoTrans.rows[3] = Vec4(0, 0, 0, 1);
+            camera.viewNoTrans = camera.matView;
+            camera.viewNoTrans.rows[0].w = 0.0f;
+            camera.viewNoTrans.rows[1].w = 0.0f;
+            camera.viewNoTrans.rows[2].w = 0.0f;
+            camera.viewNoTrans.rows[3] = Vec4(0, 0, 0, 1);
 
-            scamera.invView = scamera.matView.Inverse();
-            scamera.invProj = scamera.matProj.Inverse();
-
-            scamera.viewPort[0] = 4096;
-            scamera.viewPort[1] = 4096;
-
-            scamera.pad0[0] = 0.f;
-            scamera.pad0[1] = 0.f;
-
-            scamera.sunDir[0] = renderOption.sunDirection[0];
-            scamera.sunDir[1] = renderOption.sunDirection[1];
-            scamera.sunDir[2] = renderOption.sunDirection[2];
-
-            scamera.sunIntensity = 0.f;
-
-            scamera.sunColor[0] = 0;
-            scamera.sunColor[1] = 0;
-            scamera.sunColor[2] = 0;
-
-            scamera.sunAngularRadius = 0;
-            scamera.sunGlowSpread = 0;
-            scamera.exposure = 0;
-
-            scamera.pad1[0] = 0.f;
-            scamera.pad1[1] = 0.f;
+            camera.invView = camera.matView.Inverse();
+            camera.invProj = camera.matProj.Inverse();
 
             // Update the uniform buffer for the camera matrices
-            memcpy(mappedData + uboByteOffset, &scamera, sizeof(scamera));
+            memcpy(mappedData + uboByteOffset, &camera, sizeof(camera));
 
             shadowByteOffset = uboByteOffset;
 
             // update offset into the buffer
-            uboByteOffset += m_deviceContext.GetAligendUniformByteOffset(sizeof(scamera));
+            uboByteOffset += m_deviceContext.GetAligendUniformByteOffset(sizeof(camera));
+        }
+
+        {
+            lightParms.viewPort[0] = WINDOW_WIDTH;
+            lightParms.viewPort[1] = WINDOW_HEIGHT;
+
+            lightParms.tonemap = renderOption.tonemapping ? 1 : 0;
+            lightParms.enableExplosure = renderOption.enableExplosure ? 1 : 0;
+
+            lightParms.sunDir[0] = renderOption.sunDirection[0];
+            lightParms.sunDir[1] = renderOption.sunDirection[1];
+            lightParms.sunDir[2] = renderOption.sunDirection[2];
+
+            lightParms.sunIntensity = renderOption.sunIntensity;
+
+            lightParms.sunColor[0] = renderOption.sunColor[0];
+            lightParms.sunColor[1] = renderOption.sunColor[1];
+            lightParms.sunColor[2] = renderOption.sunColor[2];
+
+            lightParms.sunAngularRadius = ElecNeko::Radians(renderOption.sunAngularRadius);
+            lightParms.sunGlowSpread = renderOption.sunGlowSpread;
+            lightParms.explosure = renderOption.explosure;
+
+            lightParms.aces = renderOption.ACESFit ? 1 : 0;
+            lightParms.simpleAces = renderOption.simpleACESFit ? 1 : 0;
+
+            memcpy(mappedData + uboByteOffset, &lightParms, sizeof(lightParms));
+
+            lightParmsByteOffset = uboByteOffset;
+
+            uboByteOffset += m_deviceContext.GetAligendUniformByteOffset(sizeof(lightParms));
+        }
+
+        {
+            skyParms.skyColor[0] = renderOption.skyColor[0];
+            skyParms.skyColor[1] = renderOption.skyColor[1];
+            skyParms.skyColor[2] = renderOption.skyColor[2];
+
+            skyParms.zenithBrightenA = renderOption.expStrengthA;
+            skyParms.horizonBrightenB = renderOption.expAAttenuationB;
+            skyParms.baseSkyBrightnessC = renderOption.baseConstantC;
+            skyParms.exponentialScatteringD = renderOption.expGammaAttenuationD;
+            skyParms.circumsolarGlowE = renderOption.expAttenuationSpeedE;
+            skyParms.angularScatteringF = renderOption.gammaScatteringF;
+            skyParms.HG = renderOption.chiContributeG;
+            skyParms.HGParmH = renderOption.chiParmH;
+            skyParms.horizonFalloffI = renderOption.thetaFixI;
+            skyParms.lm = renderOption.Lm;
+
+            skyParms.pad0[0] = 0;
+            skyParms.pad0[1] = 0;
+            skyParms.pad0[2] = 0;
+
+            memcpy(mappedData + uboByteOffset, &skyParms, sizeof(skyParms));
+
+            skyParmsByteOffset = uboByteOffset;
+
+            uboByteOffset += m_deviceContext.GetAligendUniformByteOffset(sizeof(skyParms));
         }
 
         //
@@ -999,16 +1039,15 @@ void Application::DrawFrame()
     //
     m_deviceContext.BeginRenderPass();
     {
+        extern FrameBuffer g_postProcessFrameBuffer;
         VkCommandBuffer cmdBuffer = m_deviceContext.m_vkCommandBuffers[imageIndex];
         {
-            extern FrameBuffer g_offscreenFrameBuffer;
-
             // Binding the pipeline is effectively the "use shader" we had back in our opengl apps
             m_copyPipeline.BindPipeline(cmdBuffer);
 
             // Descriptor is how we bind our buffers and images
             Descriptor descriptor = m_copyPipeline.GetFreeDescriptor();
-            descriptor.BindImage(VK_IMAGE_LAYOUT_GENERAL, g_offscreenFrameBuffer.m_imageColor.m_vkImageView,
+            descriptor.BindImage(VK_IMAGE_LAYOUT_GENERAL, g_postProcessFrameBuffer.m_imageColor.m_vkImageView,
                                  Samplers::m_samplerStandard, 0);
             descriptor.BindDescriptor(&m_deviceContext, cmdBuffer, &m_copyPipeline);
             m_modelFullScreen.DrawIndexed(cmdBuffer);
@@ -1080,6 +1119,38 @@ void Application::DrawFrame()
                 ImGui::SliderFloat("SunAngularRadius", &renderOption.sunAngularRadius, .28f, 1.14f);
                 ImGui::SliderFloat("SunGlowSpread", &renderOption.sunGlowSpread, 0.02f, 0.12f);
                 ImGui::SliderFloat("Explosure", &renderOption.explosure, 0.8f, 1.6f);
+            }
+
+            if (ImGui::CollapsingHeader("Sky Parameters"))
+            {
+                ImGui::ColorEdit3("SkyColor", renderOption.skyColor, ImGuiColorEditFlags_Float);
+                ImGui::SliderFloat("ZenithBrighten", &renderOption.expStrengthA, 0, 10.f);
+                ImGui::SliderFloat("HorizonBrighten", &renderOption.expAAttenuationB, -1.f, -.2f);
+                ImGui::SliderFloat("BaseSkyBrightness", &renderOption.baseConstantC, .1f, 1.f);
+                ImGui::SliderFloat("ExponentialScattering", &renderOption.expGammaAttenuationD, 0.05f, .5f);
+                ImGui::SliderFloat("CircumsolarGlow", &renderOption.expAttenuationSpeedE, -5.f, -1.f);
+                ImGui::SliderFloat("AngularScattering", &renderOption.gammaScatteringF, 0.01f, 0.2f);
+                ImGui::SliderFloat("HenyeyGreenstein", &renderOption.chiContributeG, 0.01f, 0.1f);
+                ImGui::SliderFloat("HGParm", &renderOption.chiParmH, .5f, .9f);
+                ImGui::SliderFloat("HorizonFalloff", &renderOption.thetaFixI, .05f, .2f);
+                ImGui::SliderFloat("ReferenceRadiance", &renderOption.Lm, 1.f, 20.f);
+            }
+        }
+
+        if (ImGui::CollapsingHeader("Post Process"))
+        {
+            ImGui::Checkbox("Enable Tonemap", &renderOption.tonemapping);
+            if (renderOption.tonemapping)
+            {
+                if (ImGui::CollapsingHeader("Tonemapping"))
+                {
+                    ImGui::Checkbox("enableExplosure", &renderOption.enableExplosure);
+                    ImGui::Checkbox("ACES Fit", &renderOption.ACESFit);
+                    if (renderOption.ACESFit)
+                    {
+                        ImGui::Checkbox("Simple ACES Fit", &renderOption.simpleACESFit);
+                    }
+                }
             }
         }
 

@@ -575,7 +575,7 @@ bool Pipeline::CreateForMesh(DeviceContext *device, const CreateParms_t &parms)
     return true;
 }
 
-bool Pipeline::CreateForSkyBox(DeviceContext* device, const CreateParms_t& parms)
+bool Pipeline::CreateForFullScreen(DeviceContext* device, const CreateParms_t& parms)
 {
     VkResult result;
 

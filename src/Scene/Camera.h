@@ -64,6 +64,7 @@ namespace ElecNeko
         Mat4 ComputeProjctionMatrix();
 
         void UpdateCamera();
+        void UpdateCamera(const Vec3& lookAt, const Vec3& lightDir);
         void OffsetOrientation(const float dx, const float dy);
 
     public:

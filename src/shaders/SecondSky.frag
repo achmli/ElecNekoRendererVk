@@ -8,6 +8,9 @@ layout(binding = 0) uniform UBO {
     mat4 viewNoTrans;
     mat4 invView;
     mat4 invProj;
+} ubo;
+
+layout(binding = 1) uniform LightParms {
     vec2 viewport;
     vec2 _pad0;
     vec3 sunDir;
@@ -16,19 +19,21 @@ layout(binding = 0) uniform UBO {
     float sunAngularRadius;
     float sunGlowSpread;
     float explosure;
-} ubo;
+} lightParms;
 
-const vec3 BASE_SKY_TINT = vec3(0.55, 0.7, 1.0);
-const float A = 0.08;     
-const float B = -0.35;    
-const float C = 0.22;     
-const float D = 0.1;     
-const float E = -2.2;     
-const float F = 0.18;      
-const float G = 0.02;     
-const float H = 0.75;    
-const float I = 0.1;
-const float Lm = 1.5;
+layout(binding = 2) uniform SkyParms {
+    vec3 skyColor;
+    float zenithBrightenA;
+    float horizonBrightenB;
+    float baseSkyBrightnessC;
+    float exponentialScatteringD;
+    float circumsolarGlowE;
+    float angularScatteringF;
+    float HG;
+    float HGParmH;
+    float horizonFalloffI;
+    float lm;
+} skyParms;
 
 const float PI = 3.1415926535898;
 
@@ -56,7 +61,7 @@ float chi(float g, float cosGamma) {
 void main() {
     //vec3 view = normalize(viewDir);
 
-    vec2 ndc = (gl_FragCoord.xy / ubo.viewport) * 2.0 - 1.0;
+    vec2 ndc = (gl_FragCoord.xy / lightParms.viewport) * 2.0 - 1.0;
     float clipZ = 1.0;
     vec4 clipPos = vec4(ndc, clipZ, 1.0);
     vec4 viewPos = ubo.invProj * clipPos;
@@ -70,32 +75,32 @@ void main() {
     float theta = acos(cosTheta);
 
     // calculate gamma
-    float cosGamma = dot(worldDir, normalize(ubo.sunDir));
+    float cosGamma = dot(worldDir, normalize(lightParms.sunDir));
     // float cosGamma = dot(worldDir, ubo.sunDir);
     cosGamma=clamp(cosGamma, -1.0, 1.0);
     float gamma = acos(cosGamma);
 
     // attennuation simplified F(theta, gamma) (stable)
-    float FHorizon = 1.0 + A * exp(B / (cosTheta+0.01));
+    float FHorizon = 1.0 + skyParms.zenithBrightenA * exp(skyParms.horizonBrightenB / (cosTheta+0.01));
 
     // scattering
-    float scattering = C + D * exp(E * gamma);
+    float scattering = skyParms.baseSkyBrightnessC + skyParms.exponentialScatteringD * exp(skyParms.circumsolarGlowE * gamma);
 
-    scattering += F * (cosGamma * cosGamma);
+    scattering += skyParms.angularScatteringF * (cosGamma * cosGamma);
 
-    scattering += G * HenyeyGreenstein(H, cosGamma);
+    scattering += skyParms.HG * HenyeyGreenstein(skyParms.HGParmH, cosGamma);
 
-    scattering += I * sqrt(cosTheta);
+    scattering += skyParms.horizonFalloffI * sqrt(cosTheta);
 
     float Fval = FHorizon * scattering;
     Fval = clamp(Fval, 0.0, 6.0);
 
     // base sky radiance (linear)
-    vec3 skyRadiance = BASE_SKY_TINT * (Fval * Lm);
+    vec3 skyRadiance = skyParms.skyColor * (Fval * skyParms.lm);
 
     // sun core and glow
-    float r = max(ubo.sunAngularRadius, 1e-5);
-    float glow = max(ubo.sunGlowSpread, r * 2.0);
+    float r = max(lightParms.sunAngularRadius, 1e-5);
+    float glow = max(lightParms.sunGlowSpread, r * 2.0);
 
     // gaussian disk (sharp core)
     float coreSigma = max(r * 0.6, 1e-6); // smaller sigma than radius for crisp edge
@@ -114,7 +119,7 @@ void main() {
 
     // compute sun radiance
     // float sunIntensityScaled = clamp(ubo.sunIntensity, 0.0, 50.0);
-    vec3 sunRadiance = ubo.sunColor * (ubo.sunIntensity * sunShape);
+    vec3 sunRadiance = lightParms.sunColor * (lightParms.sunIntensity * sunShape);
 
     // sunRadiance += ubo.sunColor * (sunIntensityScaled * 0.25 * core);
 

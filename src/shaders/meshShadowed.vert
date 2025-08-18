@@ -13,11 +13,6 @@ layout(binding = 0) uniform uboCamera {
     mat4 viewNoTrans;
     mat4 invView;
     mat4 invProj;
-    vec2 viewport;
-    vec2 _pad0;
-    vec3 sunDir;
-    float sunIntensity;
-    vec3 sunColor;
 } camera;
 layout(binding = 1) uniform uboModel {
     mat4 model;
@@ -53,9 +48,6 @@ layout(location = 2) out vec3 modelNormal;
 layout(location = 3) out vec4 shadowPos;
 layout(location = 4) out vec2 texCoord;
 layout(location = 5) out ivec2 hasTexture;
-layout(location = 6) out vec2 viewPort;
-layout(location = 7) out vec3 sunDirenction;
-layout(location = 8) out vec3 sunAlbedo;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -84,8 +76,4 @@ void main() {
 
     texCoord=inTexCoord;
     hasTexture=ivec2(hasTex.hasAlbedoMap, hasTex.hasNormalMap);
-
-    viewPort = camera.viewport;
-    sunDirenction = camera.sunDir;
-    sunAlbedo = camera.sunColor;
 }
