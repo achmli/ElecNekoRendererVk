@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Texture.h"
+#include "Material.h"
+
+#include "Scene/Camera.h"
 
 #include "Math/Vector.h"
 #include "Math/Quat.h"
@@ -98,8 +101,14 @@ namespace ElecNeko
         std::vector<VVertex> m_vertices;
         std::vector<uint32_t> m_indices;
 
+        std::string name;
+
+        Mat4 xform;
+
         int32_t albTexIndex;
         int32_t norTexIndex;
+
+        int32_t materialId;
 
         Buffer m_vertexBuffer;
         Buffer m_indexBuffer;
@@ -116,6 +125,9 @@ namespace ElecNeko
         ~Mesh() = default;
 
         bool LoadFromFile(DeviceContext *device, const std::string &name);
+        int LoadTexture(DeviceContext *device, const std::string &name);
+        int AddMaterial(const Material &material);
+
         bool MakeUBO(DeviceContext *device);
 
         void Cleanup(DeviceContext *device);
@@ -123,6 +135,12 @@ namespace ElecNeko
         std::vector<MeshPart> m_meshParts;
         std::vector<Texture> albedoMaps;
         std::vector<Texture> normalMaps;
+
+        std::vector<Texture> m_textures;
+
+        std::vector<Material> m_materials;
+
+        Camera m_cam;
 
         Buffer uniformBuffer;
 

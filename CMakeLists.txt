@@ -59,15 +59,18 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         ${SOURCE_ROOT}
         ${THIRD_PARTY_ROOT}/stb
         ${THIRD_PARTY_ROOT}/tinyobjloader
+        ${THIRD_PARTY_ROOT}/tinygltf
         ${THIRD_PARTY_ROOT}/eigen
         ${THIRD_PARTY_ROOT}/xatlas
         ${THIRD_PARTY_ROOT}/imgui
         ${THIRD_PARTY_ROOT}/imgui/backends
         ${THIRD_PARTY_ROOT}/glfw/include
+        ${THIRD_PARTY_ROOT}/assimp/include
         ${VULKAN_INCLUDE}
 )
 
 add_subdirectory(${THIRD_PARTY_ROOT}/glfw)
+add_subdirectory(${THIRD_PARTY_ROOT}/assimp)
 
 add_library(imgui STATIC
         ${THIRD_PARTY_ROOT}/imgui/imgui.cpp
@@ -91,4 +94,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         ${VULKAN_LIB} 
         glfw 
         imgui
+        assimp
 )

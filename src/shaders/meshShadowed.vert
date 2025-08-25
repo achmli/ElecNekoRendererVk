@@ -21,10 +21,6 @@ layout(binding = 2) uniform uboShadow {
     mat4 view;
     mat4 proj;
 } shadow;
-layout(binding = 3) uniform uboHasTex {
-    int hasAlbedoMap;
-    int hasNormalMap;
-} hasTex;
 
 /*
     ==========================================
@@ -42,12 +38,10 @@ output
     ==========================================
 */
 
-layout(location = 0) out vec4 worldNormal;
-layout(location = 1) out vec4 modelPos;
-layout(location = 2) out vec3 modelNormal;
-layout(location = 3) out vec4 shadowPos;
-layout(location = 4) out vec2 texCoord;
-layout(location = 5) out ivec2 hasTexture;
+layout(location = 0) out vec3 worldNormal;
+layout(location = 1) out vec3 worldPos;
+layout(location = 2) out vec4 shadowPos;
+layout(location = 3) out vec3 camPos;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -59,21 +53,20 @@ main
     ==========================================
 */
 void main() {
-    // vec3 normal = 2.0 * (inNormal.xyz - vec3(0.5));
-    vec3 normal = normalize(inNormal);
-    modelNormal = normal;
-    modelPos = vec4(inPosition, 1.0);
+    // world position
+    vec4 worldPos4 = model.model * vec4(inPosition, 1.0);
+    worldPos = worldPos4.xyz;
 
-    // Get the tangent space in world coordinates
-    worldNormal = model.model * vec4(normal, 0.0);
-    // worldNormal = vec4(transpose(inverse(mat3(model.model))) * normal, 0.0);
+    // correct normal matrix: transpose(inverse(mat3(model)))
+    mat3 normalMat = transpose(inverse(mat3(model.model)));
+    worldNormal = normalize(normalMat * inNormal);
 
-    // Project coordinate to screen
-    gl_Position = camera.proj * camera.view * model.model * vec4(inPosition, 1.0);
+    // shadow position (light-projection * light-view * worldPos)
+    shadowPos = shadow.proj * shadow.view * worldPos4;
 
-    // Project the world position into the shadow texture position
-    shadowPos = shadow.proj * shadow.view * model.model * vec4(inPosition, 1.0);
+    // camera world position (use invView to get camera transform)
+    camPos = (camera.invView * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 
-    texCoord=inTexCoord;
-    hasTexture=ivec2(hasTex.hasAlbedoMap, hasTex.hasNormalMap);
+    // clip position
+    gl_Position = camera.proj * camera .view * worldPos4;
 }

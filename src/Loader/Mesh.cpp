@@ -247,6 +247,38 @@ namespace ElecNeko
         return true;
     }
 
+    int Mesh::LoadTexture(DeviceContext* device, const std::string& name)
+    { 
+        int id = -1;
+
+        for (int i = 0; i < m_textures.size(); i++)
+        {
+            if (name == m_textures[i].name)
+            {
+                return i;
+            }
+        }
+
+        id = m_textures.size();
+
+        m_textures.emplace_back();
+        if (!m_textures.back().LoadTexture(device, name))
+        {
+            printf("Failed to load texture!\n");
+            assert(0);
+            id = -1;
+        }
+
+        return id;
+    }
+
+    int Mesh::AddMaterial(const Material& material) 
+    {
+        int id = m_materials.size();
+        m_materials.push_back(material);
+        return id;
+    }
+
     bool Mesh::MakeUBO(DeviceContext *device)
     {
         Vec3 fwd = Vec3(1, 0, 0);

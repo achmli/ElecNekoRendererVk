@@ -460,9 +460,9 @@ namespace ElecNeko
 
             Descriptors::CreateParms_t descriptorParms;
             memset(&descriptorParms, 0, sizeof(descriptorParms));
-            descriptorParms.numUniformsVertex = 3;
+            descriptorParms.numUniformsVertex = 2;
             descriptorParms.numUniformsFragment = 0;
-            descriptorParms.numImageSamplers = 1;
+            descriptorParms.numImageSamplers = 0;
             result = g_shadowDescriptors.ElecNekoCreate(device, descriptorParms);
             if (!result)
             {
@@ -628,9 +628,9 @@ namespace ElecNeko
 
             Descriptors::CreateParms_t descriptorParms;
             memset(&descriptorParms, 0, sizeof(descriptorParms));
-            descriptorParms.numUniformsVertex = 4;
-            descriptorParms.numUniformsFragment = 1;
-            descriptorParms.numImageSamplers = 2;
+            descriptorParms.numUniformsVertex = 3;
+            descriptorParms.numUniformsFragment = 2;
+            descriptorParms.numImageSamplers = 1;
             result = g_meshShadowDescriptors.ElecNekoCreate(device, descriptorParms);
             if (!result)
             {
@@ -1096,4 +1096,142 @@ namespace ElecNeko
             g_postProcessFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
         }
 	}
+
+    void DrawOffscreen(DeviceContext* device, int cmdBufferIndex, Buffer* uniforms, SkyBox& skyBox, World* world, const RenderOption& renderOption)
+    {
+        VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
+
+        const int camOffset = 0;
+        const int camSize = sizeof(float) * 16 * 5;
+
+        const int shadowCamOffset = device->GetAligendUniformByteOffset(camOffset + camSize);
+        const int shadowCamSize = camSize;
+
+        const int lightParmsOffset = device->GetAligendUniformByteOffset(shadowCamOffset + shadowCamSize);
+        const int lightParmsSize = sizeof(float) * 16;
+
+        const int skyParmsOffset = device->GetAligendUniformByteOffset(lightParmsOffset + lightParmsSize);
+        const int skyParmsSize = sizeof(float) * 16;
+
+        // update shadow
+        {
+            g_shadowFrameBuffer.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+            g_shadowFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
+
+            g_shadowPipeline.BindPipeline(cmdBuffer);
+            
+            for (int i = 0; i < world->m_meshInstances.size(); i++)
+            {
+                int meshIdx = world->m_meshInstances[i].meshId;
+                int mateIdx = world->m_meshInstances[i].materialId;
+                if (world->m_meshes[meshIdx]->m_vertices.empty())
+                {
+                    continue;
+                }
+                Descriptor descriptor = g_shadowPipeline.GetFreeDescriptor();
+                descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
+                descriptor.BindBuffer(&world->m_meshInstances[i].uniformBuffer, 0, world->m_meshInstances[i].uniformBuffer.m_vkBufferSize, 1);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipeline);
+                world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
+            }
+
+            g_shadowFrameBuffer.EndRenderPass(device, cmdBufferIndex);
+            g_shadowFrameBuffer.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+        }
+
+        {
+            g_offscreenFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            g_offscreenFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
+            //
+            //	Draw the sky
+            //
+            if (!renderOption.skyBox && !renderOption.simpleRealSky)
+            {
+                // Binding the pipeline is effectively the "use shader" we had back in our opengl apps
+                g_skyPipeline.BindPipeline(cmdBuffer);
+
+                // Descriptor is how we bind our buffers and images
+                Descriptor descriptor = g_skyPipeline.GetFreeDescriptor();
+                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_skyPipeline);
+                g_skyModel.DrawIndexed(cmdBuffer);
+            }
+            else if (!renderOption.skyBox)
+            {
+                g_simpleSkyPipeline.BindPipeline(cmdBuffer);
+
+                Descriptor descriptor = g_simpleSkyPipeline.GetFreeDescriptor();
+                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 1);
+                descriptor.BindBuffer(uniforms, skyParmsOffset, skyParmsSize, 2);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_simpleSkyPipeline);
+                vkCmdDraw(cmdBuffer, 3, 1, 0, 0);
+            }
+            else
+            {
+                g_newSkyPipeline.BindPipeline(cmdBuffer);
+
+                Descriptor descriptor = g_newSkyPipeline.GetFreeDescriptor();
+                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, skyBox.m_cubeImage.m_vkImageView, ElecNeko::ElecNekoSampler::m_samplerCubemap,
+                                     0);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_newSkyPipeline);
+                vkCmdDraw(cmdBuffer, 36, 1, 0, 0);
+            }
+
+            // draw the model
+            {
+                g_meshShadowPipeline.BindPipeline(cmdBuffer);
+
+                for (int i = 0; i < world->m_meshInstances.size(); i++)
+                {
+                    int meshIdx = world->m_meshInstances[i].meshId;
+                    int mateIdx = world->m_meshInstances[i].materialId;
+                    if (world->m_meshes[meshIdx]->m_vertices.empty())
+                    {
+                        continue;
+                    }
+                    Descriptor descriptor = g_meshShadowPipeline.GetFreeDescriptor();
+                    descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                    descriptor.BindBuffer(&world->m_meshInstances[i].uniformBuffer, 0, world->m_meshInstances[i].uniformBuffer.m_vkBufferSize, 1);
+                    descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 2);
+                    descriptor.BindBuffer(&world->m_materials[mateIdx].matBuffer, 0, world->m_materials[mateIdx].matBuffer.m_vkBufferSize, 3);
+                    descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 4);
+                    descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView,
+                                         Samplers::m_samplerStandard, 0);
+                    descriptor.BindDescriptor(device, cmdBuffer, &g_meshShadowPipeline);
+                    world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
+                }
+            }
+
+            g_offscreenFrameBuffer.EndRenderPass(device, cmdBufferIndex);
+
+            g_offscreenFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);	
+        }
+
+        // post process
+        {
+            g_postProcessFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            g_postProcessFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
+
+            // tonemapping
+            {
+                g_tonemapPipeline.BindPipeline(cmdBuffer);
+
+                Descriptor descriptor = g_tonemapPipeline.GetFreeDescriptor();
+                descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 0);
+                descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_offscreenFrameBuffer.m_imageColor.m_vkImageView,
+                                     ElecNekoSampler::m_samplerTexture, 0);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_tonemapPipeline);
+                vkCmdDraw(cmdBuffer, 3, 1, 0, 0);
+            }
+
+            g_postProcessFrameBuffer.EndRenderPass(device, cmdBufferIndex);
+
+            g_postProcessFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+        }
+    }
 }

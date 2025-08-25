@@ -21,7 +21,7 @@
 
 #include "Loader/Mesh.h"
 
-#include "Scene/Camera.h"
+#include "Scene/World.h"
 #include "Scene/SkyBox.h"
 
 #include "RenderOption.h"
@@ -103,9 +103,11 @@ private:
     std::vector<ElecNeko::Mesh *> m_meshes;
     std::vector<ElecNeko::PendingMeshDeletion> m_toDeleteMeshes;
 
+    ElecNeko::World world;
+
     ElecNeko::SkyBox m_skyBox;
 
-    ElecNeko::Camera m_camera;
+    // ElecNeko::Camera m_camera;
     ElecNeko::OrthoCamera m_shadowCamera;
     // ElecNeko::Camera m_shadowCam;
 

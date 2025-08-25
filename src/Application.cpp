@@ -97,9 +97,8 @@ void Application::Initialize()
 
     
 
-    m_camera.Initialize(Vec3(75.f, 75.f, 75.f), Vec3(32.5f, -6.6f, -49.3f), 80.f, static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(WINDOW_WIDTH), .1f, 1000.f);
-    m_shadowCamera.Initialize(m_camera.position + Vec3(renderOption.sunDirection) * 30, m_camera.position, static_cast<float>(WINDOW_WIDTH),
-                              static_cast<float>(WINDOW_HEIGHT), 25, 175);
+    // m_camera.Initialize(Vec3(75.f, 75.f, 75.f), Vec3(32.5f, -6.6f, -49.3f), 80.f, static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(WINDOW_WIDTH), .1f, 1000.f);
+    
 
     m_skyBox.LoadFromFile(&m_deviceContext, "Skybox");
 
@@ -113,29 +112,42 @@ void Application::Initialize()
         m_models.push_back(model);
     }*/
     {
-        /*m_meshes.emplace_back();
-        if (!m_meshes[0].LoadFromFile(&m_deviceContext, "Tree"))
-        {
-            printf("Failed to Load Mesh!\n");
-            assert(0);
-        }
+    //    /*m_meshes.emplace_back();
+    //    if (!m_meshes[0].LoadFromFile(&m_deviceContext, "Tree"))
+    //    {
+    //        printf("Failed to Load Mesh!\n");
+    //        assert(0);
+    //    }
 
-        m_meshes[0].MakeUBO(&m_deviceContext);
+    //    m_meshes[0].MakeUBO(&m_deviceContext);
 
-        for (auto &meshPart: m_meshes[0].m_meshParts)
-        {
-            meshPart.MakeVBO(&m_deviceContext);
-        }*/
+    //    for (auto &meshPart: m_meshes[0].m_meshParts)
+    //    {
+    //        meshPart.MakeVBO(&m_deviceContext);
+    //    }*/
 
-        ElecNeko::Mesh *mesh = new ElecNeko::Mesh();
+        /*ElecNeko::Mesh *mesh = new ElecNeko::Mesh();
         mesh->LoadFromFile(&m_deviceContext, "lost_empire");
         mesh->MakeUBO(&m_deviceContext);
         for (auto& meshPart : mesh->m_meshParts)
         {
             meshPart.MakeVBO(&m_deviceContext);
         }
-        m_meshes.emplace_back(mesh);
+        m_meshes.emplace_back(mesh);*/
     }
+    world.LoadSceneFromFile(&m_deviceContext, "../res/scenes/hyperion_distant_light.scene");
+    for (auto& instance : world.m_meshInstances)
+    {
+        instance.MakeUBO(&m_deviceContext);
+    }
+
+    for (auto& mate : world.m_materials)
+    {
+        mate.MakeBuffer(&m_deviceContext);
+    }
+
+    m_shadowCamera.Initialize(world.m_cam->position + Vec3(renderOption.sunDirection) * 30, world.m_cam->position, static_cast<float>(WINDOW_WIDTH),
+                              static_cast<float>(WINDOW_HEIGHT), 25, 175);
 
     m_mousePosition = Vec2(0, 0);
 
@@ -557,7 +569,7 @@ void Application::MouseMoved(float x, float y)
     Vec2 ds = newPosition - m_mousePosition;
     m_mousePosition = newPosition;
 
-    m_camera.OffsetOrientation(ds.x, ds.y);
+    world.m_cam->OffsetOrientation(ds.x, ds.y);
 }
 
 void Application::LeftMouseMoved(float x, float y)
@@ -624,8 +636,7 @@ Application::MouseScrolled
 */
 void Application::MouseScrolled(float z)
 { 
-    m_camera.position += m_camera.forward * z * m_cameraMoveSpeed; 
-}
+    world.m_cam->position += world.m_cam->forward * z * m_cameraMoveSpeed; }
 
 /*
 ====================================================
@@ -668,17 +679,17 @@ void Application::ProcessKeyboard(float deltaTime)
     float velocity = m_cameraMoveSpeed * deltaTime;
 
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_W) == GLFW_PRESS)
-        m_camera.position += m_camera.forward * velocity;
+        world.m_cam->position += world.m_cam->forward * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_S) == GLFW_PRESS)
-        m_camera.position -= m_camera.forward * velocity;
+        world.m_cam->position -= world.m_cam->forward * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_A) == GLFW_PRESS)
-        m_camera.position -= m_camera.right * velocity;
+        world.m_cam->position -= world.m_cam->right * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_D) == GLFW_PRESS)
-        m_camera.position += m_camera.right * velocity;
+        world.m_cam->position += world.m_cam->right * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_SPACE) == GLFW_PRESS)
-        m_camera.position += m_camera.up * velocity;
+        world.m_cam->position += world.m_cam->up * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-        m_camera.position -= m_camera.up * velocity;
+        world.m_cam->position -= world.m_cam->up * velocity;
 }
 
 /*
@@ -785,7 +796,7 @@ void Application::MainLoop()
             }
         }
 
-        m_shadowCamera.UpdateCamera(m_camera.position, renderOption.sunDirection);
+        m_shadowCamera.UpdateCamera(world.m_cam->position, renderOption.sunDirection);
 
         // Draw the Scene
         DrawFrame();
@@ -822,10 +833,13 @@ void Application::UpdateUniforms()
         float viewPort[2];
         uint32_t tonemap;
         uint32_t enableExplosure;
+
         float sunDir[3];
         float sunIntensity;
+
         float sunColor[3];
         float sunAngularRadius;
+
         float sunGlowSpread;
         float explosure;
         uint32_t aces;
@@ -859,9 +873,21 @@ void Application::UpdateUniforms()
         // Update the uniform buffer with the camera information
         //
         {   
-            camera.matProj = m_camera.ComputeProjectionMatrix();
+            /*camera.matProj = m_camera.ComputeProjectionMatrix();
             camera.matView = m_camera.ComputeViewMatrix();
 
+            camera.viewNoTrans = camera.matView;
+            camera.viewNoTrans.rows[0].w = 0.0f;
+            camera.viewNoTrans.rows[1].w = 0.0f;
+            camera.viewNoTrans.rows[2].w = 0.0f;
+            camera.viewNoTrans.rows[3] = Vec4(0, 0, 0, 1);
+
+            camera.invView = camera.matView.Inverse();
+            camera.invProj = camera.matProj.Inverse();*/
+
+            camera.matProj = world.m_cam->ComputeProjectionMatrix();
+            camera.matView = world.m_cam->ComputeViewMatrix();
+            
             camera.viewNoTrans = camera.matView;
             camera.viewNoTrans.rows[0].w = 0.0f;
             camera.viewNoTrans.rows[1].w = 0.0f;
@@ -1033,7 +1059,8 @@ void Application::DrawFrame()
 
     // Draw everything in an offscreen buffer
     //DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
-    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes, renderOption);
+    // ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes, renderOption);
+    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, &world, renderOption);
     //
     //	Draw the offscreen framebuffer to the swap chain frame buffer
     //

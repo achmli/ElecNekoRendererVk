@@ -2,18 +2,18 @@
 
 layout(binding = 3) uniform sampler2D texAlbedo;
 
-layout(location = 0) in vec2 texCoord;
-layout(location = 1) flat in ivec2 hasTexture;
+layout(location = 0) flat in ivec2 hasTexture;
+layout(location = 1) in vec2 uv;
 
 void main() {
-    float alpha = 1.0;
-    if(hasTexture.x == 0) {
-        alpha = 1.0;
+    float a = 1.0;
+    if(hasTexture.x==0) {
+        a=1.0;
     }else {
-        alpha = texture(texAlbedo, texCoord).a;
+        a=texture(texAlbedo,uv).a;
     }
 
-    if(alpha < 0.0001) {
+    if(a<0.0001) {
         discard;
     }
 }
