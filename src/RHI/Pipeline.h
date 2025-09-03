@@ -79,6 +79,7 @@ public:
 	bool Create( DeviceContext * device, const CreateParms_t & parms );
     bool CreateForMesh(DeviceContext *device, const CreateParms_t &parms);
     bool CreateForFullScreen(DeviceContext *device, const CreateParms_t &parms);
+    bool CreateForTransparency(DeviceContext *device, const CreateParms_t &parms);
 	bool CreateCompute( DeviceContext * device, const CreateParms_t & parms );
 	void Cleanup( DeviceContext * device );
 

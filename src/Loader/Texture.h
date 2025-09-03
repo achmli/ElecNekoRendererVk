@@ -22,6 +22,7 @@ namespace ElecNeko
         ~Texture() = default;
 
         bool LoadTexture(DeviceContext *device, const std::string &filename);
+        void DefaultTexture(DeviceContext* device, float r, float g, float b, float a);
 
         void Cleanup(DeviceContext *device);
 
@@ -51,6 +52,17 @@ namespace ElecNeko
         originComponents = c;
         texData.resize(imageSize);
         std::copy_n(data, width * height * components, texData.begin());
+
+        {
+            Image::CreateParms_t parms{};
+            parms.usageFlags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            parms.format = VK_FORMAT_R8G8B8A8_UNORM;
+            parms.width = width;
+            parms.height = height;
+            parms.depth = 1;
+
+            m_image.Create(device, parms);
+        }
 
         Buffer stagingBuffer;
         stagingBuffer.Allocate(device, texData.data(), static_cast<int>(imageSize), VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
@@ -134,7 +146,7 @@ namespace ElecNeko
         }
 
         Buffer stagingBuffer;
-        if (stagingBuffer.Allocate(device, texData.data(), static_cast<int>(imageSize), VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
+        if (!stagingBuffer.Allocate(device, texData.data(), static_cast<int>(imageSize), VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
         {
             std::cerr << "Failed to allocate staging buffer for texture: " << name << "\n";
             m_image.Cleanup(device);

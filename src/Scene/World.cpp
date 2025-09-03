@@ -854,6 +854,21 @@ namespace ElecNeko
         return firstIndex;
     }
 
+    void World::CreateDefaultTextures(DeviceContext* device)
+    { 
+        std::array<uint8_t, 4> white = {255, 255, 255, 255};
+        defaultAlbedo = new Texture(device, "default_albedo", white.data(), 1, 1, 4);
+
+        std::array<uint8_t, 4> normal = {128, 128, 255, 255};
+        defaultNormal = new Texture(device, "default_normal", normal.data(), 1, 1, 4);
+
+        std::array<uint8_t, 4> metalRough = {0, 128, 255, 255};
+        defaultMetalRough = new Texture(device, "default_metallic_roughness", metalRough.data(), 1, 1, 4);
+
+        std::array<uint8_t, 4> black = {0, 0, 0, 255};
+        defaultEmission = new Texture(device, "default_emission", black.data(), 1, 1, 4);
+    }
+
     int World::AddTexture(DeviceContext* device, const std::string& filename) 
     { 
         Texture *texture = new Texture();
@@ -879,7 +894,8 @@ namespace ElecNeko
 
     void World::AddCamera(Vec3 eye, Vec3 lookAt, float fov, float aspecRatio, float zNear, float zFar)
     { 
-        delete m_cam;
+        if (m_cam)
+            delete m_cam;
 
         m_cam = new Camera;
         m_cam->Initialize(eye, lookAt, fov, aspecRatio, zNear, zFar);
@@ -1271,5 +1287,59 @@ namespace ElecNeko
             }
         }
         return true;
+    }
+
+    void World::UnloadScene(DeviceContext* device)
+    { 
+        for (auto& inst : m_meshInstances)
+        {
+            inst.Cleanup(device);
+        }
+        m_meshInstances.clear();
+
+        for (auto* mesh : m_meshes)
+        {
+            if (mesh)
+            {
+                mesh->Cleanup(device);
+                delete mesh;
+            }
+        }
+        m_meshes.clear();
+        m_meshIndexByKey.clear();
+
+        for (auto* tex : m_textures)
+        {
+            if (tex)
+            {
+                tex->Cleanup(device);
+                delete tex;
+            }
+        }
+        m_textures.clear();
+        m_textureCache.clear();
+
+        m_materials.clear();
+
+        if (m_cam)
+        {
+            delete m_cam;
+            m_cam = nullptr;
+        }
+    }
+
+    void World::Cleanup(DeviceContext* device)
+    { 
+        UnloadScene(device);
+        
+        defaultAlbedo->Cleanup(device);
+        defaultNormal->Cleanup(device);
+        defaultMetalRough->Cleanup(device);
+        defaultEmission->Cleanup(device);
+
+        delete defaultAlbedo;
+        delete defaultNormal;
+        delete defaultMetalRough;
+        delete defaultEmission;
     }
 }

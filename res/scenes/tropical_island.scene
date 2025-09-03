@@ -65,7 +65,7 @@ material sand
 material palm
 {
 	albedotexture tropical_island/textures/palm.png
-	alphamode blend
+	alphamode mask
 }
 
 

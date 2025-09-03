@@ -53,7 +53,7 @@ namespace ElecNeko
     class World
     {
     public:
-        World() : m_cam(nullptr) {}
+        World() : m_cam(nullptr),defaultAlbedo(nullptr),defaultNormal(nullptr),defaultMetalRough(nullptr),defaultEmission(nullptr){}
         ~World() = default;
 
         int AddTexture(DeviceContext *device, const std::string& filename);
@@ -63,11 +63,17 @@ namespace ElecNeko
         int LoadMeshGeometryOnly(DeviceContext *device, const std::string &filename);
         int LoadMeshWithMaterials(DeviceContext *device, const std::string &filename, Mat4 transMat);
 
-        void AddCamera(Vec3 eye, Vec3 lookAt, float fov, float aspecRatio = (16.f / 9.f), float zNear = .1f, float zFar = 1000.f);
+        void AddCamera(Vec3 eye, Vec3 lookAt, float fov, float aspecRatio = (9.f / 16.f), float zNear = .1f, float zFar = 1000.f);
 
         int EnsureTextureCached(DeviceContext *device, const std::string &filename);
 
         bool LoadSceneFromFile(DeviceContext *device, const std::string &filename);
+
+        void CreateDefaultTextures(DeviceContext *device);
+
+        void UnloadScene(DeviceContext *device);
+
+        void Cleanup(DeviceContext *device);
 
     public:
         std::vector<ElecNekoMesh*> m_meshes;
@@ -75,10 +81,10 @@ namespace ElecNeko
 
         std::vector<Material> m_materials;
         std::vector<Texture*> m_textures;
-        /*Texture defaultAlbedo;
-        Texture defaultNormal;
-        Texture defaultMetalRough;
-        Texture defaultEmission;*/
+        Texture *defaultAlbedo;
+        Texture *defaultNormal;
+        Texture *defaultMetalRough;
+        Texture *defaultEmission;
 
         std::vector<ElecNekoMeshInstance> m_meshInstances;
         

@@ -411,6 +411,18 @@ namespace ElecNeko
     Shader g_tonemapShader;
     Descriptors g_tonemapDescriptors;
 
+    Pipeline g_alphaTestShadowPipeline;
+    Shader g_alphaTestShadowShader;
+    Descriptors g_alphaTestShadowDescriptors;
+
+    Pipeline g_alphaBlendMeshPipeline;
+    Shader g_alphaBlendMeshShader;
+    Descriptors g_alphaBlendMeshDescriptors;
+
+    Pipeline g_alphaTestMeshPipeline;
+    Shader g_alphaTestMeshShader;
+    Descriptors g_alphaTestMeshDescriptors;
+
     bool InitOffscreen(DeviceContext *device, const RenderOption& renderOption,int width, int height)
     {
         bool result;
@@ -481,6 +493,47 @@ namespace ElecNeko
             pipelineParms.depthTest = true;
             pipelineParms.depthWrite = true;
             result = g_shadowPipeline.CreateForMesh(device, pipelineParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+        }
+
+        // alpha test shadow map
+        {
+            result = g_alphaTestShadowShader.Load(device, "alphaTestShadow");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 2;
+            descriptorParms.numUniformsFragment = 0;
+            descriptorParms.numImageSamplers = 1;
+            result = g_alphaTestShadowDescriptors.ElecNekoCreate(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_shadowFrameBuffer;
+            pipelineParms.descriptors = &g_alphaTestShadowDescriptors;
+            pipelineParms.shader = &g_alphaTestShadowShader;
+            pipelineParms.width = g_shadowFrameBuffer.m_parms.width;
+            pipelineParms.height = g_shadowFrameBuffer.m_parms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.depthTest = true;
+            pipelineParms.depthWrite = true;
+            result = g_alphaTestShadowPipeline.CreateForMesh(device, pipelineParms);
             if (!result)
             {
                 printf("ERROR: Failed to build pipeline\n");
@@ -630,7 +683,7 @@ namespace ElecNeko
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 3;
             descriptorParms.numUniformsFragment = 2;
-            descriptorParms.numImageSamplers = 1;
+            descriptorParms.numImageSamplers = 5;
             result = g_meshShadowDescriptors.ElecNekoCreate(device, descriptorParms);
             if (!result)
             {
@@ -657,6 +710,86 @@ namespace ElecNeko
                 return false;
             }
         }
+
+        {
+            result = g_alphaTestMeshShader.Load(device, "maskMesh");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 3;
+            descriptorParms.numUniformsFragment = 2;
+            descriptorParms.numImageSamplers = 5;
+            result = g_alphaTestMeshDescriptors.ElecNekoCreate(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+            pipelineParms.descriptors = &g_alphaTestMeshDescriptors;
+            pipelineParms.shader = &g_alphaTestMeshShader;
+            pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+            pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
+            pipelineParms.depthTest = true;
+            pipelineParms.depthWrite = true;
+            result = g_alphaTestMeshPipeline.CreateForMesh(device, pipelineParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+        }
+
+        /*{
+            result = g_alphaBlendMeshShader.Load(device, "maskMesh");
+            if (!result)
+            {
+                printf("ERROR: Failed to load shader\n");
+                assert(0);
+                return false;
+            }
+
+            Descriptors::CreateParms_t descriptorParms;
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+            descriptorParms.numUniformsVertex = 3;
+            descriptorParms.numUniformsFragment = 2;
+            descriptorParms.numImageSamplers = 5;
+            result = g_alphaBlendMeshDescriptors.ElecNekoCreate(device, descriptorParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build descriptors\n");
+                assert(0);
+                return false;
+            }
+
+            Pipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_offscreenFrameBuffer;
+            pipelineParms.descriptors = &g_alphaBlendMeshDescriptors;
+            pipelineParms.shader = &g_alphaBlendMeshShader;
+            pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
+            pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
+            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.depthTest = true;
+            pipelineParms.depthWrite = true;
+            result = g_alphaTestMeshPipeline.CreateForTransparency(device, pipelineParms);
+            if (!result)
+            {
+                printf("ERROR: Failed to build pipeline\n");
+                assert(0);
+                return false;
+            }
+        }*/
 
         {
             FrameBuffer::CreateParms_t frameBufferParms;
@@ -712,6 +845,7 @@ namespace ElecNeko
                 return false;
             }
         }
+        
 
         return true;
     }
@@ -743,6 +877,14 @@ namespace ElecNeko
         g_meshShadowPipeline.Cleanup(device);
         g_meshShadowShader.Cleanup(device);
         g_meshShadowDescriptors.Cleanup(device);
+        
+        g_alphaTestShadowPipeline.Cleanup(device);
+        g_alphaTestShadowShader.Cleanup(device);
+        g_alphaTestShadowDescriptors.Cleanup(device);
+
+        g_alphaTestMeshPipeline.Cleanup(device);
+        g_alphaTestMeshShader.Cleanup(device);
+        g_alphaTestMeshDescriptors.Cleanup(device);
 
         g_shadowPipeline.Cleanup(device);
         g_shadowShader.Cleanup(device);
@@ -754,54 +896,6 @@ namespace ElecNeko
         g_tonemapDescriptors.Cleanup(device);
         g_postProcessFrameBuffer.Cleanup(device);
         return true;
-    }
-
-    bool ReinitializeModel(DeviceContext *device)
-    {
-        g_meshShadowPipeline.Cleanup(device);
-        g_meshShadowShader.Cleanup(device);
-        g_meshShadowDescriptors.Cleanup(device);
-
-        bool result;
-
-        result = g_meshShadowShader.Load(device, "meshShadowed");
-        if (!result)
-        {
-            printf("ERROR: Failed to load shader\n");
-            assert(0);
-            return false;
-        }
-
-        Descriptors::CreateParms_t descriptorParms;
-        memset(&descriptorParms, 0, sizeof(descriptorParms));
-        descriptorParms.numUniformsVertex = 4;
-        descriptorParms.numUniformsFragment = 1;
-        descriptorParms.numImageSamplers = 2;
-        result = g_meshShadowDescriptors.ElecNekoCreate(device, descriptorParms);
-        if (!result)
-        {
-            printf("ERROR: Failed to build descriptors\n");
-            assert(0);
-            return false;
-        }
-
-        Pipeline::CreateParms_t pipelineParms;
-        pipelineParms.framebuffer = &g_offscreenFrameBuffer;
-        pipelineParms.descriptors = &g_meshShadowDescriptors;
-        pipelineParms.shader = &g_meshShadowShader;
-        pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
-        pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-        pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
-        pipelineParms.depthTest = true;
-        pipelineParms.depthWrite = true;
-
-        result = g_meshShadowPipeline.CreateForMesh(device, pipelineParms);
-        if (!result)
-        {
-            printf("ERROR: Failed to build pipeline\n");
-            assert(0);
-            return false;
-        }
     }
 
     bool ReinitializeSky(DeviceContext* device, const RenderOption& renderOption)
@@ -1119,21 +1213,53 @@ namespace ElecNeko
 
             g_shadowFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
 
-            g_shadowPipeline.BindPipeline(cmdBuffer);
-            
-            for (int i = 0; i < world->m_meshInstances.size(); i++)
             {
-                int meshIdx = world->m_meshInstances[i].meshId;
-                int mateIdx = world->m_meshInstances[i].materialId;
-                if (world->m_meshes[meshIdx]->m_vertices.empty())
+                g_shadowPipeline.BindPipeline(cmdBuffer);
+
+                for (int i = 0; i < world->m_meshInstances.size(); i++)
                 {
-                    continue;
+                    int meshIdx = world->m_meshInstances[i].meshId;
+                    int mateIdx = world->m_meshInstances[i].materialId;
+                    if (world->m_meshes[meshIdx]->m_vertices.empty() || world->m_materials[mateIdx].alphaMode!=AlphaMode::Opaque)
+                    {
+                        continue;
+                    }
+                    Descriptor descriptor = g_shadowPipeline.GetFreeDescriptor();
+                    descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
+                    descriptor.BindBuffer(&world->m_meshInstances[i].uniformBuffer, 0, world->m_meshInstances[i].uniformBuffer.m_vkBufferSize, 1);
+                    descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipeline);
+                    world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
                 }
-                Descriptor descriptor = g_shadowPipeline.GetFreeDescriptor();
-                descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
-                descriptor.BindBuffer(&world->m_meshInstances[i].uniformBuffer, 0, world->m_meshInstances[i].uniformBuffer.m_vkBufferSize, 1);
-                descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipeline);
-                world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
+            }
+
+            {
+                g_alphaTestShadowPipeline.BindPipeline(cmdBuffer);
+
+                for (int i = 0; i < world->m_meshInstances.size(); i++)
+                {
+                    int meshIdx = world->m_meshInstances[i].meshId;
+                    int mateIdx = world->m_meshInstances[i].materialId;
+                    if (world->m_meshes[meshIdx]->m_vertices.empty() || world->m_materials[mateIdx].alphaMode != AlphaMode::Mask)
+                    {
+                        continue;
+                    }
+                    Descriptor descriptor = g_alphaTestShadowPipeline.GetFreeDescriptor();
+                    descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
+                    descriptor.BindBuffer(&world->m_meshInstances[i].uniformBuffer, 0, world->m_meshInstances[i].uniformBuffer.m_vkBufferSize, 1);
+                    if (world->m_materials[mateIdx].baseColorTexId > -1)
+                    {
+                        int albedoIndex = world->m_materials[mateIdx].baseColorTexId;
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[albedoIndex]->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 0);
+                    }
+                    else
+                    {
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultAlbedo->m_image.m_vkImageView, Samplers::m_samplerStandard,
+                                             0);
+                    }
+                    descriptor.BindDescriptor(device, cmdBuffer, &g_alphaTestShadowPipeline);
+                    world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
+                }
             }
 
             g_shadowFrameBuffer.EndRenderPass(device, cmdBufferIndex);
@@ -1189,7 +1315,7 @@ namespace ElecNeko
                 {
                     int meshIdx = world->m_meshInstances[i].meshId;
                     int mateIdx = world->m_meshInstances[i].materialId;
-                    if (world->m_meshes[meshIdx]->m_vertices.empty())
+                    if (world->m_meshes[meshIdx]->m_vertices.empty() || world->m_materials[mateIdx].alphaMode!=AlphaMode::Opaque)
                     {
                         continue;
                     }
@@ -1201,7 +1327,119 @@ namespace ElecNeko
                     descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 4);
                     descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView,
                                          Samplers::m_samplerStandard, 0);
+                    if (world->m_materials[mateIdx].baseColorTexId > - 1)
+                    {
+                        int albedoIndex = world->m_materials[mateIdx].baseColorTexId;
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[albedoIndex]->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 1);
+                    }
+                    else
+                    {
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultAlbedo->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 1);
+                    }
+                    if (world->m_materials[mateIdx].normalMapTexId > -1)
+                    {
+                        int normalIndex = world->m_materials[mateIdx].normalMapTexId;
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[normalIndex]->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 2);
+                    }
+                    else
+                    {
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultNormal->m_image.m_vkImageView, Samplers::m_samplerStandard,
+                                             2);
+                    }
+                    if (world->m_materials[mateIdx].metallicRoughtnessTexId > -1)
+                    {
+                        int metalIndex = world->m_materials[mateIdx].metallicRoughtnessTexId;
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[metalIndex]->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 3);
+                    }
+                    else
+                    {
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultMetalRough->m_image.m_vkImageView, Samplers::m_samplerStandard,
+                                             3);
+                    }
+                    if (world->m_materials[mateIdx].emissionmapTexId > -1)
+                    {
+                        int emitIndex = world->m_materials[mateIdx].emissionmapTexId;
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[emitIndex]->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 4);
+                    }
+                    else
+                    {
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultEmission->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 4);
+                    }
                     descriptor.BindDescriptor(device, cmdBuffer, &g_meshShadowPipeline);
+                    world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
+                }
+            }
+
+            {
+                g_alphaTestMeshPipeline.BindPipeline(cmdBuffer);
+
+                for (int i = 0; i < world->m_meshInstances.size(); i++)
+                {
+                    int meshIdx = world->m_meshInstances[i].meshId;
+                    int mateIdx = world->m_meshInstances[i].materialId;
+                    if (world->m_meshes[meshIdx]->m_vertices.empty() || world->m_materials[mateIdx].alphaMode != AlphaMode::Mask)
+                    {
+                        continue;
+                    }
+                    Descriptor descriptor = g_alphaTestMeshDescriptors.GetFreeDescriptor();
+                    descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                    descriptor.BindBuffer(&world->m_meshInstances[i].uniformBuffer, 0, world->m_meshInstances[i].uniformBuffer.m_vkBufferSize, 1);
+                    descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 2);
+                    descriptor.BindBuffer(&world->m_materials[mateIdx].matBuffer, 0, world->m_materials[mateIdx].matBuffer.m_vkBufferSize, 3);
+                    descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 4);
+                    descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView,
+                                         Samplers::m_samplerStandard, 0);
+                    if (world->m_materials[mateIdx].baseColorTexId > -1)
+                    {
+                        int albedoIndex = world->m_materials[mateIdx].baseColorTexId;
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[albedoIndex]->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 1);
+                    }
+                    else
+                    {
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultAlbedo->m_image.m_vkImageView, Samplers::m_samplerStandard,
+                                             1);
+                    }
+                    if (world->m_materials[mateIdx].normalMapTexId > -1)
+                    {
+                        int normalIndex = world->m_materials[mateIdx].normalMapTexId;
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[normalIndex]->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 2);
+                    }
+                    else
+                    {
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultNormal->m_image.m_vkImageView, Samplers::m_samplerStandard,
+                                             2);
+                    }
+                    if (world->m_materials[mateIdx].metallicRoughtnessTexId > -1)
+                    {
+                        int metalIndex = world->m_materials[mateIdx].metallicRoughtnessTexId;
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[metalIndex]->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 3);
+                    }
+                    else
+                    {
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultMetalRough->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 3);
+                    }
+                    if (world->m_materials[mateIdx].emissionmapTexId > -1)
+                    {
+                        int emitIndex = world->m_materials[mateIdx].emissionmapTexId;
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[emitIndex]->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 4);
+                    }
+                    else
+                    {
+                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultEmission->m_image.m_vkImageView,
+                                             Samplers::m_samplerStandard, 4);
+                    }
+                    descriptor.BindDescriptor(device, cmdBuffer, &g_alphaTestMeshPipeline);
                     world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
                 }
             }

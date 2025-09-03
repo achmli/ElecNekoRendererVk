@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 #include "Math/Quat.h"
 #include "Math/Vector.h"
@@ -100,10 +101,10 @@ private:
     Model m_modelFullScreen;
     std::vector<Model *> m_models; // models for the bodies
 
-    std::vector<ElecNeko::Mesh *> m_meshes;
-    std::vector<ElecNeko::PendingMeshDeletion> m_toDeleteMeshes;
+    ElecNeko::World* world;
+    ElecNeko::World *deletingWorld = nullptr; 
 
-    ElecNeko::World world;
+    std::vector<std::filesystem::path> m_sceneFiles;
 
     ElecNeko::SkyBox m_skyBox;
 
@@ -137,8 +138,6 @@ private:
     static const int WINDOW_HEIGHT = 1440;
 
     static const bool m_enableLayers = true;
-
-    
 };
 
 extern Application *g_application;

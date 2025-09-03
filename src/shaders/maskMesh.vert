@@ -68,7 +68,7 @@ void main() {
     // camera world position (use invView to get camera transform)
     camPos = (camera.invView * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 
-    // texCoords
+    // uv
     texCoords = inTexCoord;
 
     // clip position

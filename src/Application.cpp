@@ -69,6 +69,53 @@ void CheckVkResult(VkResult err)
         abort();
 }
 
+namespace ElecNeko
+{
+    namespace fs = std::filesystem;
+    static std::string ExtNormalized(const fs::path &p) 
+    { 
+        auto e = p.extension().string();
+        if (!e.empty() && e.front() == '.')
+        {
+            e.erase(0, 1);
+        }
+        return e;
+    }
+
+    std::vector<fs::path> FindSceneFilesInDir(const fs::path &dir, bool throwOnError = false)
+    {
+        std::vector<fs::path> out;
+        std::error_code ec;
+        if (!fs::exists(dir, ec) || !fs::is_directory(dir, ec))
+        {
+            if (throwOnError)
+                throw std::runtime_error("not a directory: " + dir.string());
+            return out;
+        }
+
+        for (fs::directory_iterator it(dir, ec); it != fs::directory_iterator(); it.increment(ec))
+        {
+            if (ec)
+            {
+                if (throwOnError)
+                    throw fs::filesystem_error("directory iteration", dir, ec);
+                break;
+            }
+
+            const fs::directory_entry &de = *it;
+            if (!de.is_regular_file(ec))
+            {
+                continue;
+            }
+            if (ExtNormalized(de.path()) == "scene")
+            {
+                out.push_back(de.path());
+            }
+        }
+        return out;
+    }
+}
+
 /*
 ========================================================================================================
 
@@ -102,51 +149,24 @@ void Application::Initialize()
 
     m_skyBox.LoadFromFile(&m_deviceContext, "Skybox");
 
-    /*m_models.reserve(m_scene->m_bodies.size());
-    for (int i = 0; i < m_scene->m_bodies.size(); i++)
-    {
-        Model *model = new Model();
-        model->BuildFromShape(m_scene->m_bodies[i].m_shape);
-        model->MakeVBO(&m_deviceContext);
+    m_sceneFiles = ElecNeko::FindSceneFilesInDir("../res/scenes");
 
-        m_models.push_back(model);
-    }*/
-    {
-    //    /*m_meshes.emplace_back();
-    //    if (!m_meshes[0].LoadFromFile(&m_deviceContext, "Tree"))
-    //    {
-    //        printf("Failed to Load Mesh!\n");
-    //        assert(0);
-    //    }
-
-    //    m_meshes[0].MakeUBO(&m_deviceContext);
-
-    //    for (auto &meshPart: m_meshes[0].m_meshParts)
-    //    {
-    //        meshPart.MakeVBO(&m_deviceContext);
-    //    }*/
-
-        /*ElecNeko::Mesh *mesh = new ElecNeko::Mesh();
-        mesh->LoadFromFile(&m_deviceContext, "lost_empire");
-        mesh->MakeUBO(&m_deviceContext);
-        for (auto& meshPart : mesh->m_meshParts)
-        {
-            meshPart.MakeVBO(&m_deviceContext);
-        }
-        m_meshes.emplace_back(mesh);*/
-    }
-    world.LoadSceneFromFile(&m_deviceContext, "../res/scenes/hyperion_distant_light.scene");
-    for (auto& instance : world.m_meshInstances)
+    
+    world = new ElecNeko::World();
+    world->LoadSceneFromFile(&m_deviceContext, m_sceneFiles[sampleSceneIdx].string());
+    for (auto& instance : world->m_meshInstances)
     {
         instance.MakeUBO(&m_deviceContext);
     }
 
-    for (auto& mate : world.m_materials)
+    for (auto& mate : world->m_materials)
     {
         mate.MakeBuffer(&m_deviceContext);
     }
 
-    m_shadowCamera.Initialize(world.m_cam->position + Vec3(renderOption.sunDirection) * 30, world.m_cam->position, static_cast<float>(WINDOW_WIDTH),
+    world->CreateDefaultTextures(&m_deviceContext);
+
+    m_shadowCamera.Initialize(world->m_cam->position + Vec3(renderOption.sunDirection) * 30, world->m_cam->position, static_cast<float>(WINDOW_WIDTH),
                               static_cast<float>(WINDOW_HEIGHT), 25, 175);
 
     m_mousePosition = Vec2(0, 0);
@@ -468,11 +488,8 @@ void Application::Cleanup()
 
     m_skyBox.Cleanup(&m_deviceContext);
 
-    for (auto& mesh : m_meshes)
-    {
-        mesh->Cleanup(&m_deviceContext);
-    }
-    m_meshes.clear();
+    world->Cleanup(&m_deviceContext);
+    delete world;
 
     // Delete Uniform Buffer Memory
     m_uniformBuffer.Cleanup(&m_deviceContext);
@@ -569,7 +586,7 @@ void Application::MouseMoved(float x, float y)
     Vec2 ds = newPosition - m_mousePosition;
     m_mousePosition = newPosition;
 
-    world.m_cam->OffsetOrientation(ds.x, ds.y);
+    world->m_cam->OffsetOrientation(ds.x, ds.y);
 }
 
 void Application::LeftMouseMoved(float x, float y)
@@ -636,7 +653,7 @@ Application::MouseScrolled
 */
 void Application::MouseScrolled(float z)
 { 
-    world.m_cam->position += world.m_cam->forward * z * m_cameraMoveSpeed; }
+    world->m_cam->position += world->m_cam->forward * z * m_cameraMoveSpeed; }
 
 /*
 ====================================================
@@ -679,17 +696,17 @@ void Application::ProcessKeyboard(float deltaTime)
     float velocity = m_cameraMoveSpeed * deltaTime;
 
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_W) == GLFW_PRESS)
-        world.m_cam->position += world.m_cam->forward * velocity;
+        world->m_cam->position += world->m_cam->forward * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_S) == GLFW_PRESS)
-        world.m_cam->position -= world.m_cam->forward * velocity;
+        world->m_cam->position -= world->m_cam->forward * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_A) == GLFW_PRESS)
-        world.m_cam->position -= world.m_cam->right * velocity;
+        world->m_cam->position -= world->m_cam->right * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_D) == GLFW_PRESS)
-        world.m_cam->position += world.m_cam->right * velocity;
+        world->m_cam->position += world->m_cam->right * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_SPACE) == GLFW_PRESS)
-        world.m_cam->position += world.m_cam->up * velocity;
+        world->m_cam->position += world->m_cam->up * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-        world.m_cam->position -= world.m_cam->up * velocity;
+        world->m_cam->position -= world->m_cam->up * velocity;
 }
 
 /*
@@ -708,14 +725,26 @@ void Application::MainLoop()
     {
         int time = GetTimeMicroseconds();
         float dt_us = (float) time - (float) timeLastFrame;
-        // if (dt_us < 16000.0f)
-        // {
-        //     int x = 16000 - (int) dt_us;
-        //     std::this_thread::sleep_for(std::chrono::microseconds(x));
-        //     dt_us = 16000;
-        //     time = GetTimeMicroseconds();
-        // }
-        timeLastFrame = time;
+        /* if (dt_us < 16000.0f)
+         {
+             int x = 16000 - (int) dt_us;
+             std::this_thread::sleep_for(std::chrono::microseconds(x));
+             dt_us = 16000;
+             time = GetTimeMicroseconds();
+         }
+        timeLastFrame = time;*/
+        //long long time = GetTimeMicroseconds();
+        //float dt_us = float(time - timeLastFrame);
+
+        //if (dt_us < 16000.0f)
+        //{
+        //    auto sleepTime = std::chrono::microseconds((int) (16000 - dt_us));
+        //    std::this_thread::sleep_for(sleepTime);
+        //    time = GetTimeMicroseconds(); // 再取一次真实时间
+        //    dt_us = float(time - timeLastFrame);
+        //}
+
+        //timeLastFrame = time;
         //printf("\ndt_ms: %.1f    ", dt_us * 0.001f);
 
         // Get User Input
@@ -777,9 +806,9 @@ void Application::MainLoop()
             printf("frame dt_ms: %.2f %.2f %.2f", avgTime * 0.001f, maxTime * 0.001f, dt_us * 0.001f);
         }
 
-        if (!m_toDeleteMeshes.empty())
+        if (deletingWorld)
         {
-            int deletingNums = m_toDeleteMeshes.size();
+            /*int deletingNums = m_toDeleteMeshes.size();
             for (int i = 0; i < deletingNums; i++)
             {
                 m_toDeleteMeshes[i].DeferedCleanup(&m_deviceContext);
@@ -793,10 +822,23 @@ void Application::MainLoop()
 
                     m_toDeleteMeshes.pop_back();
                 }
+            }*/
+            static int currentLoop = 0;
+            int totalLoops = 100;
+            if (currentLoop < totalLoops)
+            {
+                currentLoop++;
+            }
+            else
+            {
+                deletingWorld->Cleanup(&m_deviceContext);
+                delete deletingWorld;
+                deletingWorld = nullptr;
+                currentLoop = 0;
             }
         }
 
-        m_shadowCamera.UpdateCamera(world.m_cam->position, renderOption.sunDirection);
+        m_shadowCamera.UpdateCamera(world->m_cam->position, renderOption.sunDirection);
 
         // Draw the Scene
         DrawFrame();
@@ -860,7 +902,7 @@ void Application::UpdateUniforms()
         float HGParmH;
         float horizonFalloffI;
         float lm;
-        float pad0[3];
+        float cameraPos[3];
     } skyParms;
 
     //
@@ -885,8 +927,10 @@ void Application::UpdateUniforms()
             camera.invView = camera.matView.Inverse();
             camera.invProj = camera.matProj.Inverse();*/
 
-            camera.matProj = world.m_cam->ComputeProjectionMatrix();
-            camera.matView = world.m_cam->ComputeViewMatrix();
+            camera.matProj = world->m_cam->ComputeProjectionMatrix();
+            camera.matView = world->m_cam->ComputeViewMatrix();
+
+            
             
             camera.viewNoTrans = camera.matView;
             camera.viewNoTrans.rows[0].w = 0.0f;
@@ -981,9 +1025,9 @@ void Application::UpdateUniforms()
             skyParms.horizonFalloffI = renderOption.thetaFixI;
             skyParms.lm = renderOption.Lm;
 
-            skyParms.pad0[0] = 0;
-            skyParms.pad0[1] = 0;
-            skyParms.pad0[2] = 0;
+            skyParms.cameraPos[0] = world->m_cam->position.x;
+            skyParms.cameraPos[1] = world->m_cam->position.y;
+            skyParms.cameraPos[2] = world->m_cam->position.z;
 
             memcpy(mappedData + uboByteOffset, &skyParms, sizeof(skyParms));
 
@@ -1060,7 +1104,7 @@ void Application::DrawFrame()
     // Draw everything in an offscreen buffer
     //DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
     // ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes, renderOption);
-    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, &world, renderOption);
+    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, world, renderOption);
     //
     //	Draw the offscreen framebuffer to the swap chain frame buffer
     //
@@ -1088,35 +1132,40 @@ void Application::DrawFrame()
         ImGui::Text(m_deviceContext.m_physicalDevices[m_deviceContext.m_deviceIndex].m_vkDeviceProperties.deviceName);
         ImGui::Text("FPS: %.1f", fps);
 
-        std::vector<const char*> sceneNames = {"lost_empire", "rungholt", "sponza"};
+        static std::string sceneName = m_sceneFiles[sampleSceneIdx].string();
 
-        std::string sceneName = sceneNames[sampleSceneIdx];
-
-        if (ImGui::Combo("Scene", &sampleSceneIdx, sceneNames.data(), sceneNames.size()))
+        auto getter = [](void *data, int idx, const char **outText) -> bool
         {
-            if (!(sceneName == sceneNames[sampleSceneIdx]))
+            auto const &vec = *static_cast<const std::vector<std::filesystem::path> *>(data);
+            if (idx < 0 || idx >= static_cast<int>(vec.size()))
             {
-                for (auto m_mesh: m_meshes)
-                {
-                    // m_mesh->Cleanup(&m_deviceContext);
-                    m_toDeleteMeshes.emplace_back(m_mesh, 100);
-                }
-                m_meshes.clear();
+                return false;
+            }
+            static std::string tmp;
+            tmp = vec[idx].filename().string();
+            *outText = tmp.c_str();
+            return true;
+        };
 
-                ElecNeko::Mesh *mesh = new ElecNeko::Mesh();
-                mesh->LoadFromFile(&m_deviceContext, sceneNames[sampleSceneIdx]);
-                if (sampleSceneIdx == 2)
+        if (ImGui::Combo("Scene", &sampleSceneIdx, getter, (void*)&m_sceneFiles, m_sceneFiles.size()))
+        {
+            if (sceneName != m_sceneFiles[sampleSceneIdx])
+            {
+                sceneName = m_sceneFiles[sampleSceneIdx].string();
+
+                deletingWorld = world;
+                world = new ElecNeko::World;
+                world->LoadSceneFromFile(&m_deviceContext, sceneName);
+                world->CreateDefaultTextures(&m_deviceContext);
+                for (auto &instance: world->m_meshInstances)
                 {
-                    mesh->scale = Vec3(.05f, .05f, .05f);
+                    instance.MakeUBO(&m_deviceContext);
                 }
 
-                mesh->MakeUBO(&m_deviceContext);
-                for (auto &meshPart: mesh->m_meshParts)
+                for (auto &mate: world->m_materials)
                 {
-                    meshPart.MakeVBO(&m_deviceContext);
+                    mate.MakeBuffer(&m_deviceContext);
                 }
-                
-                m_meshes.emplace_back(mesh);
             }
         }
 

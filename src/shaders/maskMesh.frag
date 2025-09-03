@@ -183,9 +183,17 @@ void main() {
 
     // material
     vec3 albedo = uMat.baseColor;
+    float alpha = uMat.opacity;
     if(uMat.baseColorTexId > -1) {
         vec4 albedoSample = texture(texAlbedo, texCoords);
         albedo *= albedoSample.rgb;
+        alpha = albedoSample.a;
+    }
+
+    float alphaCO = max(uMat.alphaCutoff, 1e-4);
+
+    if(alpha < alphaCO) {
+        discard;
     }
 
     float metallic = uMat.metallic;
@@ -195,7 +203,7 @@ void main() {
         metallic = mix(metallic, mrSample.r, step(0.001, mrSample.r));
         roughness = mix(roughness, mrSample.g, step(0.001, mrSample.g));
     }
-    roughness=clamp(roughness, 0.045, 1.0);
+    roughness = clamp(roughness, 0.045, 1.0);
 
     // Fresnel F0
     vec3 F0 = vec3(0.04);

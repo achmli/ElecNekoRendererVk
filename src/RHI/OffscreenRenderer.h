@@ -23,7 +23,6 @@ namespace ElecNeko
     bool InitOffscreen(DeviceContext *device, const RenderOption &renderOption, int width, int height);
     bool CleanupOffscreen(DeviceContext *device, const RenderOption &renderOption);
 
-    bool ReinitializeModel(DeviceContext *device);
     bool ReinitializeSky(DeviceContext *device, const RenderOption &renderOption);
 
     void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, std::vector<Mesh *> mesh, const RenderOption &renderOption);
