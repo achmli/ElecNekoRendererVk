@@ -72,8 +72,8 @@ void CheckVkResult(VkResult err)
 namespace ElecNeko
 {
     namespace fs = std::filesystem;
-    static std::string ExtNormalized(const fs::path &p) 
-    { 
+    static std::string ExtNormalized(const fs::path &p)
+    {
         auto e = p.extension().string();
         if (!e.empty() && e.front() == '.')
         {
@@ -114,7 +114,7 @@ namespace ElecNeko
         }
         return out;
     }
-}
+} // namespace ElecNeko
 
 /*
 ========================================================================================================
@@ -142,29 +142,34 @@ void Application::Initialize()
     m_scene->Initialize();
     m_scene->Reset();
 
-    
 
-    // m_camera.Initialize(Vec3(75.f, 75.f, 75.f), Vec3(32.5f, -6.6f, -49.3f), 80.f, static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(WINDOW_WIDTH), .1f, 1000.f);
-    
+    // m_camera.Initialize(Vec3(75.f, 75.f, 75.f), Vec3(32.5f, -6.6f, -49.3f), 80.f, static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(WINDOW_WIDTH), .1f,
+    // 1000.f);
+
 
     m_skyBox.LoadFromFile(&m_deviceContext, "Skybox");
 
     m_sceneFiles = ElecNeko::FindSceneFilesInDir("../res/scenes");
 
-    
+
     world = new ElecNeko::World();
     world->LoadSceneFromFile(&m_deviceContext, m_sceneFiles[sampleSceneIdx].string());
-    for (auto& instance : world->m_meshInstances)
+    for (auto &instance: world->m_meshInstances)
     {
         instance.MakeUBO(&m_deviceContext);
     }
 
-    for (auto& mate : world->m_materials)
+    for (auto &mate: world->m_materials)
     {
         mate.MakeBuffer(&m_deviceContext);
     }
 
     world->CreateDefaultTextures(&m_deviceContext);
+
+    for (auto *light: world->m_lights)
+    {
+        light->UpdateUBO(&m_deviceContext);
+    }
 
     m_shadowCamera.Initialize(world->m_cam->position + Vec3(renderOption.sunDirection) * 30, world->m_cam->position, static_cast<float>(WINDOW_WIDTH),
                               static_cast<float>(WINDOW_HEIGHT), 25, 175);
@@ -255,8 +260,7 @@ bool Application::InitializeVulkan()
     //
     //	Vulkan Surface for GLFW Window
     //
-    if (VK_SUCCESS !=
-        glfwCreateWindowSurface(m_deviceContext.m_vkInstance, m_glfwWindow, nullptr, &m_deviceContext.m_vkSurface))
+    if (VK_SUCCESS != glfwCreateWindowSurface(m_deviceContext.m_vkInstance, m_glfwWindow, nullptr, &m_deviceContext.m_vkSurface))
     {
         printf("ERROR: Failed to create window sruface\n");
         assert(0);
@@ -311,8 +315,7 @@ bool Application::InitializeVulkan()
     //
     //	Offscreen rendering
     //
-    ElecNeko::InitOffscreen(&m_deviceContext, renderOption, m_deviceContext.m_swapChain.m_windowWidth,
-                  m_deviceContext.m_swapChain.m_windowHeight);
+    ElecNeko::InitOffscreen(&m_deviceContext, renderOption, m_deviceContext.m_swapChain.m_windowWidth, m_deviceContext.m_swapChain.m_windowHeight);
 
     //
     //	Full screen texture rendering
@@ -440,10 +443,8 @@ bool Application::InitializeImGui()
     initInfo.PipelineCache = VK_NULL_HANDLE;
     initInfo.DescriptorPool = m_imguiDescriptorPool;
     initInfo.Allocator = nullptr;
-    initInfo.MinImageCount =
-            m_deviceContext.m_physicalDevices[m_deviceContext.m_deviceIndex].m_vkSurfaceCapabilities.minImageCount;
-    initInfo.ImageCount =
-            m_deviceContext.m_physicalDevices[m_deviceContext.m_deviceIndex].m_vkSurfaceCapabilities.minImageCount + 1;
+    initInfo.MinImageCount = m_deviceContext.m_physicalDevices[m_deviceContext.m_deviceIndex].m_vkSurfaceCapabilities.minImageCount;
+    initInfo.ImageCount = m_deviceContext.m_physicalDevices[m_deviceContext.m_deviceIndex].m_vkSurfaceCapabilities.minImageCount + 1;
     initInfo.CheckVkResultFn = nullptr;
     initInfo.RenderPass = m_imguiRenderPass;
     ImGui_ImplVulkan_Init(&initInfo);
@@ -566,8 +567,8 @@ Application::OnMouseMoved
 void Application::OnMouseMoved(GLFWwindow *window, double x, double y)
 {
     Application *application = reinterpret_cast<Application *>(glfwGetWindowUserPointer(window));
-    //if (application->m_isMouseDown)
-        //application->MouseMoved((float) x, (float) y);
+    // if (application->m_isMouseDown)
+    // application->MouseMoved((float) x, (float) y);
 
     if (application->m_isRightButtonDown)
     {
@@ -610,7 +611,7 @@ void Application::MouseButtonCallback(GLFWwindow *window, int button, int action
             double x, y;
             glfwGetCursorPos(window, &x, &y);
             application->m_mousePosition = Vec2(static_cast<float>(x), static_cast<float>(y));
-        } 
+        }
         else if (action == GLFW_RELEASE)
         {
             application->m_isMouseDown = false;
@@ -651,9 +652,7 @@ void Application::OnMouseWheelScrolled(GLFWwindow *window, double x, double y)
 Application::MouseScrolled
 ====================================================
 */
-void Application::MouseScrolled(float z)
-{ 
-    world->m_cam->position += world->m_cam->forward * z * m_cameraMoveSpeed; }
+void Application::MouseScrolled(float z) { world->m_cam->position += world->m_cam->forward * z * m_cameraMoveSpeed; }
 
 /*
 ====================================================
@@ -733,19 +732,19 @@ void Application::MainLoop()
              time = GetTimeMicroseconds();
          }
         timeLastFrame = time;*/
-        //long long time = GetTimeMicroseconds();
-        //float dt_us = float(time - timeLastFrame);
+        // long long time = GetTimeMicroseconds();
+        // float dt_us = float(time - timeLastFrame);
 
-        //if (dt_us < 16000.0f)
+        // if (dt_us < 16000.0f)
         //{
-        //    auto sleepTime = std::chrono::microseconds((int) (16000 - dt_us));
-        //    std::this_thread::sleep_for(sleepTime);
-        //    time = GetTimeMicroseconds(); // 再取一次真实时间
-        //    dt_us = float(time - timeLastFrame);
-        //}
+        //     auto sleepTime = std::chrono::microseconds((int) (16000 - dt_us));
+        //     std::this_thread::sleep_for(sleepTime);
+        //     time = GetTimeMicroseconds(); // 锟斤拷取一锟斤拷锟斤拷实时锟斤拷
+        //     dt_us = float(time - timeLastFrame);
+        // }
 
-        //timeLastFrame = time;
-        //printf("\ndt_ms: %.1f    ", dt_us * 0.001f);
+        // timeLastFrame = time;
+        // printf("\ndt_ms: %.1f    ", dt_us * 0.001f);
 
         // Get User Input
         glfwPollEvents();
@@ -914,7 +913,7 @@ void Application::UpdateUniforms()
         //
         // Update the uniform buffer with the camera information
         //
-        {   
+        {
             /*camera.matProj = m_camera.ComputeProjectionMatrix();
             camera.matView = m_camera.ComputeViewMatrix();
 
@@ -930,8 +929,7 @@ void Application::UpdateUniforms()
             camera.matProj = world->m_cam->ComputeProjectionMatrix();
             camera.matView = world->m_cam->ComputeViewMatrix();
 
-            
-            
+
             camera.viewNoTrans = camera.matView;
             camera.viewNoTrans.rows[0].w = 0.0f;
             camera.viewNoTrans.rows[1].w = 0.0f;
@@ -954,8 +952,8 @@ void Application::UpdateUniforms()
         // Update the uniform buffer with the shadow camera information
         //
         {
-            /*m_shadowCamera.forward = Vec3(0 - renderOption.sunDirection[0] * 30, 0 - renderOption.sunDirection[1] * 30, 0 - renderOption.sunDirection[2] * 30);
-            m_shadowCamera.position = m_camera.position + Vec3(renderOption.sunDirection) * 30;*/
+            /*m_shadowCamera.forward = Vec3(0 - renderOption.sunDirection[0] * 30, 0 - renderOption.sunDirection[1] * 30, 0 - renderOption.sunDirection[2] *
+            30); m_shadowCamera.position = m_camera.position + Vec3(renderOption.sunDirection) * 30;*/
 
             camera.matView = m_shadowCamera.ComputeViewMatrix();
             camera.matProj = m_shadowCamera.ComputeProjctionMatrix();
@@ -1039,7 +1037,7 @@ void Application::UpdateUniforms()
         //
         //	Update the uniform buffer with the body positions/orientations
         //
-        //for (int i = 0; i < m_scene->m_bodies.size(); i++)
+        // for (int i = 0; i < m_scene->m_bodies.size(); i++)
         //{
         //    Body &body = m_scene->m_bodies[i];
 
@@ -1102,7 +1100,7 @@ void Application::DrawFrame()
     const uint32_t imageIndex = m_deviceContext.BeginFrame();
 
     // Draw everything in an offscreen buffer
-    //DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
+    // DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
     // ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes, renderOption);
     ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, world, renderOption);
     //
@@ -1118,8 +1116,7 @@ void Application::DrawFrame()
 
             // Descriptor is how we bind our buffers and images
             Descriptor descriptor = m_copyPipeline.GetFreeDescriptor();
-            descriptor.BindImage(VK_IMAGE_LAYOUT_GENERAL, g_postProcessFrameBuffer.m_imageColor.m_vkImageView,
-                                 Samplers::m_samplerStandard, 0);
+            descriptor.BindImage(VK_IMAGE_LAYOUT_GENERAL, g_postProcessFrameBuffer.m_imageColor.m_vkImageView, Samplers::m_samplerStandard, 0);
             descriptor.BindDescriptor(&m_deviceContext, cmdBuffer, &m_copyPipeline);
             m_modelFullScreen.DrawIndexed(cmdBuffer);
         }
@@ -1147,7 +1144,7 @@ void Application::DrawFrame()
             return true;
         };
 
-        if (ImGui::Combo("Scene", &sampleSceneIdx, getter, (void*)&m_sceneFiles, m_sceneFiles.size()))
+        if (ImGui::Combo("Scene", &sampleSceneIdx, getter, (void *) &m_sceneFiles, m_sceneFiles.size()))
         {
             if (sceneName != m_sceneFiles[sampleSceneIdx])
             {

@@ -3,8 +3,8 @@
 //
 #pragma once
 #include <vulkan/vulkan.hpp>
-#include "Descriptor.h"
 #include "Buffer.h"
+#include "Descriptor.h"
 
 class DeviceContext;
 class FrameBuffer;
@@ -14,7 +14,8 @@ class Shader;
 namespace ElecNeko
 {
     class GFrameBuffer;
-}
+    class ElecNekoShader;
+} // namespace ElecNeko
 
 /*
 ====================================================
@@ -23,26 +24,26 @@ Pipeline
 Think of this as all of the state that's used to draw
 ====================================================
 */
-class Pipeline {
+class Pipeline
+{
 public:
-	Pipeline() {}
-	~Pipeline() {}
+    Pipeline() {}
+    ~Pipeline() {}
 
-	enum CullMode_t {
-		CULL_MODE_FRONT,
-		CULL_MODE_BACK,
-		CULL_MODE_NONE
-	};
+    enum CullMode_t
+    {
+        CULL_MODE_FRONT,
+        CULL_MODE_BACK,
+        CULL_MODE_NONE
+    };
 
     struct ElecNekoCreateParms_t
     {
-        ElecNekoCreateParms_t() {
-            memset( this, 0, sizeof( ElecNekoCreateParms_t ) );
-        }
+        ElecNekoCreateParms_t() { memset(this, 0, sizeof(ElecNekoCreateParms_t)); }
         VkRenderPass renderPass;
-        ElecNeko::GFrameBuffer * framebuffer;
-        Descriptors * descriptors;
-        Shader * shader;
+        ElecNeko::GFrameBuffer *framebuffer;
+        Descriptors *descriptors;
+        Shader *shader;
 
         int width;
         int height;
@@ -56,44 +57,43 @@ public:
         VkShaderStageFlagBits pushConstantShaderStages;
     };
 
-	struct CreateParms_t {
-		CreateParms_t() {
-			memset( this, 0, sizeof( CreateParms_t ) );
-		}
-		VkRenderPass	renderPass;
-		FrameBuffer * framebuffer;
-		Descriptors * descriptors;
-		Shader * shader;
+    struct CreateParms_t
+    {
+        CreateParms_t() { memset(this, 0, sizeof(CreateParms_t)); }
+        VkRenderPass renderPass;
+        FrameBuffer *framebuffer;
+        Descriptors *descriptors;
+        ElecNeko::ElecNekoShader *shader;
 
-		int width;
-		int height;
+        int width;
+        int height;
 
-		CullMode_t cullMode;
+        CullMode_t cullMode;
 
-		bool depthTest;
-		bool depthWrite;
+        bool depthTest;
+        bool depthWrite;
 
-		int pushConstantSize;
-		VkShaderStageFlagBits pushConstantShaderStages;
-	};
-	bool Create( DeviceContext * device, const CreateParms_t & parms );
+        int pushConstantSize;
+        VkShaderStageFlagBits pushConstantShaderStages;
+    };
+    bool Create(DeviceContext *device, const CreateParms_t &parms);
     bool CreateForMesh(DeviceContext *device, const CreateParms_t &parms);
     bool CreateForFullScreen(DeviceContext *device, const CreateParms_t &parms);
     bool CreateForTransparency(DeviceContext *device, const CreateParms_t &parms);
-	bool CreateCompute( DeviceContext * device, const CreateParms_t & parms );
-	void Cleanup( DeviceContext * device );
+    bool CreateCompute(DeviceContext *device, const CreateParms_t &parms);
+    void Cleanup(DeviceContext *device);
 
-	Descriptor GetFreeDescriptor() { return m_parms.descriptors->GetFreeDescriptor(); }
+    Descriptor GetFreeDescriptor() { return m_parms.descriptors->GetFreeDescriptor(); }
 
-	void BindPipeline( VkCommandBuffer cmdBuffer );
-	void BindPipelineCompute( VkCommandBuffer cmdBuffer );
-	void DispatchCompute( VkCommandBuffer cmdBuffer, int groupCountX, int groupCountY, int groupCountZ );
+    void BindPipeline(VkCommandBuffer cmdBuffer);
+    void BindPipelineCompute(VkCommandBuffer cmdBuffer);
+    void DispatchCompute(VkCommandBuffer cmdBuffer, int groupCountX, int groupCountY, int groupCountZ);
 
-	CreateParms_t m_parms;
+    CreateParms_t m_parms;
 
-	//
-	//	PipelineState
-	//
-	VkPipelineLayout m_vkPipelineLayout;
-	VkPipeline m_vkPipeline;
+    //
+    //	PipelineState
+    //
+    VkPipelineLayout m_vkPipelineLayout;
+    VkPipeline m_vkPipeline;
 };

@@ -32,8 +32,8 @@ mat3 ACESOutputMat = mat3
     vec3(-0.00327, -0.07276, 1.07602));
 
 vec3 RRTAndODTFit(vec3 v) {
-    vec3 a = v * (v + 0.0245786f) - 0.000090537f;
-    vec3 b = v * (0.983729f * v + 0.4329510f) + 0.238081f;
+    vec3 a = v * (v + 0.0245786) - 0.000090537;
+    vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
     return a / b;
 }
 
@@ -52,11 +52,11 @@ vec3 ACESFitted(vec3 color) {
 }
 
 vec3 ACES(in vec3 c) {
-    float a = 2.51f;
-    float b = 0.03f;
-    float y = 2.43f;
-    float d = 0.59f;
-    float e = 0.14f;
+    float a = 2.51;
+    float b = 0.03;
+    float y = 2.43;
+    float d = 0.59;
+    float e = 0.14;
 
     return clamp((c * (a * c + b)) / (c * (y * c + d) + e), 0.0, 1.0);
 }

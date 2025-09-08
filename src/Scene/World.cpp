@@ -3,38 +3,32 @@
 #include <cassert>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <iostream>
+#include <sstream>
 
 #include <assimp/Importer.hpp>
-#include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/scene.h>
 
 #include "assimp/pbrmaterial.h"
 
 namespace ElecNeko
 {
-    static Vec3 AiColorToVec3(const aiColor4D &c) 
-	{ 
-		return Vec3(static_cast<float>(c.r), static_cast<float>(c.g), static_cast<float>(c.b));
-	}
+    static Vec3 AiColorToVec3(const aiColor4D &c) { return Vec3(static_cast<float>(c.r), static_cast<float>(c.g), static_cast<float>(c.b)); }
 
-	static bool AiGetMaterialFloat(aiMaterial* m, const char* key, unsigned int type, unsigned int idx, float& out)
-	{
+    static bool AiGetMaterialFloat(aiMaterial *m, const char *key, unsigned int type, unsigned int idx, float &out)
+    {
         aiReturn r = m->Get(key, type, idx, out);
         return r == AI_SUCCESS;
-	}
+    }
 
-	static std::string GetAiTexturePath(const aiString &s) 
-	{ 
-		return std::string(s.C_Str());
-	}
+    static std::string GetAiTexturePath(const aiString &s) { return std::string(s.C_Str()); }
 
     // safe lowercase helper
-    static std::string ToLowerStr(const std::string& s)
-    { 
+    static std::string ToLowerStr(const std::string &s)
+    {
         std::string out = s;
-        for (char& c : out)
+        for (char &c: out)
         {
             c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         }
@@ -42,53 +36,50 @@ namespace ElecNeko
     }
 
     bool ElecNekoMesh::MakeVBO(DeviceContext *device)
-	{ 
-		if (m_vertices.empty())
-		{
+    {
+        if (m_vertices.empty())
+        {
             return true;
-		}
+        }
 
-		int bufferSize = static_cast<int>(sizeof(VVertex) * m_vertices.size());
+        int bufferSize = static_cast<int>(sizeof(VVertex) * m_vertices.size());
         if (!m_vertexBuffer.Allocate(device, m_vertices.data(), bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
-		{
+        {
             printf("Failed to Allocate vertex Buffer!\n");
             assert(0);
             return false;
-		}
+        }
 
-		bufferSize = static_cast<int>(sizeof(uint32_t) * m_indices.size());
+        bufferSize = static_cast<int>(sizeof(uint32_t) * m_indices.size());
         if (!m_indexBuffer.Allocate(device, m_indices.data(), bufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT))
-		{
+        {
             printf("Failed to Allocate  indices Buffer!\n");
             assert(0);
             return false;
-		}
+        }
         return true;
-	}
+    }
 
-	void ElecNekoMesh::Cleanup(DeviceContext* device)
-	{ 
-		m_vertexBuffer.Cleanup(device);
+    void ElecNekoMesh::Cleanup(DeviceContext *device)
+    {
+        m_vertexBuffer.Cleanup(device);
         m_indexBuffer.Cleanup(device);
-	}
-	
-	bool ElecNekoMeshInstance::MakeUBO(DeviceContext* device)
-	{ 
-		int bufferSize = sizeof(transform);
-		if (!uniformBuffer.Allocate(device, transform.ToPtr(), bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT))
-		{
+    }
+
+    bool ElecNekoMeshInstance::MakeUBO(DeviceContext *device)
+    {
+        int bufferSize = sizeof(transform);
+        if (!uniformBuffer.Allocate(device, transform.ToPtr(), bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT))
+        {
             printf("Failed to allocate uniform buffer!\n");
             assert(0);
             return false;
-		}
+        }
 
-		return true;
-	}
+        return true;
+    }
 
-	void ElecNekoMeshInstance::Cleanup(DeviceContext* device) 
-	{ 
-		uniformBuffer.Cleanup(device);
-	}
+    void ElecNekoMeshInstance::Cleanup(DeviceContext *device) { uniformBuffer.Cleanup(device); }
 
     void ElecNekoMesh::DrawIndexed(VkCommandBuffer vkCommandBuffer)
     {
@@ -101,22 +92,22 @@ namespace ElecNeko
         vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
     }
 
-	static std::string Trim(std::string_view v)
-	{
-		size_t b = 0, e = v.size();
-		while (b < e && std::isspace((unsigned char)v[b]))
-		{
+    static std::string Trim(std::string_view v)
+    {
+        size_t b = 0, e = v.size();
+        while (b < e && std::isspace((unsigned char) v[b]))
+        {
             ++b;
-		}
-		while (e > b && std::isspace((unsigned char)v[e - 1]))
-		{
-			--e;
-		}
+        }
+        while (e > b && std::isspace((unsigned char) v[e - 1]))
+        {
+            --e;
+        }
         return std::string(v.substr(b, e - b));
-	}
+    }
 
-	static std::vector<std::string> ReadBlock(std::ifstream& ifs, const std::string& firstLine)
-	{
+    static std::vector<std::string> ReadBlock(std::ifstream &ifs, const std::string &firstLine)
+    {
         std::vector<std::string> out;
 
         // If the opening line contains '{' then we start reading subsequent lines until matching '}'
@@ -152,9 +143,9 @@ namespace ElecNeko
         }
 
         return out;
-	}
+    }
 
-	// parse a vec3 from a single line token like: "position -0.1 0.2 1.0"
+    // parse a vec3 from a single line token like: "position -0.1 0.2 1.0"
     static std::optional<std::array<float, 3>> ParseVec3(const std::string &line)
     {
         std::istringstream iss(line);
@@ -201,11 +192,11 @@ namespace ElecNeko
         std::getline(iss, rest);
         // trim rest
         size_t b = 0, e = rest.size();
-        while (b < e && std::isspace((unsigned char)rest[b]))
+        while (b < e && std::isspace((unsigned char) rest[b]))
         {
             ++b;
         }
-        while (e > b && std::isspace((unsigned char)rest[e - 1]))
+        while (e > b && std::isspace((unsigned char) rest[e - 1]))
         {
             --e;
         }
@@ -228,7 +219,7 @@ namespace ElecNeko
         return fallback;
     }
 
-    static std::string NormalizePathForKey(const std::string& p)
+    static std::string NormalizePathForKey(const std::string &p)
     {
         try
         {
@@ -240,8 +231,8 @@ namespace ElecNeko
     }
 
     // helper: convert aiMatrix 4x4 ->Mat4
-    static Mat4 AiToMat4(const aiMatrix4x4& m)
-    { 
+    static Mat4 AiToMat4(const aiMatrix4x4 &m)
+    {
         Mat4 out;
         out.rows[0] = Vec4(static_cast<float>(m.a1), static_cast<float>(m.a2), static_cast<float>(m.a3), static_cast<float>(m.a4));
         out.rows[1] = Vec4(static_cast<float>(m.b1), static_cast<float>(m.b2), static_cast<float>(m.b3), static_cast<float>(m.b4));
@@ -278,7 +269,8 @@ namespace ElecNeko
     }
 
     // helper: recursive traversal to create instances for each node->mesh reference ---
-    static void TraverseAssimpNodesAndCretaeInstances(const aiScene* scene, const aiNode* node, const aiMatrix4x4& parentTransform, World* world, const std::vector<int>& aiToWorldMesh, const std::vector<int>& aiToWorldMat)
+    static void TraverseAssimpNodesAndCretaeInstances(const aiScene *scene, const aiNode *node, const aiMatrix4x4 &parentTransform, World *world,
+                                                      const std::vector<int> &aiToWorldMesh, const std::vector<int> &aiToWorldMat)
     {
         if (!node)
         {
@@ -323,8 +315,8 @@ namespace ElecNeko
         }
     }
 
-    static std::string SaveEmbeddedTextureToTemFile(const aiTexture* atex, const std::filesystem::path& basePath, int embIndex)
-    { 
+    static std::string SaveEmbeddedTextureToTemFile(const aiTexture *atex, const std::filesystem::path &basePath, int embIndex)
+    {
         if (!atex)
         {
             return "";
@@ -333,16 +325,16 @@ namespace ElecNeko
         // compressed (mHeight == 0) stores pcData with size = mWidth
         if (atex->mHeight == 0 && atex->pcData)
         {
-            //std::string fmt = atex->achFormatHint ? std::string(atex->achFormatHint) : "png";
+            // std::string fmt = atex->achFormatHint ? std::string(atex->achFormatHint) : "png";
             //// normalize format hint (some are like "PNG\0")
-            //for (auto& c : fmt)
+            // for (auto& c : fmt)
             //{
-            //    if (c == '\0')
-            //    {
-            //        fmt.resize(&c - fmt.c_str());
-            //        break;
-            //    }
-            //}
+            //     if (c == '\0')
+            //     {
+            //         fmt.resize(&c - fmt.c_str());
+            //         break;
+            //     }
+            // }
             std::string fmt = "";
             if (atex->achFormatHint && atex->achFormatHint[0] != '\0')
             {
@@ -375,11 +367,12 @@ namespace ElecNeko
     }
 
     // helper: robustly try several textures slots and return world texture id (or -1).
-    static int ResolveAndLoadTextureFromMaterial(aiMaterial* aim, const aiScene* scene, World* world, DeviceContext* device, const std::filesystem::path& basepath, const std::vector<aiTextureType>& tryTypes)
+    static int ResolveAndLoadTextureFromMaterial(aiMaterial *aim, const aiScene *scene, World *world, DeviceContext *device,
+                                                 const std::filesystem::path &basepath, const std::vector<aiTextureType> &tryTypes)
     {
         aiString texPath;
         // try each texture type in order
-        for (auto type : tryTypes)
+        for (auto type: tryTypes)
         {
             if (aim->GetTexture(type, 0, &texPath) == AI_SUCCESS)
             {
@@ -389,7 +382,7 @@ namespace ElecNeko
                     continue;
                 }
 
-                //embedded texture reference link "*0"
+                // embedded texture reference link "*0"
                 if (p.front() == '*')
                 {
                     // parse index
@@ -397,8 +390,7 @@ namespace ElecNeko
                     try
                     {
                         emb = std::stoi(p.substr(1));
-                    }
-                    catch (...)
+                    } catch (...)
                     {
                         continue;
                     }
@@ -434,7 +426,7 @@ namespace ElecNeko
         return -1;
     }
 
-    static Material ConvertAssimpMaterial(aiMaterial* aim, const aiScene* scene, World* world, DeviceContext* device, const std::filesystem::path& basePath)
+    static Material ConvertAssimpMaterial(aiMaterial *aim, const aiScene *scene, World *world, DeviceContext *device, const std::filesystem::path &basePath)
     {
         Material mat; // default ctor sets defaults
 
@@ -466,7 +458,7 @@ namespace ElecNeko
         mat.metallic = metal;
         mat.roughness = sqrtf((rough > 0.f) ? rough : 0.f);
 
-        // emissive 
+        // emissive
         aiColor3D emissive(0.f, 0.f, 0.f);
         if (aim->Get(AI_MATKEY_COLOR_EMISSIVE, emissive) == AI_SUCCESS)
         {
@@ -495,9 +487,9 @@ namespace ElecNeko
             if (kl.find("alphamode") != std::string::npos || kl.find("alpha_mode") != std::string::npos)
             {
                 // data is stored as string
-                std::string val(reinterpret_cast<const char*>(prop->mData), prop->mDataLength);
+                std::string val(reinterpret_cast<const char *>(prop->mData), prop->mDataLength);
                 // trim null/newline
-                while (!val.empty() && (val.back() == '\0' || std::isspace((unsigned char)val.back())))
+                while (!val.empty() && (val.back() == '\0' || std::isspace((unsigned char) val.back())))
                 {
                     val.pop_back();
                 }
@@ -574,7 +566,7 @@ namespace ElecNeko
         return mat;
     }
 
-	int World::LoadMeshGeometryOnly(DeviceContext *device, const std::string &filename)
+    int World::LoadMeshGeometryOnly(DeviceContext *device, const std::string &filename)
     {
         std::string key = NormalizePathForKey(filename);
         auto it = m_meshIndexByKey.find(key);
@@ -584,19 +576,20 @@ namespace ElecNeko
         }
 
         Assimp::Importer importer;
-        unsigned int flags = aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices | aiProcess_ImproveCacheLocality;
+        unsigned int flags = aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices |
+                             aiProcess_ImproveCacheLocality;
 
-        const aiScene* scene = importer.ReadFile(filename, flags);
-        if(!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) != 0 || !scene->mRootNode)
+        const aiScene *scene = importer.ReadFile(filename, flags);
+        if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) != 0 || !scene->mRootNode)
         {
             std::cerr << "Assimp: failed to load " << filename << ": " << importer.GetErrorString() << "\n";
             return -1;
         }
 
-        ElecNekoMesh* mesh = new ElecNekoMesh();
+        ElecNekoMesh *mesh = new ElecNekoMesh();
         mesh->name = std::filesystem::path(filename).stem().string();
 
-        // pre-alloc heuristics 
+        // pre-alloc heuristics
         size_t totalVerticesHint = 0;
         size_t totalFacesHint = 0;
 
@@ -615,19 +608,21 @@ namespace ElecNeko
         for (unsigned int mi = 0; mi < scene->mNumMeshes; ++mi)
         {
             aiMesh *am = scene->mMeshes[mi];
-            if(!am) continue;
+            if (!am)
+                continue;
 
             // build index/vertex buffers (dedupe)
             for (unsigned int fi = 0; fi < am->mNumFaces; ++fi)
             {
                 const aiFace &face = am->mFaces[fi];
-                if(face.mNumIndices != 3) continue;
+                if (face.mNumIndices != 3)
+                    continue;
 
                 for (unsigned int k = 0; k < 3; ++k)
                 {
                     uint32_t idx = face.mIndices[k];
                     VVertex vv{};
-                    if(am->HasPositions())
+                    if (am->HasPositions())
                     {
                         vv.position[0] = am->mVertices[idx].x;
                         vv.position[1] = am->mVertices[idx].y;
@@ -637,8 +632,8 @@ namespace ElecNeko
                     {
                         vv.position[0] = vv.position[1] = vv.position[2] = 0.f;
                     }
-                    
-                    if(am->HasTextureCoords(0))
+
+                    if (am->HasTextureCoords(0))
                     {
                         vv.uv[0] = am->mTextureCoords[0][idx].x;
                         vv.uv[1] = 1.f - am->mTextureCoords[0][idx].y;
@@ -647,8 +642,8 @@ namespace ElecNeko
                     {
                         vv.uv[0] = vv.uv[1] = 0.f;
                     }
-                    
-                    if(am->HasNormals())
+
+                    if (am->HasNormals())
                     {
                         vv.normal[0] = am->mNormals[idx].x;
                         vv.normal[1] = am->mNormals[idx].y;
@@ -662,7 +657,7 @@ namespace ElecNeko
                     }
 
                     auto it = dedup.find(vv);
-                    if(it == dedup.end())
+                    if (it == dedup.end())
                     {
                         uint32_t newIdx = static_cast<uint32_t>(mesh->m_vertices.size());
                         mesh->m_vertices.push_back(vv);
@@ -677,13 +672,13 @@ namespace ElecNeko
             }
         }
 
-        if(mesh->m_vertices.empty() || mesh->m_indices.empty())
+        if (mesh->m_vertices.empty() || mesh->m_indices.empty())
         {
             delete mesh;
             return -1;
         }
 
-        if(!mesh->MakeVBO(device))
+        if (!mesh->MakeVBO(device))
         {
             std::cerr << "Failed to make VBO\n";
             delete mesh;
@@ -700,8 +695,8 @@ namespace ElecNeko
     {
         std::string key = NormalizePathForKey(filename);
 
-        const auto& it = m_textureCache.find(key);
-        if(it != m_textureCache.end())
+        const auto &it = m_textureCache.find(key);
+        if (it != m_textureCache.end())
         {
             return it->second;
         }
@@ -718,10 +713,11 @@ namespace ElecNeko
     int World::LoadMeshWithMaterials(DeviceContext *device, const std::string &filename, Mat4 transMat)
     {
         Assimp::Importer importer;
-        unsigned int flags = aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices | aiProcess_ImproveCacheLocality;
+        unsigned int flags = aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices |
+                             aiProcess_ImproveCacheLocality;
 
-        const aiScene* scene = importer.ReadFile(filename, flags);
-        if(!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) != 0 || !scene->mRootNode)
+        const aiScene *scene = importer.ReadFile(filename, flags);
+        if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) != 0 || !scene->mRootNode)
         {
             std::cerr << "Assimp: failed to load " << filename << ": " << importer.GetErrorString() << "\n";
             return -1;
@@ -729,10 +725,10 @@ namespace ElecNeko
 
         std::filesystem::path basePath = std::filesystem::path(filename).parent_path();
         int firstIndex = static_cast<int>(m_meshes.size());
-        
+
         // 1) convert materials -> World::m_materials and keep ai index -> world index mapping
         std::vector<int> aiToWorldMat(scene->mNumMaterials, -1);
-        
+
         for (uint32_t aiMatIdx = 0; aiMatIdx < scene->mNumMaterials; ++aiMatIdx)
         {
             aiMaterial *aim = scene->mMaterials[aiMatIdx];
@@ -854,8 +850,8 @@ namespace ElecNeko
         return firstIndex;
     }
 
-    void World::CreateDefaultTextures(DeviceContext* device)
-    { 
+    void World::CreateDefaultTextures(DeviceContext *device)
+    {
         std::array<uint8_t, 4> white = {255, 255, 255, 255};
         defaultAlbedo = new Texture(device, "default_albedo", white.data(), 1, 1, 4);
 
@@ -869,8 +865,8 @@ namespace ElecNeko
         defaultEmission = new Texture(device, "default_emission", black.data(), 1, 1, 4);
     }
 
-    int World::AddTexture(DeviceContext* device, const std::string& filename) 
-    { 
+    int World::AddTexture(DeviceContext *device, const std::string &filename)
+    {
         Texture *texture = new Texture();
 
         if (!texture->LoadTexture(device, filename))
@@ -885,15 +881,15 @@ namespace ElecNeko
         return idx;
     }
 
-    int World::AddMaterial(const Material& material)
-    { 
+    int World::AddMaterial(const Material &material)
+    {
         int idx = m_materials.size();
         m_materials.push_back(material);
         return idx;
     }
 
     void World::AddCamera(Vec3 eye, Vec3 lookAt, float fov, float aspecRatio, float zNear, float zFar)
-    { 
+    {
         if (m_cam)
             delete m_cam;
 
@@ -901,7 +897,7 @@ namespace ElecNeko
         m_cam->Initialize(eye, lookAt, fov, aspecRatio, zNear, zFar);
     }
 
-    bool World::LoadSceneFromFile(DeviceContext* device, const std::string& filename) 
+    bool World::LoadSceneFromFile(DeviceContext *device, const std::string &filename)
     {
         std::ifstream ifs(filename);
         if (!ifs.is_open())
@@ -945,7 +941,7 @@ namespace ElecNeko
                 }
                 auto block = ReadBlock(ifs, t);
                 Material mat;
-                for (auto& ln : block)
+                for (auto &ln: block)
                 {
                     if (ln.rfind("color", 0) == 0)
                     {
@@ -1188,6 +1184,103 @@ namespace ElecNeko
                 }
                 continue;
             }
+            if (token == "light")
+            {
+                auto block = ReadBlock(ifs, t);
+                std::string tok;
+
+                Light *light = nullptr;
+
+                for (auto &ln: block)
+                {
+                    if (ln.rfind("type", 0) == 0)
+                    {
+                        tok = ParseSingleToken(ln);
+                    }
+                }
+                if (tok == "quad")
+                {
+                    light = new QuadLight();
+
+                    auto *ql = dynamic_cast<QuadLight *>(light);
+                    if (ql)
+                    {
+                        for (auto &ln: block)
+                        {
+                            if (ln.rfind("position", 0) == 0)
+                            {
+                                if (auto v = ParseVec3(ln))
+                                {
+                                    ql->position = Vec3((*v)[0], (*v)[1], (*v)[2]);
+                                }
+                            }
+                            else if (ln.rfind("emission", 0) == 0)
+                            {
+                                if (auto v = ParseVec3(ln))
+                                {
+                                    ql->emission = Vec3((*v)[0], (*v)[1], (*v)[2]);
+                                }
+                            }
+                            else if (ln.rfind("v1", 0) == 0)
+                            {
+                                if (auto v = ParseVec3(ln))
+                                {
+                                    ql->u = Vec3((*v)[0], (*v)[1], (*v)[2]);
+                                }
+                            }
+                            else if (ln.rfind("v2", 0) == 0)
+                            {
+                                if (auto v = ParseVec3(ln))
+                                {
+                                    ql->v = Vec3((*v)[0], (*v)[1], (*v)[2]);
+                                }
+                            }
+                            ql->u = ql->u - ql->position;
+                            ql->v = ql->v - ql->position;
+                            ql->area = ql->u.Cross(ql->v).GetMagnitude();
+                        }
+                        ql->MakeUBO(device);
+                        m_lights.push_back(light);
+                    }
+                }
+                else if (tok == "sphere")
+                {
+                    light = new PointLight();
+
+                    auto *pl = dynamic_cast<PointLight *>(light);
+                    if (pl)
+                    {
+                        for (auto &ln: block)
+                        {
+                            if (ln.rfind("position", 0) == 0)
+                            {
+                                if (auto v = ParseVec3(ln))
+                                {
+                                    pl->position = Vec3((*v)[0], (*v)[1], (*v)[2]);
+                                }
+                            }
+                            else if (ln.rfind("emission", 0) == 0)
+                            {
+                                if (auto v = ParseVec3(ln))
+                                {
+                                    pl->emission = Vec3((*v)[0], (*v)[1], (*v)[2]);
+                                }
+                            }
+                            else if (ln.rfind("radius", 0) == 0)
+                            {
+                                pl->radius = ParseSingleFloat(ln, pl->radius);
+                            }
+                        }
+                        pl->MakeUBO(device);
+
+                        m_lights.push_back(light);
+                    }
+                }
+                else
+                {
+                    continue;
+                }
+            }
             if (token == "gltf")
             {
                 auto block = ReadBlock(ifs, t);
@@ -1196,7 +1289,7 @@ namespace ElecNeko
                 translate.Identity();
                 scale.Identity();
                 rotation.Identity();
-                for (auto& ln : block)
+                for (auto &ln: block)
                 {
                     if (ln.rfind("file", 0) == 0)
                     {
@@ -1250,7 +1343,7 @@ namespace ElecNeko
                 float aperture = 0.f;
                 float focalDist = 1.f;
 
-                for (auto& ln : block)
+                for (auto &ln: block)
                 {
                     if (ln.rfind("position", 0) == 0)
                     {
@@ -1289,15 +1382,15 @@ namespace ElecNeko
         return true;
     }
 
-    void World::UnloadScene(DeviceContext* device)
-    { 
-        for (auto& inst : m_meshInstances)
+    void World::UnloadScene(DeviceContext *device)
+    {
+        for (auto &inst: m_meshInstances)
         {
             inst.Cleanup(device);
         }
         m_meshInstances.clear();
 
-        for (auto* mesh : m_meshes)
+        for (auto *mesh: m_meshes)
         {
             if (mesh)
             {
@@ -1308,7 +1401,7 @@ namespace ElecNeko
         m_meshes.clear();
         m_meshIndexByKey.clear();
 
-        for (auto* tex : m_textures)
+        for (auto *tex: m_textures)
         {
             if (tex)
             {
@@ -1321,6 +1414,14 @@ namespace ElecNeko
 
         m_materials.clear();
 
+        for (auto *light: m_lights)
+        {
+            if (light)
+            {
+                light->Cleanup(device);
+            }
+        }
+
         if (m_cam)
         {
             delete m_cam;
@@ -1328,10 +1429,10 @@ namespace ElecNeko
         }
     }
 
-    void World::Cleanup(DeviceContext* device)
-    { 
+    void World::Cleanup(DeviceContext *device)
+    {
         UnloadScene(device);
-        
+
         defaultAlbedo->Cleanup(device);
         defaultNormal->Cleanup(device);
         defaultMetalRough->Cleanup(device);
@@ -1342,4 +1443,4 @@ namespace ElecNeko
         delete defaultMetalRough;
         delete defaultEmission;
     }
-}
+} // namespace ElecNeko

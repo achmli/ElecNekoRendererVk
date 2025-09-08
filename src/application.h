@@ -4,11 +4,11 @@
 #pragma once
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <filesystem>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
 #include <vector>
-#include <filesystem>
 
 #include "Math/Quat.h"
 #include "Math/Vector.h"
@@ -16,14 +16,15 @@
 #include "Physics/Shapes.h"
 
 #include "RHI/DeviceContext.h"
+#include "RHI/ElecNekoShader.h"
 #include "RHI/FrameBuffer.h"
 #include "RHI/model.h"
 #include "RHI/shader.h"
 
 #include "Loader/Mesh.h"
 
-#include "Scene/World.h"
 #include "Scene/SkyBox.h"
+#include "Scene/World.h"
 
 #include "RenderOption.h"
 
@@ -101,8 +102,8 @@ private:
     Model m_modelFullScreen;
     std::vector<Model *> m_models; // models for the bodies
 
-    ElecNeko::World* world;
-    ElecNeko::World *deletingWorld = nullptr; 
+    ElecNeko::World *world;
+    ElecNeko::World *deletingWorld = nullptr;
 
     std::vector<std::filesystem::path> m_sceneFiles;
 
@@ -117,13 +118,13 @@ private:
     //
     //	Pipeline for copying the offscreen framebuffer to the swapchain
     //
-    Shader m_copyShader;
+    ElecNeko::ElecNekoShader m_copyShader;
     Descriptors m_copyDescriptors;
     Pipeline m_copyPipeline;
 
     // User input
     Vec2 m_mousePosition;
-    
+
     bool m_isPaused;
     bool m_stepFrame;
     bool m_isMouseDown = false;

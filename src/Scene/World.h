@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Loader/Mesh.h"
+#include "Light.h"
 
 #include <unordered_map>
 
@@ -87,6 +88,8 @@ namespace ElecNeko
         Texture *defaultEmission;
 
         std::vector<ElecNekoMeshInstance> m_meshInstances;
+
+        std::vector<Light *> m_lights;
         
         std::unordered_map<std::string,int> m_textureCache;
 
