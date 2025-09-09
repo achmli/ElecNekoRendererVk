@@ -97,3 +97,67 @@ public:
     VkPipelineLayout m_vkPipelineLayout;
     VkPipeline m_vkPipeline;
 };
+
+
+namespace ElecNeko
+{
+    class ElecNekoPipeline
+    {
+    public:
+        ElecNekoPipeline() = default;
+        ~ElecNekoPipeline() = default;
+
+        enum CullMode_t
+        {
+            CULL_MODE_FRONT,
+            CULL_MODE_BACK,
+            CULL_MODE_NONE
+        };
+
+        enum Usage_t
+        {
+            USAGE_DEFAULT,
+            USAGE_MESH,
+            USAGE_FULL_SCREEN,
+            USAGE_TRANSPARENCY
+        };
+
+        struct CreateParms_t
+        {
+            CreateParms_t() { memset(this, 0, sizeof(CreateParms_t)); }
+
+            VkRenderPass renderPass;
+            FrameBuffer *framebuffer;
+            Descriptors *descriptors;
+            ElecNekoShader *shader;
+
+            int width;
+            int height;
+
+            CullMode_t cullMode;
+
+            bool depthTest;
+            bool depthWrite;
+
+            int pushConstantSize;
+            VkShaderStageFlagBits pushConstantShaderStages;
+        };
+        bool Create(DeviceContext *device, const CreateParms_t &parms, Usage_t usage = USAGE_DEFAULT);
+        bool CreateCompute(DeviceContext *device, const CreateParms_t &parms);
+        void Cleanup(DeviceContext *device);
+
+        Descriptor GetFreeDescriptor() { return m_parms.descriptors->GetFreeDescriptor(); }
+
+        void BindPipeline(VkCommandBuffer cmdBuffer);
+        void BindPipelineCompute(VkCommandBuffer cmdBuffer);
+        void DispatchCompute(VkCommandBuffer cmdBuffer, int groupCountX, int groupCountY, int groupCountZ);
+
+        CreateParms_t m_parms;
+
+        //
+        //	PipelineState
+        //
+        VkPipelineLayout m_vkPipelineLayout;
+        VkPipeline m_vkPipeline;
+    };
+} // namespace ElecNeko

@@ -82,7 +82,7 @@ private:
     static void MouseButtonCallback(GLFWwindow *window, int button, int action, int mods);
 
 private:
-    class Scene *m_scene;
+    // class Scene *m_scene;
 
     GLFWwindow *m_glfwWindow;
 

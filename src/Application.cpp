@@ -138,9 +138,9 @@ void Application::Initialize()
 
     InitializeImGui();
 
-    m_scene = new Scene;
-    m_scene->Initialize();
-    m_scene->Reset();
+    // m_scene = new Scene;
+    // m_scene->Initialize();
+    // m_scene->Reset();
 
 
     // m_camera.Initialize(Vec3(75.f, 75.f, 75.f), Vec3(32.5f, -6.6f, -49.3f), 80.f, static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(WINDOW_WIDTH), .1f,
@@ -476,8 +476,8 @@ void Application::Cleanup()
     vkDestroyRenderPass(m_deviceContext.m_vkDevice, m_imguiRenderPass, nullptr);
 
     // Delete the screen so that it can clean itself up
-    delete m_scene;
-    m_scene = NULL;
+    // delete m_scene;
+    // m_scene = NULL;
 
     // Delete models
     /*for (int i = 0; i < m_models.size(); i++)
@@ -674,7 +674,7 @@ void Application::Keyboard(int key, int scancode, int action, int modifiers)
 {
     if (GLFW_KEY_R == key && GLFW_RELEASE == action)
     {
-        m_scene->Reset();
+        // m_scene->Reset();
     }
     if (GLFW_KEY_T == key && GLFW_RELEASE == action)
     {
@@ -789,7 +789,7 @@ void Application::MainLoop()
             int startTime = GetTimeMicroseconds();
             for (int i = 0; i < 2; i++)
             {
-                m_scene->Update(dt_sec * 0.5f);
+                // m_scene->Update(dt_sec * 0.5f);
             }
             int endTime = GetTimeMicroseconds();
 

@@ -16,3 +16,5 @@ res/CubeMaps/CornellBox/*
 res/CubeMaps/GraceCathedral/*
 res/CubeMaps/Indoor/*
 res/CubeMaps/Skybox/*.txt
+
+src/shaders/spirv/*.spirv
