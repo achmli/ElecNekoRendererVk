@@ -324,85 +324,89 @@ namespace ElecNeko
             }
 
             // try compile from source
+            bool compiledSuccessfully = false;
             if (srcExists)
             {
                 auto srcOpt = ReadFileText(srcPathStr);
-                if (!srcOpt)
+                if (srcOpt)
                 {
-                    std::cerr << "Failed to read shader source file: " << srcPathStr << "\n";
-                    m_vkShaderModules[s] = VK_NULL_HANDLE;
-                    continue;
-                }
-
-                int kind = ShaderStageToShaderCKind((ShaderStage_t) s);
-                if (kind < 0)
-                {
-                    std::cerr << "on runtime compiler support for stage" << StageVulkanName((ShaderStage_t) s) << "\n";
-                    m_vkShaderModules[s] = VK_NULL_HANDLE;
-                    continue;
-                }
-
-                shaderc::CompileOptions options;
-                // set includer
-                options.SetIncluder(std::make_unique<FileIncluder>(srcDir));
-                options.SetOptimizationLevel(shaderc_optimization_level_performance);
-
-                shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(*srcOpt, static_cast<shaderc_shader_kind>(kind), srcPathStr.c_str(), options);
-                // shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(srcOpt->data(), // 传裸指针
-                //                                                                  srcOpt->size(), // 明确告诉长度（不包括额外 \0）
-                //                                                                  static_cast<shaderc_shader_kind>(kind), srcPathStr.c_str(),
-                //                                                                  "main", // entrypoint
-                //                                                                  options);
-                if (module.GetCompilationStatus() != shaderc_compilation_status_success)
-                {
-                    std::cerr << "Failed to compile shader: " << srcPathStr << ":" << module.GetErrorMessage() << "\n";
-                    m_vkShaderModules[s] = VK_NULL_HANDLE;
-                    continue;
-                }
-                std::cout << "Compile Successfully!\n";
-
-                // copy spirv
-                std::vector<uint32_t> spirv(module.cbegin(), module.cend());
-
-                if (writeSpvToDisk)
-                {
-                    try
+                    int kind = ShaderStageToShaderCKind((ShaderStage_t) s);
+                    if (kind < 0)
                     {
-                        if (!std::filesystem::exists(spirvDir))
+                        std::cerr << "on runtime compiler support for stage" << StageVulkanName((ShaderStage_t) s) << "\n";
+                        m_vkShaderModules[s] = VK_NULL_HANDLE;
+                        continue;
+                    }
+
+                    shaderc::CompileOptions options;
+                    // set includer
+                    options.SetIncluder(std::make_unique<FileIncluder>(srcDir));
+                    options.SetOptimizationLevel(shaderc_optimization_level_performance);
+
+                    shaderc::SpvCompilationResult module =
+                            compiler.CompileGlslToSpv(*srcOpt, static_cast<shaderc_shader_kind>(kind), srcPathStr.c_str(), options);
+                    // shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(srcOpt->data(), // 传裸指针
+                    //                                                                  srcOpt->size(), // 明确告诉长度（不包括额外 \0）
+                    //                                                                  static_cast<shaderc_shader_kind>(kind), srcPathStr.c_str(),
+                    //                                                                  "main", // entrypoint
+                    //                                                                  options);
+                    if (module.GetCompilationStatus() == shaderc_compilation_status_success)
+                    {
+                        // copy spirv
+                        std::vector<uint32_t> spirv(module.cbegin(), module.cend());
+
+                        if (writeSpvToDisk)
                         {
-                            std::filesystem::create_directories(spirvDir);
+                            try
+                            {
+                                if (!std::filesystem::exists(spirvDir))
+                                {
+                                    std::filesystem::create_directories(spirvDir);
+                                }
+                                std::ofstream ofs(spirvPathStr, std::ios::binary);
+                                if (ofs)
+                                {
+                                    ofs.write(reinterpret_cast<const char *>(spirv.data()), spirv.size() * sizeof(uint32_t));
+                                    ofs.close();
+                                    std::cout << "Write SPV to disk: " << spirvPathStr << " Successfully\n";
+                                }
+                                else
+                                {
+                                    std::cerr << "Failed to write SPV to disk: " << spirvPathStr << "\n";
+                                }
+                            } catch (const std::exception &e)
+                            {
+                                std::cerr << "Failed to write SPV to disk: " << e.what() << "\n";
+                            }
                         }
-                        std::ofstream ofs(spirvPathStr, std::ios::binary);
-                        if (ofs)
+                        VkShaderModule vkMod = CreateShaderModule(device->m_vkDevice, spirv.data(), static_cast<int>(spirv.size()));
+                        if (vkMod != VK_NULL_HANDLE)
                         {
-                            ofs.write(reinterpret_cast<const char *>(spirv.data()), spirv.size() * sizeof(uint32_t));
-                            ofs.close();
+                            m_vkShaderModules[s] = vkMod;
+                            compiledSuccessfully = true;
+                            std::cout << "Compiled shader successfully: " << srcPathStr << "\n";
+                            continue;
                         }
                         else
                         {
-                            std::cerr << "Failed to write SPV to disk: " << spirvPathStr << "\n";
+                            std::cerr << "Failed to create VkShaderModule from compiled shader: " << srcPathStr << "\n";
                         }
-                    } catch (const std::exception &e)
+                    }
+                    else
                     {
-                        std::cerr << "Failed to write SPV to disk: " << e.what() << "\n";
+                        std::cerr << "Failed to compile shader: " << srcPathStr << ":" << module.GetErrorMessage() << "\n";
+                        m_vkShaderModules[s] = VK_NULL_HANDLE;
                     }
                 }
-
-                // create module
-                VkShaderModule vkMod = CreateShaderModule(device->m_vkDevice, spirv.data(), static_cast<int>(spirv.size()));
-                if (vkMod == VK_NULL_HANDLE)
+                else
                 {
-                    std::cerr << "Failed to create VkShaderModule from compiled shader: " << srcPathStr << "\n";
+                    std::cerr << "Failed to read shader source file: " << srcPathStr << "\n";
                     m_vkShaderModules[s] = VK_NULL_HANDLE;
-                    continue;
                 }
-
-                m_vkShaderModules[s] = vkMod;
-                continue;
             }
 
             // if spirv exists but we didn't pick it earlier (maybe it's older than src but no src), try Load spirv
-            if (spirvExists)
+            if (spirvExists && !compiledSuccessfully)
             {
                 auto spirvBytesOpt = ReadFileBinary(spirvPathStr);
                 if (spirvBytesOpt)
