@@ -15,58 +15,61 @@ VkSampler ElecNeko::ElecNekoSampler::m_samplerCubemap;
 Samplers::InitializeSamplers
 ====================================================
 */
-bool Samplers::InitializeSamplers( DeviceContext * device ) {
-	VkResult result;
-	VkSamplerCreateInfo samplerInfo = {};
+bool Samplers::InitializeSamplers(DeviceContext *device)
+{
+    VkResult result;
+    VkSamplerCreateInfo samplerInfo = {};
 
-	// Create Sampler
-	memset( &samplerInfo, 0, sizeof( samplerInfo ) );
-	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerInfo.magFilter = VK_FILTER_LINEAR;
-	samplerInfo.minFilter = VK_FILTER_LINEAR;
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.anisotropyEnable = VK_TRUE;
-	samplerInfo.maxAnisotropy = 16;
-	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	samplerInfo.unnormalizedCoordinates = VK_FALSE;
-	samplerInfo.compareEnable = VK_FALSE;
-	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    // Create Sampler
+    memset(&samplerInfo, 0, sizeof(samplerInfo));
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = 16;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-	result = vkCreateSampler( device->m_vkDevice, &samplerInfo, nullptr, &m_samplerStandard );
-	if ( VK_SUCCESS != result ) {
-		printf( "failed to create m_samplerStandard!\n" );
-		assert( 0 );
-		return false;
-	}
+    result = vkCreateSampler(device->m_vkDevice, &samplerInfo, nullptr, &m_samplerStandard);
+    if (VK_SUCCESS != result)
+    {
+        printf("failed to create m_samplerStandard!\n");
+        assert(0);
+        return false;
+    }
 
 
-	// Create sampler to sample from to depth attachment 
-	// Used to sample in the fragment shader for shadowed rendering
-	memset( &samplerInfo, 0, sizeof( samplerInfo ) );
-	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerInfo.magFilter = VK_FILTER_LINEAR;
-	samplerInfo.minFilter = VK_FILTER_LINEAR;
-	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerInfo.mipLodBias = 0.0f;
-	samplerInfo.maxAnisotropy = 1.0f;
-	samplerInfo.minLod = 0.0f;
-	samplerInfo.maxLod = 1.0f;
-	samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    // Create sampler to sample from to depth attachment
+    // Used to sample in the fragment shader for shadowed rendering
+    memset(&samplerInfo, 0, sizeof(samplerInfo));
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.maxAnisotropy = 1.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 1.0f;
+    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 
-	result = vkCreateSampler( device->m_vkDevice, &samplerInfo, nullptr, &m_samplerDepth );
-	if ( VK_SUCCESS != result ) {
-		printf( "failed to create m_samplerDepth!\n" );
-		assert( 0 );
-		return false;
-	}
+    result = vkCreateSampler(device->m_vkDevice, &samplerInfo, nullptr, &m_samplerDepth);
+    if (VK_SUCCESS != result)
+    {
+        printf("failed to create m_samplerDepth!\n");
+        assert(0);
+        return false;
+    }
 
-	return true;
+    return true;
 }
 
 /*
@@ -74,18 +77,19 @@ bool Samplers::InitializeSamplers( DeviceContext * device ) {
 Samplers::Cleanup
 ====================================================
 */
-void Samplers::Cleanup( DeviceContext * device ) {
-	vkDestroySampler( device->m_vkDevice, m_samplerStandard, nullptr );
-	vkDestroySampler( device->m_vkDevice, m_samplerDepth, nullptr );
+void Samplers::Cleanup(DeviceContext *device)
+{
+    vkDestroySampler(device->m_vkDevice, m_samplerStandard, nullptr);
+    vkDestroySampler(device->m_vkDevice, m_samplerDepth, nullptr);
 }
 
 namespace ElecNeko
 {
-	bool ElecNekoSampler::InitializeSampler(DeviceContext* device)
-	{
+    bool ElecNekoSampler::InitializeSampler(DeviceContext *device)
+    {
         VkSamplerCreateInfo samplerInfo = {};
         memset(&samplerInfo, 0, sizeof(samplerInfo));
-		samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
         samplerInfo.minFilter = VK_FILTER_LINEAR;
         samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
@@ -99,14 +103,14 @@ namespace ElecNeko
         samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-		if (vkCreateSampler(device->m_vkDevice, &samplerInfo, nullptr, &m_samplerTexture))
-		{
+        if (vkCreateSampler(device->m_vkDevice, &samplerInfo, nullptr, &m_samplerTexture))
+        {
             printf("failed to create m_samplerTexture!\n");
             assert(0);
             return false;
-		}
+        }
 
-		memset(&samplerInfo, 0, sizeof(samplerInfo));
+        memset(&samplerInfo, 0, sizeof(samplerInfo));
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
         samplerInfo.minFilter = VK_FILTER_LINEAR;
@@ -118,24 +122,23 @@ namespace ElecNeko
         samplerInfo.unnormalizedCoordinates = VK_FALSE;
         samplerInfo.compareEnable = VK_FALSE;
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = 0.0f;
         samplerInfo.mipLodBias = 0.0f;
 
-		if (vkCreateSampler(device->m_vkDevice, &samplerInfo, nullptr, &m_samplerCubemap))
+        if (vkCreateSampler(device->m_vkDevice, &samplerInfo, nullptr, &m_samplerCubemap))
         {
             printf("failed to create m_samplerCubemap!\n");
             assert(0);
             return false;
         }
 
-		return true;
-	}
+        return true;
+    }
 
-	void ElecNekoSampler::Cleanup(DeviceContext* device) 
-	{
-		vkDestroySampler(device->m_vkDevice, m_samplerTexture, nullptr);
+    void ElecNekoSampler::Cleanup(DeviceContext *device)
+    {
+        vkDestroySampler(device->m_vkDevice, m_samplerTexture, nullptr);
         vkDestroySampler(device->m_vkDevice, m_samplerCubemap, nullptr);
-	}
-}
+    }
+} // namespace ElecNeko

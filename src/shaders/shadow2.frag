@@ -1,19 +1,17 @@
 #version 450
 
-layout(binding = 3) uniform sampler2D texAlbedo;
+layout (location = 5) in float debugMatrixIndex;
+layout (location = 6) in vec3 debugWorldPos;
 
-layout(location = 0) flat in ivec2 hasTexture;
-layout(location = 1) in vec2 uv;
+layout (location = 0) out vec4 outColor;
 
 void main() {
-    float a = 1.0;
-    if(hasTexture.x==0) {
-        a=1.0;
-    }else {
-        a=texture(texAlbedo,uv).a;
-    }
-
-    if(a<0.0001) {
-        discard;
+    if (debugMatrixIndex < -1.5) {
+        outColor = vec4(1.0, 1.0, 0.0, 1.0);
+    } else if (debugMatrixIndex < -0.5) {
+        outColor = vec4(1.0, 0.0, 0.0, 1.0);
+    } else {
+        float hue = mod(debugMatrixIndex / 10.0, 1.0);
+        outColor = vec4(hue, 0.5, 0.5, 1.0);
     }
 }

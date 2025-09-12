@@ -27,6 +27,7 @@
 #include "Scene/World.h"
 
 #include "RenderOption.h"
+#include "Scene.h"
 
 /*
 ====================================================
@@ -106,6 +107,8 @@ private:
     ElecNeko::World *deletingWorld = nullptr;
 
     std::vector<std::filesystem::path> m_sceneFiles;
+
+    ElecNeko::Scene *m_scene;
 
     ElecNeko::SkyBox m_skyBox;
 

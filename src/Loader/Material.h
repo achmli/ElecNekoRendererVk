@@ -47,10 +47,10 @@ namespace ElecNeko
         float mediumColor[3];
         float mediumAnisotropy;
 
-        uint32_t baseColorTexId;
-        uint32_t metallicRoughtnessTexId;
-        uint32_t normalMapTexId;
-        uint32_t emissionmapTexId;
+        int32_t baseColorTexId;
+        int32_t metallicRoughtnessTexId;
+        int32_t normalMapTexId;
+        int32_t emissionmapTexId;
 
         float opacity;
         uint32_t alphaMode;
@@ -58,11 +58,11 @@ namespace ElecNeko
         float padding1;
     };
 
-	class Material
-	{
+    class Material
+    {
     public:
-        Material() 
-        { 
+        Material()
+        {
             name = "";
 
             baseColor = Vec3(1.f, 1.f, 1.f);
@@ -102,6 +102,7 @@ namespace ElecNeko
 
         Material_t MakeStrcut();
         bool MakeBuffer(DeviceContext *device);
+
     public:
         std::string name;
 
@@ -110,7 +111,7 @@ namespace ElecNeko
 
         Vec3 emission;
         float padding0;
-        
+
         float metallic;
         float roughness;
         float subsurface;
@@ -140,10 +141,10 @@ namespace ElecNeko
         float padding1;
 
         Buffer matBuffer;
-	};
+    };
 
     inline Material_t Material::MakeStrcut()
-    { 
+    {
         Material_t mat;
         mat.baseColor[0] = baseColor.x;
         mat.baseColor[1] = baseColor.y;
@@ -191,7 +192,7 @@ namespace ElecNeko
         return mat;
     }
 
-    inline bool Material::MakeBuffer(DeviceContext* device) 
+    inline bool Material::MakeBuffer(DeviceContext *device)
     {
         Material_t mate = MakeStrcut();
 
@@ -203,4 +204,4 @@ namespace ElecNeko
 
         return true;
     }
-}
+} // namespace ElecNeko

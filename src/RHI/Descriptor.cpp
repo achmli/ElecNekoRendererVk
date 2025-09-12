@@ -2,13 +2,13 @@
 //  Descriptor.cpp
 //
 #include "Descriptor.h"
-#include "DeviceContext.h"
-#include "Samplers.h"
-#include "Pipeline.h"
-#include "Image.h"
-#include "model.h"
-#include <vector>
 #include <assert.h>
+#include <vector>
+#include "DeviceContext.h"
+#include "Image.h"
+#include "Pipeline.h"
+#include "Samplers.h"
+#include "model.h"
 
 /*
 ========================================================================================================
@@ -23,105 +23,114 @@ Descriptors
 Descriptors::Create
 ====================================================
 */
-bool Descriptors::Create( DeviceContext * device, const CreateParms_t & parms ) {
-	VkResult result;
+bool Descriptors::Create(DeviceContext *device, const CreateParms_t &parms)
+{
+    VkResult result;
 
-	m_parms = parms;
+    m_parms = parms;
 
-	//
-	//	Create the non-global pool
-	//
-	std::vector< VkDescriptorPoolSize > poolSizes;
+    //
+    //	Create the non-global pool
+    //
+    std::vector<VkDescriptorPoolSize> poolSizes;
     const int numUniforms = parms.numUniformsFragment + parms.numUniformsVertex;
-	if ( numUniforms > 0 ) {
-		VkDescriptorPoolSize poolSize;
-		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = numUniforms * MAX_DESCRIPTOR_SETS;
-		poolSizes.push_back( poolSize );
-	}
-	if ( parms.numImageSamplers > 0 ) {
-		VkDescriptorPoolSize poolSize;
-		poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		poolSize.descriptorCount = parms.numImageSamplers * MAX_DESCRIPTOR_SETS;
-		poolSizes.push_back( poolSize );
-	}
+    if (numUniforms > 0)
+    {
+        VkDescriptorPoolSize poolSize;
+        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSize.descriptorCount = numUniforms * MAX_DESCRIPTOR_SETS;
+        poolSizes.push_back(poolSize);
+    }
+    if (parms.numImageSamplers > 0)
+    {
+        VkDescriptorPoolSize poolSize;
+        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSize.descriptorCount = parms.numImageSamplers * MAX_DESCRIPTOR_SETS;
+        poolSizes.push_back(poolSize);
+    }
 
-	VkDescriptorPoolCreateInfo poolInfo = {};
-	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = (uint32_t)poolSizes.size();
-	poolInfo.pPoolSizes = poolSizes.data();
-	poolInfo.maxSets = MAX_DESCRIPTOR_SETS;
-	poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    VkDescriptorPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = (uint32_t) poolSizes.size();
+    poolInfo.pPoolSizes = poolSizes.data();
+    poolInfo.maxSets = MAX_DESCRIPTOR_SETS;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
-	result = vkCreateDescriptorPool( device->m_vkDevice, &poolInfo, nullptr, &m_vkDescriptorPool );
-	if ( VK_SUCCESS != result ) {
-		printf( "ERROR: Failed to create descriptor pool\n" );
-		assert( 0 );
-		return false;
-	}
+    result = vkCreateDescriptorPool(device->m_vkDevice, &poolInfo, nullptr, &m_vkDescriptorPool);
+    if (VK_SUCCESS != result)
+    {
+        printf("ERROR: Failed to create descriptor pool\n");
+        assert(0);
+        return false;
+    }
 
-	//
-	// Create Descriptor Set Layout
-	//
-	VkDescriptorSetLayoutBinding * uniformBindings = (VkDescriptorSetLayoutBinding *)alloca( sizeof( VkDescriptorSetLayoutBinding ) * ( numUniforms ) );
-	memset( uniformBindings, 0, sizeof( VkDescriptorSetLayoutBinding ) * numUniforms );
+    //
+    // Create Descriptor Set Layout
+    //
+    VkDescriptorSetLayoutBinding *uniformBindings = (VkDescriptorSetLayoutBinding *) alloca(sizeof(VkDescriptorSetLayoutBinding) * (numUniforms));
+    memset(uniformBindings, 0, sizeof(VkDescriptorSetLayoutBinding) * numUniforms);
 
-	int idx = 0;
+    int idx = 0;
 
-	const int numVertexUniforms = parms.numUniformsVertex;
-	for ( int i = 0; i < parms.numUniformsVertex; i++ ) {
-		uniformBindings[ idx ].binding = idx;
-		uniformBindings[ idx ].descriptorCount = 1;
-		uniformBindings[ idx ].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		uniformBindings[ idx ].pImmutableSamplers = nullptr;
-		uniformBindings[ idx ].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    const int numVertexUniforms = parms.numUniformsVertex;
+    for (int i = 0; i < parms.numUniformsVertex; i++)
+    {
+        uniformBindings[idx].binding = idx;
+        uniformBindings[idx].descriptorCount = 1;
+        uniformBindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uniformBindings[idx].pImmutableSamplers = nullptr;
+        uniformBindings[idx].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-		idx++;
-	}
+        idx++;
+    }
 
-	for ( int i = 0; i < parms.numUniformsFragment; i++ ) {
-		uniformBindings[ idx ].binding = idx;
-		uniformBindings[ idx ].descriptorCount = 1;
-		uniformBindings[ idx ].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		uniformBindings[ idx ].pImmutableSamplers = nullptr;
-		uniformBindings[ idx ].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    for (int i = 0; i < parms.numUniformsFragment; i++)
+    {
+        uniformBindings[idx].binding = idx;
+        uniformBindings[idx].descriptorCount = 1;
+        uniformBindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        uniformBindings[idx].pImmutableSamplers = nullptr;
+        uniformBindings[idx].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-		idx++;
-	}
+        idx++;
+    }
 
-	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	layoutInfo.bindingCount = numUniforms;
-	layoutInfo.pBindings = uniformBindings;
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = numUniforms;
+    layoutInfo.pBindings = uniformBindings;
 
-	result = vkCreateDescriptorSetLayout( device->m_vkDevice, &layoutInfo, nullptr, &m_vkDescriptorSetLayout );
-	if ( VK_SUCCESS != result ) {
-		printf( "ERROR: Failed to create descriptor set layout\n" );
-		assert( 0 );
-		return false;
-	}
+    result = vkCreateDescriptorSetLayout(device->m_vkDevice, &layoutInfo, nullptr, &m_vkDescriptorSetLayout);
+    if (VK_SUCCESS != result)
+    {
+        printf("ERROR: Failed to create descriptor set layout\n");
+        assert(0);
+        return false;
+    }
 
-	//
-	//	Create Descriptor Sets
-	//
-	VkDescriptorSetLayout layouts[ MAX_DESCRIPTOR_SETS ];
-	for ( int i = 0; i < MAX_DESCRIPTOR_SETS; i++ ) {
-		layouts[ i ] = m_vkDescriptorSetLayout;
-	}
-	VkDescriptorSetAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = m_vkDescriptorPool;
-	allocInfo.descriptorSetCount = MAX_DESCRIPTOR_SETS;
-	allocInfo.pSetLayouts = layouts;
+    //
+    //	Create Descriptor Sets
+    //
+    VkDescriptorSetLayout layouts[MAX_DESCRIPTOR_SETS];
+    for (int i = 0; i < MAX_DESCRIPTOR_SETS; i++)
+    {
+        layouts[i] = m_vkDescriptorSetLayout;
+    }
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_vkDescriptorPool;
+    allocInfo.descriptorSetCount = MAX_DESCRIPTOR_SETS;
+    allocInfo.pSetLayouts = layouts;
 
-	result = vkAllocateDescriptorSets( device->m_vkDevice, &allocInfo, m_vkDescriptorSets );
-	if ( VK_SUCCESS != result ) {
-		printf( "ERROR: Failed to allocate descriptor set\n" );
-		assert( 0 );
-		return false;
-	}
+    result = vkAllocateDescriptorSets(device->m_vkDevice, &allocInfo, m_vkDescriptorSets);
+    if (VK_SUCCESS != result)
+    {
+        printf("ERROR: Failed to allocate descriptor set\n");
+        assert(0);
+        return false;
+    }
 
-	return true;
+    return true;
 }
 
 /*
@@ -129,20 +138,17 @@ bool Descriptors::Create( DeviceContext * device, const CreateParms_t & parms ) 
 Descriptors::Create
 ====================================================
 */
-void Descriptors::Cleanup( DeviceContext * device ) {
-	// Free the descriptor sets
-	vkFreeDescriptorSets( device->m_vkDevice, m_vkDescriptorPool, MAX_DESCRIPTOR_SETS, m_vkDescriptorSets );
+void Descriptors::Cleanup(DeviceContext *device)
+{
+    // Free the descriptor sets
+    vkFreeDescriptorSets(device->m_vkDevice, m_vkDescriptorPool, MAX_DESCRIPTOR_SETS, m_vkDescriptorSets);
 
-	// Destroy descriptor set layout
-	vkDestroyDescriptorSetLayout( device->m_vkDevice, m_vkDescriptorSetLayout, nullptr );
+    // Destroy descriptor set layout
+    vkDestroyDescriptorSetLayout(device->m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 
-	// Destroy Descriptor Pool
-	vkDestroyDescriptorPool( device->m_vkDevice, m_vkDescriptorPool, nullptr );
+    // Destroy Descriptor Pool
+    vkDestroyDescriptorPool(device->m_vkDevice, m_vkDescriptorPool, nullptr);
 }
-
-
-
-
 
 
 /*
@@ -158,13 +164,14 @@ Descriptor
 Descriptor::Descriptor
 ====================================================
 */
-Descriptor::Descriptor() {
-	m_parent = NULL;
-	m_id = -1;
-	m_numImages = 0;
-	m_numBuffers = 0;
-	memset( m_imageInfo, 0, sizeof( VkDescriptorImageInfo ) * MAX_IMAGEINFO );
-	memset( m_bufferInfo, 0, sizeof( VkDescriptorBufferInfo ) * MAX_BUFFERS );
+Descriptor::Descriptor()
+{
+    m_parent = NULL;
+    m_id = -1;
+    m_numImages = 0;
+    m_numBuffers = 0;
+    memset(m_imageInfo, 0, sizeof(VkDescriptorImageInfo) * MAX_IMAGEINFO);
+    memset(m_bufferInfo, 0, sizeof(VkDescriptorBufferInfo) * MAX_BUFFERS);
 }
 
 /*
@@ -172,13 +179,14 @@ Descriptor::Descriptor() {
 Descriptor::BindImage
 ====================================================
 */
-void Descriptor::BindImage( VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler, int slot ) {
-	assert( slot < MAX_IMAGEINFO );
-	assert( m_numImages < MAX_IMAGEINFO );
-	m_imageInfo[ slot ].imageLayout = imageLayout;
-	m_imageInfo[ slot ].imageView = imageView;
-	m_imageInfo[ slot ].sampler = sampler;
-	m_numImages++;
+void Descriptor::BindImage(VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler, int slot)
+{
+    assert(slot < MAX_IMAGEINFO);
+    assert(m_numImages < MAX_IMAGEINFO);
+    m_imageInfo[slot].imageLayout = imageLayout;
+    m_imageInfo[slot].imageView = imageView;
+    m_imageInfo[slot].sampler = sampler;
+    m_numImages++;
 }
 
 /*
@@ -186,13 +194,14 @@ void Descriptor::BindImage( VkImageLayout imageLayout, VkImageView imageView, Vk
 Descriptor::BindBuffer
 ====================================================
 */
-void Descriptor::BindBuffer( Buffer * uniformBuffer, int offset, int size, int slot ) {
-	assert( slot < MAX_BUFFERS );
-	assert( m_numBuffers < MAX_BUFFERS );
-	m_bufferInfo[ slot ].buffer	= uniformBuffer->m_vkBuffer;
-	m_bufferInfo[ slot ].offset	= offset;
-	m_bufferInfo[ slot ].range	= size;
-	m_numBuffers++;
+void Descriptor::BindBuffer(Buffer *uniformBuffer, int offset, int size, int slot)
+{
+    assert(slot < MAX_BUFFERS);
+    assert(m_numBuffers < MAX_BUFFERS);
+    m_bufferInfo[slot].buffer = uniformBuffer->m_vkBuffer;
+    m_bufferInfo[slot].offset = offset;
+    m_bufferInfo[slot].range = size;
+    m_numBuffers++;
 }
 
 /*
@@ -200,39 +209,80 @@ void Descriptor::BindBuffer( Buffer * uniformBuffer, int offset, int size, int s
 Descriptor::BindDescriptor
 ====================================================
 */
-void Descriptor::BindDescriptor( DeviceContext * device, VkCommandBuffer vkCommandBuffer, Pipeline * pso ) {
-	const int numDescriptors = m_numImages + m_numBuffers;
-	const int allocationSize = sizeof( VkWriteDescriptorSet ) * numDescriptors;
-	VkWriteDescriptorSet * descriptorWrites = (VkWriteDescriptorSet *)alloca( allocationSize );
-	memset( descriptorWrites, 0, allocationSize );
+void Descriptor::BindDescriptor(DeviceContext *device, VkCommandBuffer vkCommandBuffer, Pipeline *pso)
+{
+    const int numDescriptors = m_numImages + m_numBuffers;
+    const int allocationSize = sizeof(VkWriteDescriptorSet) * numDescriptors;
+    VkWriteDescriptorSet *descriptorWrites = (VkWriteDescriptorSet *) alloca(allocationSize);
+    memset(descriptorWrites, 0, allocationSize);
 
-	int idx = 0;
-	for ( int i = 0; i < m_numBuffers; i++ ) {
-		descriptorWrites[ idx ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[ idx ].dstSet = m_parent->m_vkDescriptorSets[ m_id ];
-		descriptorWrites[ idx ].dstBinding = idx;
-		descriptorWrites[ idx ].dstArrayElement = 0;
-		descriptorWrites[ idx ].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		descriptorWrites[ idx ].descriptorCount = 1;
-		descriptorWrites[ idx ].pBufferInfo = &m_bufferInfo[ i ];
+    int idx = 0;
+    for (int i = 0; i < m_numBuffers; i++)
+    {
+        descriptorWrites[idx].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[idx].dstSet = m_parent->m_vkDescriptorSets[m_id];
+        descriptorWrites[idx].dstBinding = idx;
+        descriptorWrites[idx].dstArrayElement = 0;
+        descriptorWrites[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[idx].descriptorCount = 1;
+        descriptorWrites[idx].pBufferInfo = &m_bufferInfo[i];
 
-		idx++;
-	}
+        idx++;
+    }
 
-	for ( int i = 0; i < m_numImages; i++ ) {
-		descriptorWrites[ idx ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrites[ idx ].dstSet = m_parent->m_vkDescriptorSets[ m_id ];
-		descriptorWrites[ idx ].dstBinding = idx;
-		descriptorWrites[ idx ].dstArrayElement = 0;
-		descriptorWrites[ idx ].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrites[ idx ].descriptorCount = 1;
-		descriptorWrites[ idx ].pImageInfo = &m_imageInfo[ i ];
+    for (int i = 0; i < m_numImages; i++)
+    {
+        descriptorWrites[idx].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[idx].dstSet = m_parent->m_vkDescriptorSets[m_id];
+        descriptorWrites[idx].dstBinding = idx;
+        descriptorWrites[idx].dstArrayElement = 0;
+        descriptorWrites[idx].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[idx].descriptorCount = 1;
+        descriptorWrites[idx].pImageInfo = &m_imageInfo[i];
 
-		idx++;
-	}
+        idx++;
+    }
 
-	vkUpdateDescriptorSets( device->m_vkDevice, (uint32_t)numDescriptors, descriptorWrites, 0, nullptr );
-	vkCmdBindDescriptorSets( vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pso->m_vkPipelineLayout, 0, 1, &m_parent->m_vkDescriptorSets[ m_id ], 0, nullptr );
+    vkUpdateDescriptorSets(device->m_vkDevice, (uint32_t) numDescriptors, descriptorWrites, 0, nullptr);
+    vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pso->m_vkPipelineLayout, 0, 1, &m_parent->m_vkDescriptorSets[m_id], 0, nullptr);
+}
+
+void Descriptor::BindDescriptor(DeviceContext *device, VkCommandBuffer vkCommandBuffer, ElecNeko::ElecNekoPipeline *pso)
+{
+    const int numDescriptors = m_numImages + m_numBuffers;
+    const int allocationSize = sizeof(VkWriteDescriptorSet) * numDescriptors;
+    VkWriteDescriptorSet *descriptorWrites = (VkWriteDescriptorSet *) alloca(allocationSize);
+    memset(descriptorWrites, 0, allocationSize);
+
+    int idx = 0;
+    for (int i = 0; i < m_numBuffers; i++)
+    {
+        descriptorWrites[idx].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[idx].dstSet = m_parent->m_vkDescriptorSets[m_id];
+        descriptorWrites[idx].dstBinding = idx;
+        descriptorWrites[idx].dstArrayElement = 0;
+        descriptorWrites[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[idx].descriptorCount = 1;
+        descriptorWrites[idx].pBufferInfo = &m_bufferInfo[i];
+
+        idx++;
+    }
+
+    for (int i = 0; i < m_numImages; i++)
+    {
+        descriptorWrites[idx].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[idx].dstSet = m_parent->m_vkDescriptorSets[m_id];
+        descriptorWrites[idx].dstBinding = idx;
+        descriptorWrites[idx].dstArrayElement = 0;
+        descriptorWrites[idx].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[idx].descriptorCount = 1;
+        descriptorWrites[idx].pImageInfo = &m_imageInfo[i];
+
+        idx++;
+    }
+
+    vkUpdateDescriptorSets(device->m_vkDevice, (uint32_t) numDescriptors, descriptorWrites, 0, nullptr);
+    vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pso->m_vkPipelineLayout, 0, 1, &m_parent->m_vkDescriptorSets[m_id], 0, nullptr);
 }
 
 
@@ -307,7 +357,7 @@ bool Descriptors::ElecNekoCreate(DeviceContext *device, const CreateParms_t &par
         idx++;
     }
 
-	for (int i = 0; i < parms.numImageSamplers; i++)
+    for (int i = 0; i < parms.numImageSamplers; i++)
     {
         uniformBindings[idx].binding = idx;
         uniformBindings[idx].descriptorCount = 1;
@@ -355,3 +405,255 @@ bool Descriptors::ElecNekoCreate(DeviceContext *device, const CreateParms_t &par
 
     return true;
 }
+
+namespace ElecNeko
+{
+    bool ElecNekoDescriptors::Create(DeviceContext *device, const CreateParms_t &parms)
+    {
+        VkResult result;
+        m_parms = parms;
+
+        std::vector<VkDescriptorPoolSize> poolSizes;
+
+        int numUniforms = parms.numUniformsVertex + parms.numUniformsFragment;
+        if (numUniforms > 0)
+        {
+            VkDescriptorPoolSize poolSize;
+            poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            poolSize.descriptorCount = numUniforms * MAX_DESCRIPTOR_SETS;
+            poolSizes.push_back(poolSize);
+        }
+
+        int numStorages = parms.numStorageVertex + parms.numStorageFragment;
+        if (numStorages > 0)
+        {
+            VkDescriptorPoolSize poolSize;
+            poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            poolSize.descriptorCount = numStorages * MAX_DESCRIPTOR_SETS;
+            poolSizes.push_back(poolSize);
+        }
+
+        if (parms.numImageSamplers > 0)
+        {
+            VkDescriptorPoolSize poolSize;
+            poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            poolSize.descriptorCount = parms.numImageSamplers * MAX_DESCRIPTOR_SETS;
+            poolSizes.push_back(poolSize);
+        }
+
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = MAX_DESCRIPTOR_SETS;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+
+        result = vkCreateDescriptorPool(device->m_vkDevice, &poolInfo, nullptr, &m_vkDescriptorPool);
+        if (VK_SUCCESS != result)
+        {
+            printf("ERROR: Failed to create descriptor pool\n");
+            assert(0);
+            return false;
+        }
+
+        int totalBindings = numUniforms + numStorages + parms.numImageSamplers;
+        std::vector<VkDescriptorSetLayoutBinding> layoutBindings(totalBindings);
+        int idx = 0;
+
+        for (int i = 0; i < parms.numUniformsVertex; i++)
+        {
+            layoutBindings[idx].binding = idx;
+            layoutBindings[idx].descriptorCount = 1;
+            layoutBindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            layoutBindings[idx].pImmutableSamplers = nullptr;
+            layoutBindings[idx].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            idx++;
+        }
+
+        for (int i = 0; i < parms.numStorageVertex; i++)
+        {
+            layoutBindings[idx].binding = idx;
+            layoutBindings[idx].descriptorCount = 1;
+            layoutBindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            layoutBindings[idx].pImmutableSamplers = nullptr;
+            layoutBindings[idx].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            idx++;
+        }
+
+
+        for (int i = 0; i < parms.numUniformsFragment; i++)
+        {
+            layoutBindings[idx].binding = idx;
+            layoutBindings[idx].descriptorCount = 1;
+            layoutBindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            layoutBindings[idx].pImmutableSamplers = nullptr;
+            layoutBindings[idx].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            idx++;
+        }
+
+
+        for (int i = 0; i < parms.numStorageFragment; i++)
+        {
+            layoutBindings[idx].binding = idx;
+            layoutBindings[idx].descriptorCount = 1;
+            layoutBindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            layoutBindings[idx].pImmutableSamplers = nullptr;
+            layoutBindings[idx].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            idx++;
+        }
+
+
+        for (int i = 0; i < parms.numImageSamplers; i++)
+        {
+            layoutBindings[idx].binding = idx;
+            layoutBindings[idx].descriptorCount = 1;
+            layoutBindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            layoutBindings[idx].pImmutableSamplers = nullptr;
+            layoutBindings[idx].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            idx++;
+        }
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
+        layoutInfo.pBindings = layoutBindings.data();
+
+        result = vkCreateDescriptorSetLayout(device->m_vkDevice, &layoutInfo, nullptr, &m_vkDescriptorSetLayout);
+        if (VK_SUCCESS != result)
+        {
+            printf("ERROR: Failed to create descriptor set layout\n");
+            assert(0);
+            return false;
+        }
+
+
+        std::vector<VkDescriptorSetLayout> layouts(MAX_DESCRIPTOR_SETS, m_vkDescriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = m_vkDescriptorPool;
+        allocInfo.descriptorSetCount = MAX_DESCRIPTOR_SETS;
+        allocInfo.pSetLayouts = layouts.data();
+
+        result = vkAllocateDescriptorSets(device->m_vkDevice, &allocInfo, m_vkDescriptorSets);
+        if (VK_SUCCESS != result)
+        {
+            printf("ERROR: Failed to allocate descriptor set\n");
+            assert(0);
+            return false;
+        }
+
+        return true;
+    }
+
+    void ElecNekoDescriptors::Cleanup(DeviceContext *device)
+    {
+        vkFreeDescriptorSets(device->m_vkDevice, m_vkDescriptorPool, MAX_DESCRIPTOR_SETS, m_vkDescriptorSets);
+
+        vkDestroyDescriptorSetLayout(device->m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+
+        vkDestroyDescriptorPool(device->m_vkDevice, m_vkDescriptorPool, nullptr);
+    }
+
+    void ElecNekoDescriptor::BindUniformBuffer(int bindingPoint, Buffer *buffer, int offset, int size)
+    {
+        DescriptorBinding binding;
+        binding.bindingPoint = bindingPoint;
+        binding.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        binding.bufferInfo.buffer = buffer->m_vkBuffer;
+        binding.bufferInfo.offset = offset;
+        binding.bufferInfo.range = size;
+        binding.isImage = false;
+
+        m_bindings.push_back(binding);
+    }
+
+    void ElecNekoDescriptor::BindStorageBuffer(int bindingPoint, Buffer *buffer, int offset, int size)
+    {
+        DescriptorBinding binding;
+        binding.bindingPoint = bindingPoint;
+        binding.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        binding.bufferInfo.buffer = buffer->m_vkBuffer;
+        binding.bufferInfo.offset = offset;
+        binding.bufferInfo.range = size;
+        binding.isImage = false;
+
+        m_bindings.push_back(binding);
+    }
+
+    void ElecNekoDescriptor::BindImage(int bindingPoint, VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler)
+    {
+        DescriptorBinding binding;
+        binding.bindingPoint = bindingPoint;
+        binding.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        binding.imageInfo.imageLayout = imageLayout;
+        binding.imageInfo.imageView = imageView;
+        binding.imageInfo.sampler = sampler;
+        binding.isImage = true;
+
+        m_bindings.push_back(binding);
+    }
+
+    void ElecNekoDescriptor::BindDescriptor(DeviceContext *device, VkCommandBuffer vkCommandBuffer, Pipeline *pso)
+    {
+        std::vector<VkWriteDescriptorSet> descriptorWrites;
+        descriptorWrites.reserve(m_bindings.size());
+
+        for (const auto &binding: m_bindings)
+        {
+            VkWriteDescriptorSet write = {};
+            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet = m_parent->m_vkDescriptorSets[m_id];
+            write.dstBinding = binding.bindingPoint;
+            write.dstArrayElement = 0;
+            write.descriptorType = binding.type;
+            write.descriptorCount = 1;
+
+            if (binding.isImage)
+            {
+                write.pImageInfo = &binding.imageInfo;
+            }
+            else
+            {
+                write.pBufferInfo = &binding.bufferInfo;
+            }
+
+            descriptorWrites.push_back(write);
+        }
+
+        vkUpdateDescriptorSets(device->m_vkDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pso->m_vkPipelineLayout, 0, 1, &m_parent->m_vkDescriptorSets[m_id], 0,
+                                nullptr);
+    }
+
+    void ElecNekoDescriptor::BindDescriptor(DeviceContext *device, VkCommandBuffer vkCommandBuffer, ElecNekoPipeline *pso)
+    {
+        std::vector<VkWriteDescriptorSet> descriptorWrites;
+        descriptorWrites.reserve(m_bindings.size());
+
+        for (const auto &binding: m_bindings)
+        {
+            VkWriteDescriptorSet write = {};
+            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet = m_parent->m_vkDescriptorSets[m_id];
+            write.dstBinding = binding.bindingPoint;
+            write.dstArrayElement = 0;
+            write.descriptorType = binding.type;
+            write.descriptorCount = 1;
+
+            if (binding.isImage)
+            {
+                write.pImageInfo = &binding.imageInfo;
+            }
+            else
+            {
+                write.pBufferInfo = &binding.bufferInfo;
+            }
+
+            descriptorWrites.push_back(write);
+        }
+
+        vkUpdateDescriptorSets(device->m_vkDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pso->m_vkPipelineLayout, 0, 1, &m_parent->m_vkDescriptorSets[m_id], 0,
+                                nullptr);
+    }
+} // namespace ElecNeko

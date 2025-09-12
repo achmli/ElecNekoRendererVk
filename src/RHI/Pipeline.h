@@ -128,7 +128,7 @@ namespace ElecNeko
 
             VkRenderPass renderPass;
             FrameBuffer *framebuffer;
-            Descriptors *descriptors;
+            ElecNekoDescriptors *descriptors;
             ElecNekoShader *shader;
 
             int width;
@@ -146,7 +146,7 @@ namespace ElecNeko
         bool CreateCompute(DeviceContext *device, const CreateParms_t &parms);
         void Cleanup(DeviceContext *device);
 
-        Descriptor GetFreeDescriptor() { return m_parms.descriptors->GetFreeDescriptor(); }
+        ElecNekoDescriptor GetFreeDescriptor() { return m_parms.descriptors->GetFreeDescriptor(); }
 
         void BindPipeline(VkCommandBuffer cmdBuffer);
         void BindPipelineCompute(VkCommandBuffer cmdBuffer);

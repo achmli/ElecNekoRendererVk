@@ -14,13 +14,13 @@ layout(binding = 0) uniform uboCamera {
     mat4 invView;
     mat4 invProj;
 } camera;
-layout(binding = 1) uniform uboModel {
-    mat4 model;
-} model;
-layout(binding = 2) uniform uboShadow {
+layout(binding = 1) uniform uboShadow {
     mat4 view;
     mat4 proj;
 } shadow;
+layout(std140, binding = 2) readonly buffer uboModel {
+    mat4 modelMatrix[];
+};
 
 /*
     ==========================================
@@ -31,6 +31,8 @@ attributes
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inTexCoord;
 layout(location = 2) in vec3 inNormal;
+layout(location = 3) in uint inMaterialIdx;
+layout(location = 4) in uint inModelMatrixIdx;
 
 /*
     ==========================================
@@ -43,6 +45,7 @@ layout(location = 1) out vec3 worldPos;
 layout(location = 2) out vec4 shadowPos;
 layout(location = 3) out vec3 camPos;
 layout(location = 4) out vec2 texCoords;
+layout(location = 5) flat out uint materialIdx;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -54,12 +57,15 @@ main
     ==========================================
 */
 void main() {
+    mat4 model;
+    model = modelMatrix[inModelMatrixIdx];
+    // mat4 model = mat4(1.0);
     // world position
-    vec4 worldPos4 = model.model * vec4(inPosition, 1.0);
+    vec4 worldPos4 = model * vec4(inPosition, 1.0);
     worldPos = worldPos4.xyz;
 
     // correct normal matrix: transpose(inverse(mat3(model)))
-    mat3 normalMat = transpose(inverse(mat3(model.model)));
+    mat3 normalMat = transpose(inverse(mat3(model)));
     worldNormal = normalize(normalMat * inNormal);
 
     // shadow position (light-projection * light-view * worldPos)
@@ -70,6 +76,9 @@ void main() {
 
     // texCoords
     texCoords = inTexCoord;
+
+    // material index
+    materialIdx = inMaterialIdx;
 
     // clip position
     gl_Position = camera.proj * camera .view * worldPos4;

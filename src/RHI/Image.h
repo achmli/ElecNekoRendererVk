@@ -10,43 +10,45 @@
 Image
 ====================================================
 */
-class Image {
+class Image
+{
 public:
-	Image() {}
-	~Image() {}
+    Image() {}
+    ~Image() {}
 
-	struct CreateParms_t {
-		VkImageUsageFlags usageFlags;
-		VkFormat format;
-		int width;
-		int height;
-		int depth;
-	};
+    struct CreateParms_t
+    {
+        VkImageUsageFlags usageFlags;
+        VkFormat format;
+        int width;
+        int height;
+        int depth;
+    };
 
-	bool Create( DeviceContext * device, const CreateParms_t & parms );
-	void Cleanup( DeviceContext * device );
-	void TransitionLayout( DeviceContext * device );
-	void TransitionLayout( VkCommandBuffer cmdBuffer, VkImageLayout newLayout );
+    bool Create(DeviceContext *device, const CreateParms_t &parms);
+    void Cleanup(DeviceContext *device);
+    void TransitionLayout(DeviceContext *device);
+    void TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
 
-	CreateParms_t	m_parms;
-	VkImage			m_vkImage;
-	VkImageView		m_vkImageView;
-	VkDeviceMemory	m_vkDeviceMemory;
+    CreateParms_t m_parms;
+    VkImage m_vkImage;
+    VkImageView m_vkImageView;
+    VkDeviceMemory m_vkDeviceMemory;
 
-	VkImageLayout	m_vkImageLayout;
+    VkImageLayout m_vkImageLayout;
 };
 
 namespace ElecNeko
 {
-	class CubeImage
-	{
+    class CubeImage
+    {
     public:
         CubeImage() = default;
         ~CubeImage() = default;
 
-		bool Create(DeviceContext *device, const int width, const int height);
+        bool Create(DeviceContext *device, const int width, const int height);
         void Cleanup(DeviceContext *device);
-        void TransitionLayout(DeviceContext* device);
+        void TransitionLayout(DeviceContext *device);
         void TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
 
     public:
@@ -54,6 +56,36 @@ namespace ElecNeko
         VkImageView m_vkImageView;
         VkDeviceMemory m_vkDeviceMemory;
 
-		VkImageLayout m_vkImageLayout;
-	};
-}
+        VkImageLayout m_vkImageLayout;
+    };
+
+    class ArrayImage
+    {
+    public:
+        ArrayImage() = default;
+        ~ArrayImage() = default;
+
+        struct CreateParms_t
+        {
+            VkImageUsageFlags usageFlags;
+            VkFormat format;
+            int width;
+            int height;
+            int arrayLayers;
+        };
+
+        bool Create(DeviceContext *device, const CreateParms_t &parms);
+        void Cleanup(DeviceContext *device);
+        void TransitionLayout(DeviceContext *device);
+        void TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
+
+    public:
+        CreateParms_t m_parms;
+
+        VkImage m_vkImage;
+        VkImageView m_vkImageView;
+        VkDeviceMemory m_vkDeviceMemory;
+
+        VkImageLayout m_vkImageLayout;
+    };
+} // namespace ElecNeko

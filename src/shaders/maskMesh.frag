@@ -5,7 +5,7 @@ uniforms
     ==========================================
 */
 
-layout(binding = 3) uniform UBOMaterial {
+struct Material {
     vec3 baseColor;
     float anisotropic;
 
@@ -39,9 +39,9 @@ layout(binding = 3) uniform UBOMaterial {
     int alphaMode;
     float alphaCutoff;
     float padding1;
-} uMat;
+};
 
-layout(binding = 4) uniform lightParms {
+layout(binding = 3) uniform lightParms {
     vec2 viewport;
     vec2 _pad0;
     vec3 sunDir;
@@ -49,12 +49,12 @@ layout(binding = 4) uniform lightParms {
     vec3 sunColor;
 } lightParm;
 
-layout(binding = 5) uniform sampler2D texShadow;
-layout(binding = 6) uniform sampler2D texAlbedo;
-layout(binding = 7) uniform sampler2D texNormal;
-layout(binding = 8) uniform sampler2D texMetalRough;
-layout(binding = 9) uniform sampler2D texEmission;
+layout(std140, binding = 4) readonly buffer Materials {
+    Material materials[];
+};
 
+layout(binding = 5) uniform sampler2D texShadow;
+layout(binding = 6) uniform sampler2DArray textureArray;
 /*
     ==========================================
 input
@@ -66,6 +66,7 @@ layout(location = 1) in vec3 worldPos;
 layout(location = 2) in vec4 shadowPos;
 layout(location = 3) in vec3 camPos;
 layout(location = 4) in vec2 texCoords;
+layout(location = 5) flat in uint materialIdx;
 
 /*
     ==========================================
@@ -126,7 +127,7 @@ float ComputeShadowPCF(vec4 shadowPos, float NdotL) {
     float currentDepth = proj.z;// * 0.5 + 0.5;
 
     // bounds check;
-    if(uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
         return 1.0;
     }
 
@@ -141,12 +142,12 @@ float ComputeShadowPCF(vec4 shadowPos, float NdotL) {
 
     float sum = 0.0;
     int count = 0;
-    for(int y = -1; y <= 1; ++y) {
-        for(int x = -1; x <= 1; ++x) {
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
             vec2 off = vec2(float(x), float(y)) * radius;
             float sampleDepth = texture(texShadow, uv + off).r;
 
-            if((currentDepth - bias) <= sampleDepth) {
+            if ((currentDepth - bias) <= sampleDepth) {
                 sum += 1.0;
             }
             count++;
@@ -162,10 +163,11 @@ main
     ==========================================
 */
 void main() {
+    Material uMat = materials[materialIdx];
     // base values
     vec3 N = normalize(worldNormal);
-    if(uMat.normalTexId > -1) {
-        vec4 NM = texture(texNormal, texCoords);
+    if (uMat.normalTexId > -1) {
+        vec4 NM = texture(textureArray, vec3(texCoords, uMat.normalTexId));
         N = getNormalFromMap(N, NM.rgb);
     }
 
@@ -173,7 +175,7 @@ void main() {
     // Ensure sunDir semantic: make L be vector from surface towards light
     // If your sunDir is "direction the sun shines (i.e. towards surface)", then L = normalize(-lightParm.sunDir).
     // If your sunDir is "direction to sun", then L = normalize(lightParm.sunDir).  Adjust accordingly.
-    vec3 L = normalize(lightParm.sunDir); // assume sunDir is direction *from* sun to world (common)
+    vec3 L = normalize(lightParm.sunDir);// assume sunDir is direction *from* sun to world (common)
     vec3 H = normalize(V + L);
 
     float NdotL = max(dot(N, L), 0.0);
@@ -184,22 +186,22 @@ void main() {
     // material
     vec3 albedo = uMat.baseColor;
     float alpha = uMat.opacity;
-    if(uMat.baseColorTexId > -1) {
-        vec4 albedoSample = texture(texAlbedo, texCoords);
+    if (uMat.baseColorTexId > -1) {
+        vec4 albedoSample = texture(textureArray, vec3(texCoords, uMat.baseColorTexId));
         albedo *= albedoSample.rgb;
         alpha = albedoSample.a;
     }
 
     float alphaCO = max(uMat.alphaCutoff, 1e-4);
 
-    if(alpha < alphaCO) {
+    if (alpha < alphaCO) {
         discard;
     }
 
     float metallic = uMat.metallic;
-    float roughness = uMat.roughness; // avoid 0
-    if(uMat.metalRoughTexId > -1) {
-        vec4 mrSample = texture(texMetalRough, texCoords);
+    float roughness = uMat.roughness;// avoid 0
+    if (uMat.metalRoughTexId > -1) {
+        vec4 mrSample = texture(textureArray, vec3(texCoords, uMat.metalRoughTexId));
         metallic = mix(metallic, mrSample.r, step(0.001, mrSample.r));
         roughness = mix(roughness, mrSample.g, step(0.001, mrSample.g));
     }
@@ -217,7 +219,7 @@ void main() {
 
     vec3 spec = (D * G * F) / max(4.0 * NdotV * NdotL, 1e-6);
 
-    vec3 kd = (1.0 - F) * (1.0 - metallic); // energy conservation
+    vec3 kd = (1.0 - F) * (1.0 - metallic);// energy conservation
     vec3 diffuse = kd * albedo / PI;
 
     vec3 radiance = lightParm.sunColor * lightParm.sunIntensity;

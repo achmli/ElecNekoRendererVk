@@ -171,6 +171,11 @@ void Application::Initialize()
         light->UpdateUBO(&m_deviceContext);
     }
 
+    m_scene = new ElecNeko::Scene();
+    m_scene->Initialize(&m_deviceContext, world);
+    m_scene->MakeVBO(&m_deviceContext);
+    m_scene->MakeUBO(&m_deviceContext);
+
     m_shadowCamera.Initialize(world->m_cam->position + Vec3(renderOption.sunDirection) * 30, world->m_cam->position, static_cast<float>(WINDOW_WIDTH),
                               static_cast<float>(WINDOW_HEIGHT), 25, 175);
 
@@ -488,6 +493,9 @@ void Application::Cleanup()
     m_models.clear();*/
 
     m_skyBox.Cleanup(&m_deviceContext);
+
+    m_scene->Cleanup(&m_deviceContext);
+    delete m_scene;
 
     world->Cleanup(&m_deviceContext);
     delete world;
@@ -1102,7 +1110,7 @@ void Application::DrawFrame()
     // Draw everything in an offscreen buffer
     // DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
     // ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes, renderOption);
-    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, world, renderOption);
+    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_scene, renderOption);
     //
     //	Draw the offscreen framebuffer to the swap chain frame buffer
     //

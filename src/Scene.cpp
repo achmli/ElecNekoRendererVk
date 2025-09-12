@@ -18,9 +18,23 @@ namespace ElecNeko
             return false;
         }
 
-        textures.reserve(world->m_textures.size() + 1);
-        textures.insert(textures.end(), world->m_textures.begin(), world->m_textures.end());
-        textures.push_back(world->defaultAlbedo);
+        // textures.reserve(world->m_textures.size() + 1);
+        // textures.insert(textures.end(), world->m_textures.begin(), world->m_textures.end());
+        // textures.push_back(world->defaultAlbedo);
+        std::vector<TextureProperty> properties;
+        properties.reserve(world->m_textures.size() + 1);
+        for (auto tex: world->m_textures)
+        {
+            properties.push_back(tex->ExtractProperties());
+        }
+        properties.push_back(world->defaultAlbedo->ExtractProperties());
+        textureArray = new TextureArray();
+        if (!textureArray->CreateFromData(device, properties, 2048, 2048, 4))
+        {
+            printf("Failed to create texture array!\n");
+            assert(0);
+            return false;
+        }
 
         materials.clear();
         materials.reserve(world->m_materials.size());
@@ -104,6 +118,108 @@ namespace ElecNeko
 
         return true;
     }
+
+    bool Scene::Initialize(DeviceContext *device, World *inWorld)
+    {
+        world = inWorld;
+        std::vector<TextureProperty> properties;
+        properties.reserve(world->m_textures.size() + 1);
+        for (auto tex: world->m_textures)
+        {
+            properties.push_back(tex->ExtractProperties());
+        }
+        properties.push_back(world->defaultAlbedo->ExtractProperties());
+        textureArray = new TextureArray();
+        if (!textureArray->CreateFromData(device, properties, 2048, 2048, 4))
+        {
+            printf("Failed to create texture array!\n");
+            assert(0);
+            return false;
+        }
+
+        materials.clear();
+        materials.reserve(world->m_materials.size());
+        for (auto material: world->m_materials)
+        {
+            materials.push_back(material.MakeStrcut());
+        }
+
+        int opaqueIndexOffset = 0;
+        int maskIndexOffset = 0;
+        int transparentIndexOffset = 0;
+        for (int i = 0; i < world->m_meshInstances.size(); i++)
+        {
+            int matID = world->m_meshInstances[i].materialId;
+            int meshID = world->m_meshInstances[i].meshId;
+
+            modelMatrices.push_back(world->m_meshInstances[i].transform);
+
+            for (int j = 0; j < world->m_meshes[meshID]->m_indices.size(); j++)
+            {
+                uint32_t idx = world->m_meshes[meshID]->m_indices[j];
+                if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+                {
+                    idx += maskIndexOffset;
+                    maskIndices.push_back(idx);
+                }
+                else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+                {
+                    idx += transparentIndexOffset;
+                    transparentIndices.push_back(idx);
+                }
+                else
+                {
+                    idx += opaqueIndexOffset;
+                    opaqueIndices.push_back(idx);
+                }
+            }
+
+            for (int j = 0; j < world->m_meshes[meshID]->m_vertices.size(); j++)
+            {
+                ElecNekoVertex v = {};
+                v.position[0] = world->m_meshes[meshID]->m_vertices[j].position[0];
+                v.position[1] = world->m_meshes[meshID]->m_vertices[j].position[1];
+                v.position[2] = world->m_meshes[meshID]->m_vertices[j].position[2];
+
+                v.normal[0] = world->m_meshes[meshID]->m_vertices[j].normal[0];
+                v.normal[1] = world->m_meshes[meshID]->m_vertices[j].normal[1];
+                v.normal[2] = world->m_meshes[meshID]->m_vertices[j].normal[2];
+
+                v.uv[0] = world->m_meshes[meshID]->m_vertices[j].uv[0];
+                v.uv[1] = world->m_meshes[meshID]->m_vertices[j].uv[1];
+
+                v.materialIdx = matID;
+                v.modelMatrixIdx = i;
+                if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+                {
+                    maskVertices.push_back(v);
+                }
+                else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+                {
+                    transparentVertices.push_back(v);
+                }
+                else
+                {
+                    opaqueVertices.push_back(v);
+                }
+            }
+            if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+            {
+                maskIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+            }
+            else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+            {
+                transparentIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+            }
+            else
+            {
+                opaqueIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+            }
+        }
+
+        return true;
+    }
+
 
     bool Scene::MakeVBO(DeviceContext *device)
     {
@@ -197,22 +313,37 @@ namespace ElecNeko
     {
         if (world)
         {
-            world->Cleanup(device);
-            delete world;
             world = nullptr;
         }
 
-        opaqueVertexBuffer.Cleanup(device);
-        opaqueIndexBuffer.Cleanup(device);
+        if (!opaqueVertices.empty())
+        {
+            opaqueVertexBuffer.Cleanup(device);
+            opaqueIndexBuffer.Cleanup(device);
+        }
 
-        maskVertexBuffer.Cleanup(device);
-        maskIndexBuffer.Cleanup(device);
+        if (!maskVertices.empty())
+        {
+            maskVertexBuffer.Cleanup(device);
+            maskIndexBuffer.Cleanup(device);
+        }
 
-        transparentVertexBuffer.Cleanup(device);
-        transparentIndexBuffer.Cleanup(device);
+        if (!transparentVertices.empty())
+        {
+            transparentVertexBuffer.Cleanup(device);
+            transparentIndexBuffer.Cleanup(device);
+        }
 
-        materialBuffer.Cleanup(device);
-        modelMatrixBuffer.Cleanup(device);
+        if (!materials.empty())
+        {
+            materialBuffer.Cleanup(device);
+        }
+        if (!modelMatrices.empty())
+        {
+            modelMatrixBuffer.Cleanup(device);
+        }
+
+        textureArray->Cleanup(device);
     }
 
     void Scene::DrawOpaqueIndexed(VkCommandBuffer vkCommandBuffer)

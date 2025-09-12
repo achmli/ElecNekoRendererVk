@@ -415,25 +415,47 @@ FrameBuffer g_postProcessFrameBuffer;
 
 namespace ElecNeko
 {
-    Pipeline g_simpleSkyPipeline;
-    ElecNeko::ElecNekoShader g_simpleSkyShader;
-    Descriptors g_simpleSkyDescriptors;
+    ElecNekoPipeline g_skyPipelineEN;
+    ElecNekoShader g_skyShaderEN;
+    ElecNekoDescriptors g_skyDescriptorsEN;
+    Model g_skyModelEN;
 
-    Pipeline g_tonemapPipeline;
-    ElecNeko::ElecNekoShader g_tonemapShader;
-    Descriptors g_tonemapDescriptors;
+    ElecNekoPipeline g_newSkyPipelineEN;
+    ElecNekoShader g_newSkyShaderEN;
+    ElecNekoDescriptors g_newSkyDescriptorsEN;
 
-    Pipeline g_alphaTestShadowPipeline;
-    ElecNeko::ElecNekoShader g_alphaTestShadowShader;
-    Descriptors g_alphaTestShadowDescriptors;
+    // Pipeline	g_checkerboardShadowPipeline;
+    // Shader		g_checkerboardShadowShader;
+    // Descriptors	g_checkerboardShadowDescriptors;
 
-    Pipeline g_alphaBlendMeshPipeline;
-    ElecNeko::ElecNekoShader g_alphaBlendMeshShader;
-    Descriptors g_alphaBlendMeshDescriptors;
+    FrameBuffer g_shadowFrameBufferEN;
+    ElecNekoPipeline g_shadowPipelineEN;
+    ElecNekoShader g_shadowShaderEN;
+    ElecNekoDescriptors g_shadowDescriptorsEN;
 
-    Pipeline g_alphaTestMeshPipeline;
-    ElecNeko::ElecNekoShader g_alphaTestMeshShader;
-    Descriptors g_alphaTestMeshDescriptors;
+    ElecNekoPipeline g_meshShadowPipelineEN;
+    ElecNekoShader g_meshShadowShaderEN;
+    ElecNekoDescriptors g_meshShadowDescriptorsEN;
+
+    ElecNekoPipeline g_simpleSkyPipeline;
+    ElecNekoShader g_simpleSkyShader;
+    ElecNekoDescriptors g_simpleSkyDescriptors;
+
+    ElecNekoPipeline g_tonemapPipeline;
+    ElecNekoShader g_tonemapShader;
+    ElecNekoDescriptors g_tonemapDescriptors;
+
+    ElecNekoPipeline g_alphaTestShadowPipeline;
+    ElecNekoShader g_alphaTestShadowShader;
+    ElecNekoDescriptors g_alphaTestShadowDescriptors;
+
+    ElecNekoPipeline g_alphaBlendMeshPipeline;
+    ElecNekoShader g_alphaBlendMeshShader;
+    ElecNekoDescriptors g_alphaBlendMeshDescriptors;
+
+    ElecNekoPipeline g_alphaTestMeshPipeline;
+    ElecNekoShader g_alphaTestMeshShader;
+    ElecNekoDescriptors g_alphaTestMeshDescriptors;
 
     bool InitOffscreen(DeviceContext *device, const RenderOption &renderOption, int width, int height)
     {
@@ -443,7 +465,7 @@ namespace ElecNeko
         //	Build the frame buffer to render into
         //
         {
-            FrameBuffer::CreateParms_t frameBufferParms;
+            FrameBuffer::CreateParms_t frameBufferParms{};
             frameBufferParms.width = width;
             frameBufferParms.height = height;
             frameBufferParms.hasColor = true;
@@ -461,12 +483,12 @@ namespace ElecNeko
         //	Shadow
         //
         {
-            FrameBuffer::CreateParms_t frameBufferParms;
+            FrameBuffer::CreateParms_t frameBufferParms{};
             frameBufferParms.width = 4096;
             frameBufferParms.height = 4096;
             frameBufferParms.hasColor = false;
             frameBufferParms.hasDepth = true;
-            result = g_shadowFrameBuffer.Create(device, frameBufferParms);
+            result = g_shadowFrameBufferEN.Create(device, frameBufferParms);
             if (!result)
             {
                 printf("ERROR: Failed to create off screen buffer\n");
@@ -474,7 +496,7 @@ namespace ElecNeko
                 return false;
             }
 
-            result = g_shadowShader.Load(device, "shadowTest");
+            result = g_shadowShaderEN.Load(device, "shadowTest");
             if (!result)
             {
                 printf("ERROR: Failed to load shader\n");
@@ -482,12 +504,14 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms{};
             memset(&descriptorParms, 0, sizeof(descriptorParms));
-            descriptorParms.numUniformsVertex = 2;
+            descriptorParms.numUniformsVertex = 1;
+            descriptorParms.numStorageVertex = 1;
             descriptorParms.numUniformsFragment = 0;
+            descriptorParms.numStorageFragment = 0;
             descriptorParms.numImageSamplers = 0;
-            result = g_shadowDescriptors.ElecNekoCreate(device, descriptorParms);
+            result = g_shadowDescriptorsEN.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -495,16 +519,16 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
-            pipelineParms.framebuffer = &g_shadowFrameBuffer;
-            pipelineParms.descriptors = &g_shadowDescriptors;
-            pipelineParms.shader = &g_shadowShader;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_shadowFrameBufferEN;
+            pipelineParms.descriptors = &g_shadowDescriptorsEN;
+            pipelineParms.shader = &g_shadowShaderEN;
             pipelineParms.width = frameBufferParms.width;
             pipelineParms.height = frameBufferParms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_NONE;
             pipelineParms.depthTest = true;
             pipelineParms.depthWrite = true;
-            result = g_shadowPipeline.CreateForMesh(device, pipelineParms);
+            result = g_shadowPipelineEN.Create(device, pipelineParms, ElecNekoPipeline::USAGE_MESH);
             if (!result)
             {
                 printf("ERROR: Failed to build pipeline\n");
@@ -523,12 +547,14 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms{};
             memset(&descriptorParms, 0, sizeof(descriptorParms));
-            descriptorParms.numUniformsVertex = 2;
+            descriptorParms.numUniformsVertex = 1;
+            descriptorParms.numStorageVertex = 1;
             descriptorParms.numUniformsFragment = 0;
+            descriptorParms.numStorageFragment = 1;
             descriptorParms.numImageSamplers = 1;
-            result = g_alphaTestShadowDescriptors.ElecNekoCreate(device, descriptorParms);
+            result = g_alphaTestShadowDescriptors.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -536,16 +562,16 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
-            pipelineParms.framebuffer = &g_shadowFrameBuffer;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
+            pipelineParms.framebuffer = &g_shadowFrameBufferEN;
             pipelineParms.descriptors = &g_alphaTestShadowDescriptors;
             pipelineParms.shader = &g_alphaTestShadowShader;
             pipelineParms.width = g_shadowFrameBuffer.m_parms.width;
             pipelineParms.height = g_shadowFrameBuffer.m_parms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_NONE;
             pipelineParms.depthTest = true;
             pipelineParms.depthWrite = true;
-            result = g_alphaTestShadowPipeline.CreateForMesh(device, pipelineParms);
+            result = g_alphaTestShadowPipeline.Create(device, pipelineParms, ElecNekoPipeline::USAGE_MESH);
             if (!result)
             {
                 printf("ERROR: Failed to build pipeline\n");
@@ -559,7 +585,7 @@ namespace ElecNeko
         //
         if (!renderOption.skyBox && !renderOption.simpleRealSky)
         {
-            result = g_skyShader.Load(device, "sky");
+            result = g_skyShaderEN.Load(device, "sky");
             if (!result)
             {
                 printf("ERROR: Failed to load shader\n");
@@ -567,10 +593,10 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms{};
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 1;
-            result = g_skyDescriptors.ElecNekoCreate(device, descriptorParms);
+            result = g_skyDescriptorsEN.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -578,16 +604,16 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
             pipelineParms.framebuffer = &g_offscreenFrameBuffer;
-            pipelineParms.descriptors = &g_skyDescriptors;
-            pipelineParms.shader = &g_skyShader;
+            pipelineParms.descriptors = &g_skyDescriptorsEN;
+            pipelineParms.shader = &g_skyShaderEN;
             pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
             pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_NONE;
             pipelineParms.depthTest = false;
             pipelineParms.depthWrite = false;
-            result = g_skyPipeline.Create(device, pipelineParms);
+            result = g_skyPipelineEN.Create(device, pipelineParms);
             if (!result)
             {
                 printf("ERROR: Failed to build pipeline\n");
@@ -596,8 +622,8 @@ namespace ElecNeko
             }
 
             ShapeSphere sphereShape(1.0f);
-            g_skyModel.BuildFromShape(&sphereShape);
-            g_skyModel.MakeVBO(device);
+            g_skyModelEN.BuildFromShape(&sphereShape);
+            g_skyModelEN.MakeVBO(device);
         }
         else if (!renderOption.skyBox)
         {
@@ -610,12 +636,12 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms{};
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 0;
             descriptorParms.numUniformsFragment = 3;
             descriptorParms.numImageSamplers = 0;
-            result = g_simpleSkyDescriptors.ElecNekoCreate(device, descriptorParms);
+            result = g_simpleSkyDescriptors.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -623,16 +649,16 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
             pipelineParms.framebuffer = &g_offscreenFrameBuffer;
             pipelineParms.descriptors = &g_simpleSkyDescriptors;
             pipelineParms.shader = &g_simpleSkyShader;
             pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
             pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_FRONT;
             pipelineParms.depthTest = false;
             pipelineParms.depthWrite = false;
-            result = g_simpleSkyPipeline.CreateForFullScreen(device, pipelineParms);
+            result = g_simpleSkyPipeline.Create(device, pipelineParms, ElecNekoPipeline::USAGE_FULL_SCREEN);
 
             if (!result)
             {
@@ -643,7 +669,7 @@ namespace ElecNeko
         }
         else
         {
-            result = g_newSkyShader.Load(device, "newSky");
+            result = g_newSkyShaderEN.Load(device, "newSky");
             if (!result)
             {
                 printf("ERROR: Failed to load shader\n");
@@ -651,12 +677,12 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms{};
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 1;
             descriptorParms.numUniformsFragment = 1;
             descriptorParms.numImageSamplers = 1;
-            result = g_newSkyDescriptors.ElecNekoCreate(device, descriptorParms);
+            result = g_newSkyDescriptorsEN.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -664,16 +690,16 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
             pipelineParms.framebuffer = &g_offscreenFrameBuffer;
-            pipelineParms.descriptors = &g_newSkyDescriptors;
-            pipelineParms.shader = &g_newSkyShader;
+            pipelineParms.descriptors = &g_newSkyDescriptorsEN;
+            pipelineParms.shader = &g_newSkyShaderEN;
             pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
             pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_NONE;
             pipelineParms.depthTest = false;
             pipelineParms.depthWrite = false;
-            result = g_newSkyPipeline.CreateForFullScreen(device, pipelineParms);
+            result = g_newSkyPipelineEN.Create(device, pipelineParms, ElecNekoPipeline::USAGE_FULL_SCREEN);
             if (!result)
             {
                 printf("ERROR: Failed to build pipeline\n");
@@ -683,7 +709,7 @@ namespace ElecNeko
         }
 
         {
-            result = g_meshShadowShader.Load(device, "meshShadowed");
+            result = g_meshShadowShaderEN.Load(device, "meshShadowed");
             if (!result)
             {
                 printf("ERROR: Failed to load shader\n");
@@ -691,12 +717,14 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms{};
             memset(&descriptorParms, 0, sizeof(descriptorParms));
-            descriptorParms.numUniformsVertex = 3;
-            descriptorParms.numUniformsFragment = 2;
-            descriptorParms.numImageSamplers = 5;
-            result = g_meshShadowDescriptors.ElecNekoCreate(device, descriptorParms);
+            descriptorParms.numUniformsVertex = 2;
+            descriptorParms.numStorageVertex = 1;
+            descriptorParms.numUniformsFragment = 1;
+            descriptorParms.numStorageFragment = 1;
+            descriptorParms.numImageSamplers = 2;
+            result = g_meshShadowDescriptorsEN.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -704,17 +732,17 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
             pipelineParms.framebuffer = &g_offscreenFrameBuffer;
-            pipelineParms.descriptors = &g_meshShadowDescriptors;
-            pipelineParms.shader = &g_meshShadowShader;
+            pipelineParms.descriptors = &g_meshShadowDescriptorsEN;
+            pipelineParms.shader = &g_meshShadowShaderEN;
             pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
             pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_BACK;
             pipelineParms.depthTest = true;
             pipelineParms.depthWrite = true;
 
-            result = g_meshShadowPipeline.CreateForMesh(device, pipelineParms);
+            result = g_meshShadowPipelineEN.Create(device, pipelineParms, ElecNekoPipeline::USAGE_MESH);
             if (!result)
             {
                 printf("ERROR: Failed to build pipeline\n");
@@ -732,12 +760,14 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms{};
             memset(&descriptorParms, 0, sizeof(descriptorParms));
-            descriptorParms.numUniformsVertex = 3;
-            descriptorParms.numUniformsFragment = 2;
-            descriptorParms.numImageSamplers = 5;
-            result = g_alphaTestMeshDescriptors.ElecNekoCreate(device, descriptorParms);
+            descriptorParms.numUniformsVertex = 2;
+            descriptorParms.numStorageVertex = 1;
+            descriptorParms.numUniformsFragment = 1;
+            descriptorParms.numStorageFragment = 1;
+            descriptorParms.numImageSamplers = 2;
+            result = g_alphaTestMeshDescriptors.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -745,16 +775,16 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
             pipelineParms.framebuffer = &g_offscreenFrameBuffer;
             pipelineParms.descriptors = &g_alphaTestMeshDescriptors;
             pipelineParms.shader = &g_alphaTestMeshShader;
             pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
             pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_BACK;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_BACK;
             pipelineParms.depthTest = true;
             pipelineParms.depthWrite = true;
-            result = g_alphaTestMeshPipeline.CreateForMesh(device, pipelineParms);
+            result = g_alphaTestMeshPipeline.Create(device, pipelineParms, ElecNekoPipeline::USAGE_MESH);
             if (!result)
             {
                 printf("ERROR: Failed to build pipeline\n");
@@ -804,7 +834,7 @@ namespace ElecNeko
         }*/
 
         {
-            FrameBuffer::CreateParms_t frameBufferParms;
+            FrameBuffer::CreateParms_t frameBufferParms{};
             frameBufferParms.width = width;
             frameBufferParms.height = height;
             frameBufferParms.hasColor = true;
@@ -826,12 +856,12 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms{};
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 0;
             descriptorParms.numUniformsFragment = 1;
             descriptorParms.numImageSamplers = 1;
-            result = g_tonemapDescriptors.ElecNekoCreate(device, descriptorParms);
+            result = g_tonemapDescriptors.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -839,17 +869,17 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
             pipelineParms.framebuffer = &g_postProcessFrameBuffer;
             pipelineParms.descriptors = &g_tonemapDescriptors;
             pipelineParms.shader = &g_tonemapShader;
             pipelineParms.width = g_postProcessFrameBuffer.m_parms.width;
             pipelineParms.height = g_postProcessFrameBuffer.m_parms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_NONE;
             pipelineParms.depthTest = false;
             pipelineParms.depthWrite = false;
 
-            result = g_tonemapPipeline.CreateForFullScreen(device, pipelineParms);
+            result = g_tonemapPipeline.Create(device, pipelineParms, ElecNekoPipeline::USAGE_FULL_SCREEN);
             if (!result)
             {
                 printf("ERROR: Failed to build pipeline\n");
@@ -866,10 +896,10 @@ namespace ElecNeko
     {
         if (!renderOption.skyBox && !renderOption.simpleRealSky)
         {
-            g_skyPipeline.Cleanup(device);
-            g_skyDescriptors.Cleanup(device);
-            g_skyShader.Cleanup(device);
-            g_skyModel.Cleanup(*device);
+            g_skyPipelineEN.Cleanup(device);
+            g_skyDescriptorsEN.Cleanup(device);
+            g_skyShaderEN.Cleanup(device);
+            g_skyModelEN.Cleanup(*device);
         }
         else if (!renderOption.skyBox)
         {
@@ -879,16 +909,16 @@ namespace ElecNeko
         }
         else
         {
-            g_newSkyPipeline.Cleanup(device);
-            g_newSkyDescriptors.Cleanup(device);
-            g_newSkyShader.Cleanup(device);
+            g_newSkyPipelineEN.Cleanup(device);
+            g_newSkyDescriptorsEN.Cleanup(device);
+            g_newSkyShaderEN.Cleanup(device);
         }
 
         g_offscreenFrameBuffer.Cleanup(device);
 
-        g_meshShadowPipeline.Cleanup(device);
-        g_meshShadowShader.Cleanup(device);
-        g_meshShadowDescriptors.Cleanup(device);
+        g_meshShadowPipelineEN.Cleanup(device);
+        g_meshShadowShaderEN.Cleanup(device);
+        g_meshShadowDescriptorsEN.Cleanup(device);
 
         g_alphaTestShadowPipeline.Cleanup(device);
         g_alphaTestShadowShader.Cleanup(device);
@@ -898,10 +928,10 @@ namespace ElecNeko
         g_alphaTestMeshShader.Cleanup(device);
         g_alphaTestMeshDescriptors.Cleanup(device);
 
-        g_shadowPipeline.Cleanup(device);
-        g_shadowShader.Cleanup(device);
-        g_shadowDescriptors.Cleanup(device);
-        g_shadowFrameBuffer.Cleanup(device);
+        g_shadowPipelineEN.Cleanup(device);
+        g_shadowShaderEN.Cleanup(device);
+        g_shadowDescriptorsEN.Cleanup(device);
+        g_shadowFrameBufferEN.Cleanup(device);
 
         g_tonemapPipeline.Cleanup(device);
         g_tonemapShader.Cleanup(device);
@@ -914,10 +944,10 @@ namespace ElecNeko
     {
         if (!renderOption.skyBox && !renderOption.simpleRealSky)
         {
-            g_skyPipeline.Cleanup(device);
-            g_skyDescriptors.Cleanup(device);
-            g_skyShader.Cleanup(device);
-            g_skyModel.Cleanup(*device);
+            g_skyPipelineEN.Cleanup(device);
+            g_skyDescriptorsEN.Cleanup(device);
+            g_skyShaderEN.Cleanup(device);
+            g_skyModelEN.Cleanup(*device);
         }
         else if (!renderOption.skyBox)
         {
@@ -927,16 +957,16 @@ namespace ElecNeko
         }
         else
         {
-            g_newSkyPipeline.Cleanup(device);
-            g_newSkyDescriptors.Cleanup(device);
-            g_newSkyShader.Cleanup(device);
+            g_newSkyPipelineEN.Cleanup(device);
+            g_newSkyDescriptorsEN.Cleanup(device);
+            g_newSkyShaderEN.Cleanup(device);
         }
 
         bool result;
 
         if (!renderOption.skyBox && !renderOption.simpleRealSky)
         {
-            result = g_skyShader.Load(device, "sky");
+            result = g_skyShaderEN.Load(device, "sky");
             if (!result)
             {
                 printf("ERROR: Failed to load shader\n");
@@ -944,10 +974,10 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms;
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 1;
-            result = g_skyDescriptors.ElecNekoCreate(device, descriptorParms);
+            result = g_skyDescriptorsEN.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -955,16 +985,16 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
             pipelineParms.framebuffer = &g_offscreenFrameBuffer;
-            pipelineParms.descriptors = &g_skyDescriptors;
-            pipelineParms.shader = &g_skyShader;
+            pipelineParms.descriptors = &g_skyDescriptorsEN;
+            pipelineParms.shader = &g_skyShaderEN;
             pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
             pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_NONE;
             pipelineParms.depthTest = false;
             pipelineParms.depthWrite = false;
-            result = g_skyPipeline.Create(device, pipelineParms);
+            result = g_skyPipelineEN.Create(device, pipelineParms);
             if (!result)
             {
                 printf("ERROR: Failed to build pipeline\n");
@@ -986,12 +1016,12 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms;
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 0;
             descriptorParms.numUniformsFragment = 3;
             descriptorParms.numImageSamplers = 0;
-            result = g_simpleSkyDescriptors.ElecNekoCreate(device, descriptorParms);
+            result = g_simpleSkyDescriptors.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -999,16 +1029,16 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
             pipelineParms.framebuffer = &g_offscreenFrameBuffer;
             pipelineParms.descriptors = &g_simpleSkyDescriptors;
             pipelineParms.shader = &g_simpleSkyShader;
             pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
             pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_NONE;
             pipelineParms.depthTest = false;
             pipelineParms.depthWrite = false;
-            result = g_simpleSkyPipeline.CreateForFullScreen(device, pipelineParms);
+            result = g_simpleSkyPipeline.Create(device, pipelineParms, ElecNekoPipeline::USAGE_FULL_SCREEN);
 
             if (!result)
             {
@@ -1019,7 +1049,7 @@ namespace ElecNeko
         }
         else
         {
-            result = g_newSkyShader.Load(device, "newSky");
+            result = g_newSkyShaderEN.Load(device, "newSky");
             if (!result)
             {
                 printf("ERROR: Failed to load shader\n");
@@ -1027,12 +1057,12 @@ namespace ElecNeko
                 return false;
             }
 
-            Descriptors::CreateParms_t descriptorParms;
+            ElecNekoDescriptors::CreateParms_t descriptorParms;
             memset(&descriptorParms, 0, sizeof(descriptorParms));
             descriptorParms.numUniformsVertex = 1;
             descriptorParms.numUniformsFragment = 1;
             descriptorParms.numImageSamplers = 1;
-            result = g_newSkyDescriptors.ElecNekoCreate(device, descriptorParms);
+            result = g_newSkyDescriptorsEN.Create(device, descriptorParms);
             if (!result)
             {
                 printf("ERROR: Failed to build descriptors\n");
@@ -1040,16 +1070,16 @@ namespace ElecNeko
                 return false;
             }
 
-            Pipeline::CreateParms_t pipelineParms;
+            ElecNekoPipeline::CreateParms_t pipelineParms;
             pipelineParms.framebuffer = &g_offscreenFrameBuffer;
-            pipelineParms.descriptors = &g_newSkyDescriptors;
-            pipelineParms.shader = &g_newSkyShader;
+            pipelineParms.descriptors = &g_newSkyDescriptorsEN;
+            pipelineParms.shader = &g_newSkyShaderEN;
             pipelineParms.width = g_offscreenFrameBuffer.m_parms.width;
             pipelineParms.height = g_offscreenFrameBuffer.m_parms.height;
-            pipelineParms.cullMode = Pipeline::CULL_MODE_NONE;
+            pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_NONE;
             pipelineParms.depthTest = false;
             pipelineParms.depthWrite = false;
-            result = g_newSkyPipeline.CreateForFullScreen(device, pipelineParms);
+            result = g_newSkyPipelineEN.Create(device, pipelineParms, ElecNekoPipeline::USAGE_FULL_SCREEN);
             if (!result)
             {
                 printf("ERROR: Failed to build pipeline\n");
@@ -1059,7 +1089,7 @@ namespace ElecNeko
         }
     }
 
-    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, std::vector<Mesh *> mesh, const RenderOption &renderOption)
+    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, Scene *scene, const RenderOption &renderOption)
     {
         VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
 
@@ -1077,209 +1107,44 @@ namespace ElecNeko
 
         // update shadow
         {
-            g_shadowFrameBuffer.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            g_shadowFrameBufferEN.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
-            g_shadowFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
+            g_shadowFrameBufferEN.BeginRenderPass(device, cmdBufferIndex);
 
-            g_shadowPipeline.BindPipeline(cmdBuffer);
-            for (int i = 0; i < mesh.size(); i++)
+            if (!scene->opaqueVertices.empty())
             {
-                for (int j = 0; j < mesh[i]->m_meshParts.size(); j++)
-                {
-                    if (mesh[i]->m_meshParts[j].m_vertices.empty())
-                        continue;
-                    Descriptor descriptor = g_shadowPipeline.GetFreeDescriptor();
-                    descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
-                    descriptor.BindBuffer(&mesh[i]->uniformBuffer, 0, mesh[i]->uniformBuffer.m_vkBufferSize, 1);
-                    descriptor.BindBuffer(&mesh[i]->m_meshParts[j].m_uniformBuffer, 0, mesh[i]->m_meshParts[j].m_uniformBuffer.m_vkBufferSize, 2);
-                    if (mesh[i]->m_meshParts[j].albTexIndex >= 0)
-                    {
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                             mesh[i]->albedoMaps[mesh[i]->m_meshParts[j].albTexIndex].m_image.m_vkImageView,
-                                             ElecNeko::ElecNekoSampler::m_samplerTexture, 0);
-                    }
-                    descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipeline);
-                    mesh[i]->m_meshParts[j].DrawIndexed(cmdBuffer);
-                }
+                g_shadowPipelineEN.BindPipeline(cmdBuffer);
+
+                ElecNekoDescriptor descriptor = g_shadowPipelineEN.GetFreeDescriptor();
+                // descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
+                // descriptor.BindBuffer(&scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize, 1);
+                descriptor.BindUniformBuffer(0, uniforms, shadowCamOffset, shadowCamSize);
+                descriptor.BindStorageBuffer(1, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipelineEN);
+                scene->DrawOpaqueIndexed(cmdBuffer);
             }
 
-            g_shadowFrameBuffer.EndRenderPass(device, cmdBufferIndex);
-            g_shadowFrameBuffer.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
-        }
-
-        {
-            g_offscreenFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-            g_offscreenFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
-            //
-            //	Draw the sky
-            //
-            if (!renderOption.skyBox && !renderOption.simpleRealSky)
-            {
-                // Binding the pipeline is effectively the "use shader" we had back in our opengl apps
-                g_skyPipeline.BindPipeline(cmdBuffer);
-
-                // Descriptor is how we bind our buffers and images
-                Descriptor descriptor = g_skyPipeline.GetFreeDescriptor();
-                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
-                descriptor.BindDescriptor(device, cmdBuffer, &g_skyPipeline);
-                g_skyModel.DrawIndexed(cmdBuffer);
-            }
-            else if (!renderOption.skyBox)
-            {
-                g_simpleSkyPipeline.BindPipeline(cmdBuffer);
-
-                Descriptor descriptor = g_simpleSkyPipeline.GetFreeDescriptor();
-                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
-                descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 1);
-                descriptor.BindBuffer(uniforms, skyParmsOffset, skyParmsSize, 2);
-                descriptor.BindDescriptor(device, cmdBuffer, &g_simpleSkyPipeline);
-                vkCmdDraw(cmdBuffer, 3, 1, 0, 0);
-            }
-            else
-            {
-                g_newSkyPipeline.BindPipeline(cmdBuffer);
-
-                Descriptor descriptor = g_newSkyPipeline.GetFreeDescriptor();
-                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
-                descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, skyBox.m_cubeImage.m_vkImageView, ElecNeko::ElecNekoSampler::m_samplerCubemap,
-                                     0);
-                descriptor.BindDescriptor(device, cmdBuffer, &g_newSkyPipeline);
-                vkCmdDraw(cmdBuffer, 36, 1, 0, 0);
-            }
-
-            // draw the model
-            {
-                g_meshShadowPipeline.BindPipeline(cmdBuffer);
-
-                for (int i = 0; i < mesh.size(); i++)
-                {
-                    for (int j = 0; j < mesh[i]->m_meshParts.size(); j++)
-                    {
-                        if (mesh[i]->m_meshParts[j].m_vertices.empty())
-                            continue;
-                        Descriptor descriptor = g_meshShadowPipeline.GetFreeDescriptor();
-                        descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
-                        descriptor.BindBuffer(&mesh[i]->uniformBuffer, 0, mesh[i]->uniformBuffer.m_vkBufferSize, 1);
-                        descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 2);
-                        descriptor.BindBuffer(&mesh[i]->m_meshParts[j].m_uniformBuffer, 0, mesh[i]->m_meshParts[j].m_uniformBuffer.m_vkBufferSize, 3);
-                        descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 4);
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView,
-                                             Samplers::m_samplerStandard, 0);
-                        if (mesh[i]->m_meshParts[j].albTexIndex >= 0)
-                        {
-                            descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                                 mesh[i]->albedoMaps[mesh[i]->m_meshParts[j].albTexIndex].m_image.m_vkImageView,
-                                                 ElecNeko::ElecNekoSampler::m_samplerTexture, 1);
-                        }
-                        descriptor.BindDescriptor(device, cmdBuffer, &g_meshShadowPipeline);
-                        mesh[i]->m_meshParts[j].DrawIndexed(cmdBuffer);
-                    }
-                }
-            }
-
-            g_offscreenFrameBuffer.EndRenderPass(device, cmdBufferIndex);
-
-            g_offscreenFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
-        }
-
-        // post process
-        {
-            g_postProcessFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-            g_postProcessFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
-
-            // tonemapping
-            {
-                g_tonemapPipeline.BindPipeline(cmdBuffer);
-
-                Descriptor descriptor = g_tonemapPipeline.GetFreeDescriptor();
-                descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 0);
-                descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_offscreenFrameBuffer.m_imageColor.m_vkImageView,
-                                     ElecNekoSampler::m_samplerTexture, 0);
-                descriptor.BindDescriptor(device, cmdBuffer, &g_tonemapPipeline);
-                vkCmdDraw(cmdBuffer, 3, 1, 0, 0);
-            }
-
-            g_postProcessFrameBuffer.EndRenderPass(device, cmdBufferIndex);
-
-            g_postProcessFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
-        }
-    }
-
-    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, World *world, const RenderOption &renderOption)
-    {
-        VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
-
-        const int camOffset = 0;
-        const int camSize = sizeof(float) * 16 * 5;
-
-        const int shadowCamOffset = device->GetAligendUniformByteOffset(camOffset + camSize);
-        const int shadowCamSize = camSize;
-
-        const int lightParmsOffset = device->GetAligendUniformByteOffset(shadowCamOffset + shadowCamSize);
-        const int lightParmsSize = sizeof(float) * 16;
-
-        const int skyParmsOffset = device->GetAligendUniformByteOffset(lightParmsOffset + lightParmsSize);
-        const int skyParmsSize = sizeof(float) * 16;
-
-        // update shadow
-        {
-            g_shadowFrameBuffer.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-
-            g_shadowFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
-
-            {
-                g_shadowPipeline.BindPipeline(cmdBuffer);
-
-                for (int i = 0; i < world->m_meshInstances.size(); i++)
-                {
-                    int meshIdx = world->m_meshInstances[i].meshId;
-                    int mateIdx = world->m_meshInstances[i].materialId;
-                    if (world->m_meshes[meshIdx]->m_vertices.empty() || world->m_materials[mateIdx].alphaMode != AlphaMode::Opaque)
-                    {
-                        continue;
-                    }
-                    Descriptor descriptor = g_shadowPipeline.GetFreeDescriptor();
-                    descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
-                    descriptor.BindBuffer(&world->m_meshInstances[i].uniformBuffer, 0, world->m_meshInstances[i].uniformBuffer.m_vkBufferSize, 1);
-                    descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipeline);
-                    world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
-                }
-            }
-
+            if (!scene->maskVertices.empty())
             {
                 g_alphaTestShadowPipeline.BindPipeline(cmdBuffer);
 
-                for (int i = 0; i < world->m_meshInstances.size(); i++)
-                {
-                    int meshIdx = world->m_meshInstances[i].meshId;
-                    int mateIdx = world->m_meshInstances[i].materialId;
-                    if (world->m_meshes[meshIdx]->m_vertices.empty() || world->m_materials[mateIdx].alphaMode != AlphaMode::Mask)
-                    {
-                        continue;
-                    }
-                    Descriptor descriptor = g_alphaTestShadowPipeline.GetFreeDescriptor();
-                    descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
-                    descriptor.BindBuffer(&world->m_meshInstances[i].uniformBuffer, 0, world->m_meshInstances[i].uniformBuffer.m_vkBufferSize, 1);
-                    if (world->m_materials[mateIdx].baseColorTexId > -1)
-                    {
-                        int albedoIndex = world->m_materials[mateIdx].baseColorTexId;
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[albedoIndex]->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 0);
-                    }
-                    else
-                    {
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultAlbedo->m_image.m_vkImageView, Samplers::m_samplerStandard,
-                                             0);
-                    }
-                    descriptor.BindDescriptor(device, cmdBuffer, &g_alphaTestShadowPipeline);
-                    world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
-                }
+                ElecNekoDescriptor descriptor = g_alphaTestShadowPipeline.GetFreeDescriptor();
+                // descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 0);
+                // descriptor.BindBuffer(&scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize, 1);
+                // descriptor.BindBuffer(&scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize, 2);
+                // descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+                //                      ElecNeko::ElecNekoSampler::m_samplerCubemap, 0);
+                descriptor.BindUniformBuffer(0, uniforms, shadowCamOffset, shadowCamSize);
+                descriptor.BindStorageBuffer(1, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
+                descriptor.BindStorageBuffer(2, &scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize);
+                descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+                                     ElecNeko::ElecNekoSampler::m_samplerCubemap);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_alphaTestShadowPipeline);
+                scene->DrawMaskIndexed(cmdBuffer);
             }
 
-            g_shadowFrameBuffer.EndRenderPass(device, cmdBufferIndex);
-            g_shadowFrameBuffer.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+            g_shadowFrameBufferEN.EndRenderPass(device, cmdBufferIndex);
+            g_shadowFrameBufferEN.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
         }
 
         {
@@ -1292,172 +1157,96 @@ namespace ElecNeko
             if (!renderOption.skyBox && !renderOption.simpleRealSky)
             {
                 // Binding the pipeline is effectively the "use shader" we had back in our opengl apps
-                g_skyPipeline.BindPipeline(cmdBuffer);
+                g_skyPipelineEN.BindPipeline(cmdBuffer);
 
                 // Descriptor is how we bind our buffers and images
-                Descriptor descriptor = g_skyPipeline.GetFreeDescriptor();
-                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
-                descriptor.BindDescriptor(device, cmdBuffer, &g_skyPipeline);
+                ElecNekoDescriptor descriptor = g_skyPipelineEN.GetFreeDescriptor();
+                // descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                descriptor.BindUniformBuffer(0, uniforms, camOffset, camSize);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_skyPipelineEN);
                 g_skyModel.DrawIndexed(cmdBuffer);
             }
             else if (!renderOption.skyBox)
             {
                 g_simpleSkyPipeline.BindPipeline(cmdBuffer);
 
-                Descriptor descriptor = g_simpleSkyPipeline.GetFreeDescriptor();
-                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
-                descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 1);
-                descriptor.BindBuffer(uniforms, skyParmsOffset, skyParmsSize, 2);
+                ElecNekoDescriptor descriptor = g_simpleSkyPipeline.GetFreeDescriptor();
+                // descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                // descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 1);
+                // descriptor.BindBuffer(uniforms, skyParmsOffset, skyParmsSize, 2);
+                descriptor.BindUniformBuffer(0, uniforms, camOffset, camSize);
+                descriptor.BindUniformBuffer(1, uniforms, lightParmsOffset, lightParmsSize);
+                descriptor.BindUniformBuffer(2, uniforms, skyParmsOffset, skyParmsSize);
                 descriptor.BindDescriptor(device, cmdBuffer, &g_simpleSkyPipeline);
                 vkCmdDraw(cmdBuffer, 3, 1, 0, 0);
             }
             else
             {
-                g_newSkyPipeline.BindPipeline(cmdBuffer);
+                g_newSkyPipelineEN.BindPipeline(cmdBuffer);
 
-                Descriptor descriptor = g_newSkyPipeline.GetFreeDescriptor();
-                descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
-                descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, skyBox.m_cubeImage.m_vkImageView, ElecNeko::ElecNekoSampler::m_samplerCubemap,
-                                     0);
-                descriptor.BindDescriptor(device, cmdBuffer, &g_newSkyPipeline);
+                ElecNekoDescriptor descriptor = g_newSkyPipelineEN.GetFreeDescriptor();
+                // descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                // descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, skyBox.m_cubeImage.m_vkImageView, ElecNeko::ElecNekoSampler::m_samplerCubemap,
+                //                      0);
+                descriptor.BindUniformBuffer(0, uniforms, camOffset, camSize);
+                descriptor.BindImage(1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, skyBox.m_cubeImage.m_vkImageView,
+                                     ElecNeko::ElecNekoSampler::m_samplerCubemap);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_newSkyPipelineEN);
                 vkCmdDraw(cmdBuffer, 36, 1, 0, 0);
             }
 
             // draw the model
+            if (!scene->opaqueVertices.empty())
             {
-                g_meshShadowPipeline.BindPipeline(cmdBuffer);
+                g_meshShadowPipelineEN.BindPipeline(cmdBuffer);
 
-                for (int i = 0; i < world->m_meshInstances.size(); i++)
-                {
-                    int meshIdx = world->m_meshInstances[i].meshId;
-                    int mateIdx = world->m_meshInstances[i].materialId;
-                    if (world->m_meshes[meshIdx]->m_vertices.empty() || world->m_materials[mateIdx].alphaMode != AlphaMode::Opaque)
-                    {
-                        continue;
-                    }
-                    Descriptor descriptor = g_meshShadowPipeline.GetFreeDescriptor();
-                    descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
-                    descriptor.BindBuffer(&world->m_meshInstances[i].uniformBuffer, 0, world->m_meshInstances[i].uniformBuffer.m_vkBufferSize, 1);
-                    descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 2);
-                    descriptor.BindBuffer(&world->m_materials[mateIdx].matBuffer, 0, world->m_materials[mateIdx].matBuffer.m_vkBufferSize, 3);
-                    descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 4);
-                    descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView,
-                                         Samplers::m_samplerStandard, 0);
-                    if (world->m_materials[mateIdx].baseColorTexId > -1)
-                    {
-                        int albedoIndex = world->m_materials[mateIdx].baseColorTexId;
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[albedoIndex]->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 1);
-                    }
-                    else
-                    {
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultAlbedo->m_image.m_vkImageView, Samplers::m_samplerStandard,
-                                             1);
-                    }
-                    if (world->m_materials[mateIdx].normalMapTexId > -1)
-                    {
-                        int normalIndex = world->m_materials[mateIdx].normalMapTexId;
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[normalIndex]->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 2);
-                    }
-                    else
-                    {
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultNormal->m_image.m_vkImageView, Samplers::m_samplerStandard,
-                                             2);
-                    }
-                    if (world->m_materials[mateIdx].metallicRoughtnessTexId > -1)
-                    {
-                        int metalIndex = world->m_materials[mateIdx].metallicRoughtnessTexId;
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[metalIndex]->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 3);
-                    }
-                    else
-                    {
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultMetalRough->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 3);
-                    }
-                    if (world->m_materials[mateIdx].emissionmapTexId > -1)
-                    {
-                        int emitIndex = world->m_materials[mateIdx].emissionmapTexId;
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[emitIndex]->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 4);
-                    }
-                    else
-                    {
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultEmission->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 4);
-                    }
-                    descriptor.BindDescriptor(device, cmdBuffer, &g_meshShadowPipeline);
-                    world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
-                }
+                ElecNekoDescriptor descriptor = g_meshShadowPipelineEN.GetFreeDescriptor();
+                // descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                // descriptor.BindBuffer(&scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize, 1);
+                // descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 2);
+                // descriptor.BindBuffer(&scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize, 3);
+                // descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 4);
+                // descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBufferEN.m_imageDepth.m_vkImageView,
+                //                      Samplers::m_samplerStandard, 0);
+                // descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+                //                      ElecNeko::ElecNekoSampler::m_samplerCubemap, 1);
+                descriptor.BindUniformBuffer(0, uniforms, camOffset, camSize);
+                descriptor.BindUniformBuffer(1, uniforms, shadowCamOffset, shadowCamSize);
+                descriptor.BindStorageBuffer(2, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
+                descriptor.BindUniformBuffer(3, uniforms, lightParmsOffset, lightParmsSize);
+                descriptor.BindStorageBuffer(4, &scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize);
+                descriptor.BindImage(5, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBufferEN.m_imageDepth.m_vkImageView,
+                                     Samplers::m_samplerStandard);
+                descriptor.BindImage(6, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+                                     ElecNeko::ElecNekoSampler::m_samplerCubemap);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_meshShadowPipelineEN);
+                scene->DrawOpaqueIndexed(cmdBuffer);
             }
-
+            if (!scene->maskVertices.empty())
             {
                 g_alphaTestMeshPipeline.BindPipeline(cmdBuffer);
 
-                for (int i = 0; i < world->m_meshInstances.size(); i++)
-                {
-                    int meshIdx = world->m_meshInstances[i].meshId;
-                    int mateIdx = world->m_meshInstances[i].materialId;
-                    if (world->m_meshes[meshIdx]->m_vertices.empty() || world->m_materials[mateIdx].alphaMode != AlphaMode::Mask)
-                    {
-                        continue;
-                    }
-                    Descriptor descriptor = g_alphaTestMeshDescriptors.GetFreeDescriptor();
-                    descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
-                    descriptor.BindBuffer(&world->m_meshInstances[i].uniformBuffer, 0, world->m_meshInstances[i].uniformBuffer.m_vkBufferSize, 1);
-                    descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 2);
-                    descriptor.BindBuffer(&world->m_materials[mateIdx].matBuffer, 0, world->m_materials[mateIdx].matBuffer.m_vkBufferSize, 3);
-                    descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 4);
-                    descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBuffer.m_imageDepth.m_vkImageView,
-                                         Samplers::m_samplerStandard, 0);
-                    if (world->m_materials[mateIdx].baseColorTexId > -1)
-                    {
-                        int albedoIndex = world->m_materials[mateIdx].baseColorTexId;
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[albedoIndex]->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 1);
-                    }
-                    else
-                    {
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultAlbedo->m_image.m_vkImageView, Samplers::m_samplerStandard,
-                                             1);
-                    }
-                    if (world->m_materials[mateIdx].normalMapTexId > -1)
-                    {
-                        int normalIndex = world->m_materials[mateIdx].normalMapTexId;
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[normalIndex]->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 2);
-                    }
-                    else
-                    {
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultNormal->m_image.m_vkImageView, Samplers::m_samplerStandard,
-                                             2);
-                    }
-                    if (world->m_materials[mateIdx].metallicRoughtnessTexId > -1)
-                    {
-                        int metalIndex = world->m_materials[mateIdx].metallicRoughtnessTexId;
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[metalIndex]->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 3);
-                    }
-                    else
-                    {
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultMetalRough->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 3);
-                    }
-                    if (world->m_materials[mateIdx].emissionmapTexId > -1)
-                    {
-                        int emitIndex = world->m_materials[mateIdx].emissionmapTexId;
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->m_textures[emitIndex]->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 4);
-                    }
-                    else
-                    {
-                        descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, world->defaultEmission->m_image.m_vkImageView,
-                                             Samplers::m_samplerStandard, 4);
-                    }
-                    descriptor.BindDescriptor(device, cmdBuffer, &g_alphaTestMeshPipeline);
-                    world->m_meshes[meshIdx]->DrawIndexed(cmdBuffer);
-                }
+                ElecNekoDescriptor descriptor = g_alphaTestMeshPipeline.GetFreeDescriptor();
+                // descriptor.BindBuffer(uniforms, camOffset, camSize, 0);
+                // descriptor.BindBuffer(&scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize, 1);
+                // descriptor.BindBuffer(uniforms, shadowCamOffset, shadowCamSize, 2);
+                // descriptor.BindBuffer(&scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize, 3);
+                // descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 4);
+                // descriptor.BindImage(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBufferEN.m_imageDepth.m_vkImageView,
+                //                      Samplers::m_samplerStandard, 0);
+                // descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+                //                      ElecNeko::ElecNekoSampler::m_samplerCubemap, 1);
+                descriptor.BindUniformBuffer(0, uniforms, camOffset, camSize);
+                descriptor.BindUniformBuffer(1, uniforms, shadowCamOffset, shadowCamSize);
+                descriptor.BindStorageBuffer(2, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
+                descriptor.BindUniformBuffer(3, uniforms, lightParmsOffset, lightParmsSize);
+                descriptor.BindStorageBuffer(4, &scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize);
+                descriptor.BindImage(5, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBufferEN.m_imageDepth.m_vkImageView,
+                                     Samplers::m_samplerStandard);
+                descriptor.BindImage(6, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+                                     ElecNeko::ElecNekoSampler::m_samplerCubemap);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_alphaTestMeshPipeline);
+                scene->DrawMaskIndexed(cmdBuffer);
             }
 
             g_offscreenFrameBuffer.EndRenderPass(device, cmdBufferIndex);
@@ -1475,10 +1264,13 @@ namespace ElecNeko
             {
                 g_tonemapPipeline.BindPipeline(cmdBuffer);
 
-                Descriptor descriptor = g_tonemapPipeline.GetFreeDescriptor();
-                descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 0);
-                descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_offscreenFrameBuffer.m_imageColor.m_vkImageView,
-                                     ElecNekoSampler::m_samplerTexture, 0);
+                ElecNekoDescriptor descriptor = g_tonemapPipeline.GetFreeDescriptor();
+                // descriptor.BindBuffer(uniforms, lightParmsOffset, lightParmsSize, 0);
+                // descriptor.BindImage(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_offscreenFrameBuffer.m_imageColor.m_vkImageView,
+                //                      ElecNekoSampler::m_samplerTexture, 0);
+                descriptor.BindUniformBuffer(0, uniforms, lightParmsOffset, lightParmsSize);
+                descriptor.BindImage(1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_offscreenFrameBuffer.m_imageColor.m_vkImageView,
+                                     ElecNekoSampler::m_samplerTexture);
                 descriptor.BindDescriptor(device, cmdBuffer, &g_tonemapPipeline);
                 vkCmdDraw(cmdBuffer, 3, 1, 0, 0);
             }

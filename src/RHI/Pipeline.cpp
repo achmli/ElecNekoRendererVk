@@ -1180,6 +1180,8 @@ namespace ElecNeko
     {
         VkResult result;
 
+        m_parms = parms;
+
         const int width = parms.width;
         const int height = parms.height;
 
