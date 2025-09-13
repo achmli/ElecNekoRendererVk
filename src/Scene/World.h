@@ -75,6 +75,7 @@ namespace ElecNeko
         void UnloadScene(DeviceContext *device);
 
         void Cleanup(DeviceContext *device);
+        void LightClean(DeviceContext *device);
 
     public:
         std::vector<ElecNekoMesh*> m_meshes;

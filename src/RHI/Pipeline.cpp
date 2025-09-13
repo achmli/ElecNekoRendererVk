@@ -1281,10 +1281,12 @@ namespace ElecNeko
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
+        VkVertexInputBindingDescription bindingDescription;
+        std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions;
+
         if (usage != USAGE_FULL_SCREEN)
         {
-            VkVertexInputBindingDescription bindingDescription;
-            std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions;
+
             if (usage == Usage_t::USAGE_MESH || usage == Usage_t::USAGE_TRANSPARENCY)
             {
                 bindingDescription = ElecNeko::ElecNekoVertex::GetBindingDescription();

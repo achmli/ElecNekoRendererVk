@@ -1443,4 +1443,48 @@ namespace ElecNeko
         delete defaultMetalRough;
         delete defaultEmission;
     }
+
+    void World::LightClean(DeviceContext* device)
+    {
+        defaultAlbedo->Cleanup(device);
+        defaultNormal->Cleanup(device);
+        defaultMetalRough->Cleanup(device);
+        defaultEmission->Cleanup(device);
+
+        delete defaultAlbedo;
+        delete defaultNormal;
+        delete defaultMetalRough;
+        delete defaultEmission;
+
+        for (auto *tex: m_textures)
+        {
+            if (tex)
+            {
+                tex->Cleanup(device);
+                delete tex;
+            }
+        }
+        m_textures.clear();
+        m_textureCache.clear();
+
+        m_materials.clear();
+
+        for (auto *light: m_lights)
+        {
+            if (light)
+            {
+                light->Cleanup(device);
+            }
+        }
+
+        if (m_cam)
+        {
+            delete m_cam;
+            m_cam = nullptr;
+        }
+
+        m_meshInstances.clear();
+        m_meshes.clear();
+        m_meshIndexByKey.clear();
+    }
 } // namespace ElecNeko

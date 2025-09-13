@@ -109,6 +109,7 @@ private:
     std::vector<std::filesystem::path> m_sceneFiles;
 
     ElecNeko::Scene *m_scene;
+    ElecNeko::Scene *deletingScene = nullptr;
 
     ElecNeko::SkyBox m_skyBox;
 

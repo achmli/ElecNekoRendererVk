@@ -220,7 +220,7 @@ namespace ElecNeko
 
     void OrthoCamera::UpdateCamera(const Vec3& lookAt, const Vec3& lightDir)
     { 
-        position = lookAt + lightDir * 50;
+        position = lookAt + lightDir * 20;
         forward = lookAt - position;
         right = forward.Cross(Vec3(0, 1, 0)).Normalize();
         up = right.Cross(forward).Normalize();

@@ -154,15 +154,15 @@ void Application::Initialize()
 
     world = new ElecNeko::World();
     world->LoadSceneFromFile(&m_deviceContext, m_sceneFiles[sampleSceneIdx].string());
-    for (auto &instance: world->m_meshInstances)
-    {
-        instance.MakeUBO(&m_deviceContext);
-    }
-
-    for (auto &mate: world->m_materials)
-    {
-        mate.MakeBuffer(&m_deviceContext);
-    }
+    // for (auto &instance: world->m_meshInstances)
+    // {
+    //     instance.MakeUBO(&m_deviceContext);
+    // }
+    //
+    // for (auto &mate: world->m_materials)
+    // {
+    //     mate.MakeBuffer(&m_deviceContext);
+    // }
 
     world->CreateDefaultTextures(&m_deviceContext);
 
@@ -176,7 +176,7 @@ void Application::Initialize()
     m_scene->MakeVBO(&m_deviceContext);
     m_scene->MakeUBO(&m_deviceContext);
 
-    m_shadowCamera.Initialize(world->m_cam->position + Vec3(renderOption.sunDirection) * 30, world->m_cam->position, static_cast<float>(WINDOW_WIDTH),
+    m_shadowCamera.Initialize(world->m_cam->position + Vec3(renderOption.sunDirection) * 10, world->m_cam->position, static_cast<float>(WINDOW_WIDTH),
                               static_cast<float>(WINDOW_HEIGHT), 25, 175);
 
     m_mousePosition = Vec2(0, 0);
@@ -497,7 +497,7 @@ void Application::Cleanup()
     m_scene->Cleanup(&m_deviceContext);
     delete m_scene;
 
-    world->Cleanup(&m_deviceContext);
+    world->LightClean(&m_deviceContext);
     delete world;
 
     // Delete Uniform Buffer Memory
@@ -813,7 +813,7 @@ void Application::MainLoop()
             printf("frame dt_ms: %.2f %.2f %.2f", avgTime * 0.001f, maxTime * 0.001f, dt_us * 0.001f);
         }
 
-        if (deletingWorld)
+        if (deletingWorld && deletingScene)
         {
             /*int deletingNums = m_toDeleteMeshes.size();
             for (int i = 0; i < deletingNums; i++)
@@ -838,7 +838,10 @@ void Application::MainLoop()
             }
             else
             {
-                deletingWorld->Cleanup(&m_deviceContext);
+                deletingScene->Cleanup(&m_deviceContext);
+                delete deletingScene;
+                deletingScene = nullptr;
+                deletingWorld->LightClean(&m_deviceContext);
                 delete deletingWorld;
                 deletingWorld = nullptr;
                 currentLoop = 0;
@@ -1159,18 +1162,23 @@ void Application::DrawFrame()
                 sceneName = m_sceneFiles[sampleSceneIdx].string();
 
                 deletingWorld = world;
+                deletingScene = m_scene;
                 world = new ElecNeko::World;
                 world->LoadSceneFromFile(&m_deviceContext, sceneName);
                 world->CreateDefaultTextures(&m_deviceContext);
-                for (auto &instance: world->m_meshInstances)
-                {
-                    instance.MakeUBO(&m_deviceContext);
-                }
-
-                for (auto &mate: world->m_materials)
-                {
-                    mate.MakeBuffer(&m_deviceContext);
-                }
+                // for (auto &instance: world->m_meshInstances)
+                // {
+                //     instance.MakeUBO(&m_deviceContext);
+                // }
+                //
+                // for (auto &mate: world->m_materials)
+                // {
+                //     mate.MakeBuffer(&m_deviceContext);
+                // }
+                m_scene = new ElecNeko::Scene;
+                m_scene->Initialize(&m_deviceContext, world);
+                m_scene->MakeVBO(&m_deviceContext);
+                m_scene->MakeUBO(&m_deviceContext);
             }
         }
 
