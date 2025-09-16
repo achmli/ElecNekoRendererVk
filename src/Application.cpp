@@ -1120,6 +1120,7 @@ void Application::DrawFrame()
     m_deviceContext.BeginRenderPass();
     {
         extern FrameBuffer g_postProcessFrameBuffer;
+        extern Image c_postProcessImage;
         VkCommandBuffer cmdBuffer = m_deviceContext.m_vkCommandBuffers[imageIndex];
         {
             // Binding the pipeline is effectively the "use shader" we had back in our opengl apps
@@ -1127,7 +1128,10 @@ void Application::DrawFrame()
 
             // Descriptor is how we bind our buffers and images
             Descriptor descriptor = m_copyPipeline.GetFreeDescriptor();
-            descriptor.BindImage(VK_IMAGE_LAYOUT_GENERAL, g_postProcessFrameBuffer.m_imageColor.m_vkImageView, Samplers::m_samplerStandard, 0);
+            if (!renderOption.isDeferred)
+                descriptor.BindImage(VK_IMAGE_LAYOUT_GENERAL, g_postProcessFrameBuffer.m_imageColor.m_vkImageView, Samplers::m_samplerStandard, 0);
+            else
+                descriptor.BindImage(VK_IMAGE_LAYOUT_GENERAL, c_postProcessImage.m_vkImageView, Samplers::m_samplerStandard, 0);
             descriptor.BindDescriptor(&m_deviceContext, cmdBuffer, &m_copyPipeline);
             m_modelFullScreen.DrawIndexed(cmdBuffer);
         }
@@ -1181,21 +1185,12 @@ void Application::DrawFrame()
                 m_scene->MakeUBO(&m_deviceContext);
             }
         }
+        ImGui::Checkbox("Deferred Rendering", &renderOption.isDeferred);
 
         if (ImGui::CollapsingHeader("Sky"))
         {
-            if (ImGui::Checkbox("SkyBox", &renderOption.skyBox))
-            {
-                ElecNeko::ReinitializeSky(&m_deviceContext, renderOption);
-            }
-
-            if (!renderOption.skyBox)
-            {
-                if (ImGui::Checkbox("SimpleRealSky", &renderOption.simpleRealSky))
-                {
-                    ElecNeko::ReinitializeSky(&m_deviceContext, renderOption);
-                }
-            }
+            ImGui::Checkbox("SkyBox", &renderOption.skyBox);
+            ImGui::Checkbox("SimpleRealSky", &renderOption.simpleRealSky);
         }
 
         if (renderOption.simpleRealSky)

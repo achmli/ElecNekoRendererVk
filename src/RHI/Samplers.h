@@ -30,5 +30,6 @@ namespace ElecNeko
 
         static VkSampler m_samplerTexture;
         static VkSampler m_samplerCubemap;
+        static VkSampler m_samplerShadow;
     };
 } // namespace ElecNeko

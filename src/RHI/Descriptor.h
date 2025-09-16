@@ -168,4 +168,70 @@ namespace ElecNeko
             return descriptor;
         }
     };
+
+    class ElecNekoDescriptorCompute
+    {
+    public:
+        ElecNekoDescriptorCompute() : m_parent(nullptr), m_id(-1) {}
+        ~ElecNekoDescriptorCompute() = default;
+
+        void BindingUniform(int bindingPoint, Buffer *buffer, int offset, int size);
+        void BindingStorageBuffer(int bindingPoint, Buffer *buffer, int offset, int size);
+        void BindingStorageImage(int bindingPoint, VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler);
+        void BindingSampledImage(int bindingPoint, VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler);
+
+        void BindDescriptor(DeviceContext *device, VkCommandBuffer vkCommandBuffer, ElecNekoPipeline *pso);
+
+        friend class ElecNekoDescriptorsCompute;
+
+    private:
+        struct DescriptorBindings
+        {
+            int bindingPoint;
+            VkDescriptorType type;
+            union
+            {
+                VkDescriptorBufferInfo bufferInfo;
+                VkDescriptorImageInfo imageInfo;
+            };
+            bool isImage;
+        };
+
+        ElecNekoDescriptorsCompute *m_parent = nullptr;
+        int m_id;
+
+        std::vector<DescriptorBindings> m_bindings;
+    };
+
+    class ElecNekoDescriptorsCompute
+    {
+    public:
+        ElecNekoDescriptorsCompute() = default;
+        ~ElecNekoDescriptorsCompute() = default;
+
+        struct CreateParms_t
+        {
+            int numUniforms = 0;
+            int numStorageBuffers = 0;
+            int numStorageImages = 0;
+            int numSampledImages = 0;
+            int maxSets = 64;
+        };
+
+        bool Create(DeviceContext *device, const CreateParms_t &parms);
+        void Cleanup(DeviceContext *device);
+
+        ElecNekoDescriptorCompute GetFreeDescriptor();
+
+    public:
+        CreateParms_t m_parms;
+
+        static const int MAX_DESCRIPTOR_SETS = 256;
+
+        VkDescriptorPool m_vkDescriptorPool = VK_NULL_HANDLE;
+        VkDescriptorSetLayout m_vkDescriptorSetLayout = VK_NULL_HANDLE;
+        VkDescriptorSet m_vkDescriptorSets[MAX_DESCRIPTOR_SETS];
+        int m_totalBindings = 0;
+        int m_allocatedCount = 0;
+    };
 } // namespace ElecNeko

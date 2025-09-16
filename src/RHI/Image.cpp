@@ -5,6 +5,36 @@
 #include <assert.h>
 #include <stdio.h>
 
+namespace ElecNeko
+{
+    static LayoutBarrierInfo GetStageAccessForLayout(VkImageLayout layout)
+    {
+        switch (layout)
+        {
+            case VK_IMAGE_LAYOUT_UNDEFINED:
+                return {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0};
+            case VK_IMAGE_LAYOUT_PREINITIALIZED:
+                return {VK_PIPELINE_STAGE_HOST_BIT, VK_ACCESS_HOST_WRITE_BIT};
+            case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+                return {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT};
+            case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+                return {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT};
+            case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                return {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT};
+            case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+                return {VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT};
+            case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+                return {VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT};
+            case VK_IMAGE_LAYOUT_GENERAL:
+                return {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
+            case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+                return {VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0};
+            default:
+                return {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
+        }
+    }
+} // namespace ElecNeko
+
 /*
 ========================================================================================================
 
@@ -233,6 +263,60 @@ void Image::TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout)
     m_vkImageLayout = newLayout;
 }
 
+void Image::TransitionLayoutEN(VkCommandBuffer cmdBuffer, VkImageLayout newLayout)
+{
+    VkImageLayout oldLayout = m_vkImageLayout;
+
+    if (oldLayout == newLayout)
+    {
+        return;
+    }
+
+    if (oldLayout == (VkImageLayout) 0)
+    {
+        oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = m_vkImage;
+
+    if (m_parms.format == VK_FORMAT_D32_SFLOAT || m_parms.format == VK_FORMAT_D32_SFLOAT_S8_UINT || m_parms.format == VK_FORMAT_D24_UNORM_S8_UINT)
+    {
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        if (m_parms.format == VK_FORMAT_D32_SFLOAT_S8_UINT || m_parms.format == VK_FORMAT_D24_UNORM_S8_UINT)
+        {
+            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+    }
+    else
+    {
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    }
+
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    ElecNeko::LayoutBarrierInfo srcInfo = ElecNeko::GetStageAccessForLayout(oldLayout);
+    ElecNeko::LayoutBarrierInfo dstInfo = ElecNeko::GetStageAccessForLayout(newLayout);
+
+    barrier.srcAccessMask = srcInfo.access;
+    barrier.dstAccessMask = dstInfo.access;
+
+    VkPipelineStageFlags srcStage = srcInfo.stage;
+    VkPipelineStageFlags dstStage = dstInfo.stage;
+
+    vkCmdPipelineBarrier(cmdBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+    m_vkImageLayout = newLayout;
+}
+
 namespace ElecNeko
 {
     bool CubeImage::Create(DeviceContext *device, const int width, const int height)
@@ -359,11 +443,19 @@ namespace ElecNeko
         barrier.subresourceRange.levelCount = 1;
         barrier.subresourceRange.baseArrayLayer = 0;
         barrier.subresourceRange.layerCount = 6;
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        // barrier.srcAccessMask = 0;
+        // barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        //
+        // VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        // VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        LayoutBarrierInfo srcInfo = GetStageAccessForLayout(m_vkImageLayout);
+        LayoutBarrierInfo dstInfo = GetStageAccessForLayout(newLayout);
 
-        VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        barrier.srcAccessMask = srcInfo.access;
+        barrier.dstAccessMask = dstInfo.access;
+
+        VkPipelineStageFlags sourceStage = srcInfo.stage;
+        VkPipelineStageFlags destinationStage = dstInfo.stage;
 
         vkCmdPipelineBarrier(cmdBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
@@ -501,48 +593,56 @@ namespace ElecNeko
         barrier.subresourceRange.baseArrayLayer = 0;
         barrier.subresourceRange.layerCount = static_cast<uint32_t>(m_parms.arrayLayers);
 
-        VkPipelineStageFlags sourceFlags;
-        VkPipelineStageFlags destFlags;
 
-        if (m_vkImageLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL)
-        {
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        LayoutBarrierInfo srcInfo = GetStageAccessForLayout(m_vkImageLayout);
+        LayoutBarrierInfo dstInfo = GetStageAccessForLayout(newLayout);
 
-            sourceFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            destFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        }
-        else if (m_vkImageLayout == VK_IMAGE_LAYOUT_GENERAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        {
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.srcAccessMask = srcInfo.access;
+        barrier.dstAccessMask = dstInfo.access;
 
-            sourceFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            destFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        }
-        else if (m_vkImageLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-        {
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            sourceFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            destFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        }
-        else if (m_vkImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        {
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            sourceFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            destFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        }
-        else
-        {
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            sourceFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            destFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        }
+        VkPipelineStageFlags sourceStage = srcInfo.stage;
+        VkPipelineStageFlags destStage = dstInfo.stage;
 
-        vkCmdPipelineBarrier(cmdBuffer, sourceFlags, destFlags, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        // if (m_vkImageLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL)
+        // {
+        //     barrier.srcAccessMask = 0;
+        //     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        //
+        //     sourceFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        //     destFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        // }
+        // else if (m_vkImageLayout == VK_IMAGE_LAYOUT_GENERAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        // {
+        //     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        //     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        //
+        //     sourceFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        //     destFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        // }
+        // else if (m_vkImageLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        // {
+        //     barrier.srcAccessMask = 0;
+        //     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        //     sourceFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        //     destFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        // }
+        // else if (m_vkImageLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        // {
+        //     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        //     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        //     sourceFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        //     destFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        // }
+        // else
+        // {
+        //     barrier.srcAccessMask = 0;
+        //     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        //     sourceFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        //     destFlags = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        // }
+
+        vkCmdPipelineBarrier(cmdBuffer, sourceStage, destStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         m_vkImageLayout = newLayout;
     }

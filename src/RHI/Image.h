@@ -5,6 +5,15 @@
 #include <vulkan/vulkan.hpp>
 #include "DeviceContext.h"
 
+namespace ElecNeko
+{
+    struct LayoutBarrierInfo
+    {
+        VkPipelineStageFlags stage;
+        VkAccessFlags access;
+    };
+} // namespace ElecNeko
+
 /*
 ====================================================
 Image
@@ -29,6 +38,7 @@ public:
     void Cleanup(DeviceContext *device);
     void TransitionLayout(DeviceContext *device);
     void TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
+    void TransitionLayoutEN(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
 
     CreateParms_t m_parms;
     VkImage m_vkImage;

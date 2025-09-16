@@ -3,16 +3,17 @@
 
 namespace ElecNeko
 {
-	struct RenderOption
-	{
-		RenderOption()
-		{ 
-			skyBox = false;
+    struct RenderOption
+    {
+        RenderOption()
+        {
+            skyBox = false;
             simpleRealSky = true;
             tonemapping = true;
             ACESFit = false;
             simpleACESFit = false;
             enableExplosure = false;
+            isDeferred = true;
 
             sunDirection[0] = 1.f;
             sunDirection[1] = 1.f;
@@ -38,14 +39,15 @@ namespace ElecNeko
             chiParmH = 0.75f;
             thetaFixI = 0.1f;
             Lm = 1.5f;
-		}
+        }
 
-		bool skyBox;
+        bool skyBox;
         bool simpleRealSky;
         bool tonemapping;
         bool ACESFit;
         bool simpleACESFit;
         bool enableExplosure;
+        bool isDeferred;
 
         float sunDirection[3];
         float sunIntensity;
@@ -65,5 +67,5 @@ namespace ElecNeko
         float chiParmH;
         float thetaFixI;
         float Lm;
-	};
-}
+    };
+} // namespace ElecNeko

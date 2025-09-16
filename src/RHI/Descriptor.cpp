@@ -656,4 +656,242 @@ namespace ElecNeko
         vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pso->m_vkPipelineLayout, 0, 1, &m_parent->m_vkDescriptorSets[m_id], 0,
                                 nullptr);
     }
+
+    bool ElecNekoDescriptorsCompute::Create(DeviceContext *device, const CreateParms_t &parms)
+    {
+        m_parms = parms;
+        VkResult result;
+
+        // Descriptor Pool
+        std::vector<VkDescriptorPoolSize> poolSizes;
+        if (parms.numUniforms > 0)
+        {
+            poolSizes.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(parms.numUniforms * parms.maxSets)});
+        }
+        if (parms.numStorageBuffers > 0)
+        {
+            poolSizes.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, static_cast<uint32_t>(parms.numStorageBuffers * parms.maxSets)});
+        }
+        if (parms.numStorageImages > 0)
+        {
+            poolSizes.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, static_cast<uint32_t>(parms.numStorageImages * parms.maxSets)});
+        }
+        if (parms.numSampledImages > 0)
+        {
+            poolSizes.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(parms.numSampledImages * parms.maxSets)});
+        }
+
+        if (poolSizes.empty())
+        {
+            poolSizes.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(parms.maxSets)});
+        }
+
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = parms.maxSets;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+
+        result = vkCreateDescriptorPool(device->m_vkDevice, &poolInfo, nullptr, &m_vkDescriptorPool);
+        if (result != VK_SUCCESS)
+        {
+            printf("ERROR: Failed to create descriptor pool\n");
+            return false;
+        }
+
+        // descriptor set layout
+        std::vector<VkDescriptorSetLayoutBinding> bindings;
+        int idx = 0;
+        for (int i = 0; i < parms.numUniforms; i++)
+        {
+            VkDescriptorSetLayoutBinding binding = {};
+            binding.binding = idx++;
+            binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            binding.descriptorCount = 1;
+            binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            binding.pImmutableSamplers = nullptr;
+            bindings.push_back(binding);
+        }
+        for (int i = 0; i < parms.numStorageBuffers; i++)
+        {
+            VkDescriptorSetLayoutBinding binding = {};
+            binding.binding = idx++;
+            binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            binding.descriptorCount = 1;
+            binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            binding.pImmutableSamplers = nullptr;
+            bindings.push_back(binding);
+        }
+        for (int i = 0; i < parms.numStorageImages; i++)
+        {
+            VkDescriptorSetLayoutBinding binding = {};
+            binding.binding = idx++;
+            binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            binding.descriptorCount = 1;
+            binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            binding.pImmutableSamplers = nullptr;
+            bindings.push_back(binding);
+        }
+        for (int i = 0; i < parms.numSampledImages; i++)
+        {
+            VkDescriptorSetLayoutBinding binding = {};
+            binding.binding = idx++;
+            binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            binding.descriptorCount = 1;
+            binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            binding.pImmutableSamplers = nullptr;
+            bindings.push_back(binding);
+        }
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        layoutInfo.pBindings = bindings.empty() ? nullptr : bindings.data();
+
+        result = vkCreateDescriptorSetLayout(device->m_vkDevice, &layoutInfo, nullptr, &m_vkDescriptorSetLayout);
+        if (result != VK_SUCCESS)
+        {
+            printf("ERROR: Failed to create descriptor set layout\n");
+            return false;
+        }
+
+        // allocate sets
+        std::vector<VkDescriptorSetLayout> layouts(parms.maxSets, m_vkDescriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = m_vkDescriptorPool;
+        allocInfo.descriptorSetCount = parms.maxSets;
+        allocInfo.pSetLayouts = layouts.data();
+
+        result = vkAllocateDescriptorSets(device->m_vkDevice, &allocInfo, m_vkDescriptorSets);
+        if (result != VK_SUCCESS)
+        {
+            printf("ERROR: Failed to allocate descriptor sets\n");
+            vkDestroyDescriptorSetLayout(device->m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+            vkDestroyDescriptorPool(device->m_vkDevice, m_vkDescriptorPool, nullptr);
+            m_vkDescriptorSetLayout = VK_NULL_HANDLE;
+            m_vkDescriptorPool = VK_NULL_HANDLE;
+            return false;
+        }
+
+        m_totalBindings = idx;
+        m_allocatedCount = 0;
+        return true;
+    }
+
+    void ElecNekoDescriptorsCompute::Cleanup(DeviceContext *device)
+    {
+        if (m_vkDescriptorSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(device->m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+            m_vkDescriptorSetLayout = VK_NULL_HANDLE;
+        }
+        if (m_vkDescriptorPool != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorPool(device->m_vkDevice, m_vkDescriptorPool, nullptr);
+            m_vkDescriptorPool = VK_NULL_HANDLE;
+        }
+        m_allocatedCount = 0;
+    }
+
+    ElecNekoDescriptorCompute ElecNekoDescriptorsCompute::GetFreeDescriptor()
+    {
+        ElecNekoDescriptorCompute descriptor;
+        descriptor.m_parent = this;
+        descriptor.m_id = m_allocatedCount % m_parms.maxSets;
+        m_allocatedCount++;
+        return descriptor;
+    }
+
+    void ElecNekoDescriptorCompute::BindingUniform(int bindingPoint, Buffer *buffer, int offset, int size)
+    {
+        DescriptorBindings b{};
+        b.bindingPoint = bindingPoint;
+        b.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        b.bufferInfo.buffer = buffer->m_vkBuffer;
+        b.bufferInfo.offset = offset;
+        b.bufferInfo.range = size;
+        b.isImage = false;
+        m_bindings.push_back(b);
+    }
+
+    void ElecNekoDescriptorCompute::BindingStorageBuffer(int bindingPoint, Buffer *buffer, int offset, int size)
+    {
+        DescriptorBindings b{};
+        b.bindingPoint = bindingPoint;
+        b.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        b.bufferInfo.buffer = buffer->m_vkBuffer;
+        b.bufferInfo.offset = offset;
+        b.bufferInfo.range = size;
+        b.isImage = false;
+        m_bindings.push_back(b);
+    }
+
+    void ElecNekoDescriptorCompute::BindingStorageImage(int bindingPoint, VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler)
+    {
+        DescriptorBindings b{};
+        b.bindingPoint = bindingPoint;
+        b.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        b.imageInfo.imageLayout = imageLayout;
+        b.imageInfo.imageView = imageView;
+        b.imageInfo.sampler = sampler;
+        b.isImage = true;
+        m_bindings.push_back(b);
+    }
+
+    void ElecNekoDescriptorCompute::BindingSampledImage(int bindingPoint, VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler)
+    {
+        DescriptorBindings b{};
+        b.bindingPoint = bindingPoint;
+        b.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        b.imageInfo.imageLayout = imageLayout;
+        b.imageInfo.imageView = imageView;
+        b.imageInfo.sampler = sampler;
+        b.isImage = true;
+        m_bindings.push_back(b);
+    }
+
+    void ElecNekoDescriptorCompute::BindDescriptor(DeviceContext *device, VkCommandBuffer vkCommandBuffer, ElecNekoPipeline *pso)
+    {
+        if (!m_parent || m_id < 0)
+        {
+            printf("Warning: Invalid descriptor set\n");
+            return;
+        }
+
+        std::vector<VkWriteDescriptorSet> descriptorWrites;
+        descriptorWrites.reserve(m_bindings.size());
+
+        for (auto &b: m_bindings)
+        {
+            VkWriteDescriptorSet write = {};
+            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet = m_parent->m_vkDescriptorSets[m_id];
+            write.dstBinding = b.bindingPoint;
+            write.dstArrayElement = 0;
+            write.descriptorCount = 1;
+            write.descriptorType = b.type;
+            if (b.isImage)
+            {
+                write.pImageInfo = &b.imageInfo;
+            }
+            else
+            {
+                write.pBufferInfo = &b.bufferInfo;
+            }
+
+            descriptorWrites.push_back(write);
+        }
+
+        if (!descriptorWrites.empty())
+        {
+            vkUpdateDescriptorSets(device->m_vkDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        }
+
+        vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pso->m_vkPipelineLayout, 0, 1, &m_parent->m_vkDescriptorSets[m_id], 0,
+                                nullptr);
+    }
+
+
 } // namespace ElecNeko

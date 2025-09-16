@@ -124,11 +124,23 @@ namespace ElecNeko
 
         struct CreateParms_t
         {
-            CreateParms_t() { memset(this, 0, sizeof(CreateParms_t)); }
+            CreateParms_t()
+            {
+                memset(this, 0, sizeof(CreateParms_t));
+                colorAttachmentCount = 1;
+                framebuffer = nullptr;
+                gFramebuffer = nullptr;
+                descriptors = nullptr;
+                descriptorsCompute = nullptr;
+            }
 
             VkRenderPass renderPass;
             FrameBuffer *framebuffer;
+            GFrameBuffer *gFramebuffer;
+            // for graphics pipeline
             ElecNekoDescriptors *descriptors;
+            // for compute pipeline
+            ElecNekoDescriptorsCompute *descriptorsCompute;
             ElecNekoShader *shader;
 
             int width;
@@ -141,12 +153,15 @@ namespace ElecNeko
 
             int pushConstantSize;
             VkShaderStageFlagBits pushConstantShaderStages;
+
+            int colorAttachmentCount;
         };
         bool Create(DeviceContext *device, const CreateParms_t &parms, Usage_t usage = USAGE_DEFAULT);
         bool CreateCompute(DeviceContext *device, const CreateParms_t &parms);
         void Cleanup(DeviceContext *device);
 
         ElecNekoDescriptor GetFreeDescriptor() { return m_parms.descriptors->GetFreeDescriptor(); }
+        ElecNekoDescriptorCompute GetFreeDescriptorCompute() { return m_parms.descriptorsCompute->GetFreeDescriptor(); }
 
         void BindPipeline(VkCommandBuffer cmdBuffer);
         void BindPipelineCompute(VkCommandBuffer cmdBuffer);
@@ -157,7 +172,7 @@ namespace ElecNeko
         //
         //	PipelineState
         //
-        VkPipelineLayout m_vkPipelineLayout;
-        VkPipeline m_vkPipeline;
+        VkPipelineLayout m_vkPipelineLayout = VK_NULL_HANDLE;
+        VkPipeline m_vkPipeline = VK_NULL_HANDLE;
     };
 } // namespace ElecNeko

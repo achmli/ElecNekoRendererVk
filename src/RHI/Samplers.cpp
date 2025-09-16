@@ -9,6 +9,7 @@ VkSampler Samplers::m_samplerStandard;
 VkSampler Samplers::m_samplerDepth;
 VkSampler ElecNeko::ElecNekoSampler::m_samplerTexture;
 VkSampler ElecNeko::ElecNekoSampler::m_samplerCubemap;
+VkSampler ElecNeko::ElecNekoSampler::m_samplerShadow;
 
 /*
 ====================================================
@@ -133,6 +134,31 @@ namespace ElecNeko
             return false;
         }
 
+        memset(&samplerInfo, 0, sizeof(samplerInfo));
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        // 推荐用 CLAMP_TO_BORDER + FLOAT_OPAQUE_WHITE so outside-shadow -> lit (1.0)
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_TRUE;
+        samplerInfo.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL; // typical shadow compare
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST; // or LINEAR if you have mips and want smoother
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f; // no mipmaps
+        samplerInfo.mipLodBias = 0.0f;
+
+        if (vkCreateSampler(device->m_vkDevice, &samplerInfo, nullptr, &m_samplerShadow))
+        {
+            printf("failed to create m_samplerShadow!\n");
+            assert(0);
+            return false;
+        }
+
         return true;
     }
 
@@ -140,5 +166,6 @@ namespace ElecNeko
     {
         vkDestroySampler(device->m_vkDevice, m_samplerTexture, nullptr);
         vkDestroySampler(device->m_vkDevice, m_samplerCubemap, nullptr);
+        vkDestroySampler(device->m_vkDevice, m_samplerShadow, nullptr);
     }
 } // namespace ElecNeko

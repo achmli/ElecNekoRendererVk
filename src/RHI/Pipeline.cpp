@@ -1186,7 +1186,8 @@ namespace ElecNeko
         const int height = parms.height;
 
         std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
-        for (int i = 0; i < Shader::SHADER_STAGE_NUM; i++)
+
+        for (int i = 0; i < ElecNekoShader::SHADER_STAGE_COUNT; i++)
         {
             if (NULL == parms.shader->m_vkShaderModules[i])
             {
@@ -1196,77 +1197,29 @@ namespace ElecNeko
             VkShaderStageFlagBits stage;
             switch (i)
             {
-                default:
                 case 0:
-                {
                     stage = VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
-                }
-                break;
+                    break;
                 case 1:
-                {
                     stage = VkShaderStageFlagBits::VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-                }
-                break;
+                    break;
                 case 2:
-                {
                     stage = VkShaderStageFlagBits::VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-                }
-                break;
+                    break;
                 case 3:
-                {
                     stage = VkShaderStageFlagBits::VK_SHADER_STAGE_GEOMETRY_BIT;
-                }
-                break;
+                    break;
                 case 4:
-                {
                     stage = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-                }
-                break;
-                case 5:
-                {
-                    stage = VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
-                }
-                break;
-                case 6:
-                {
-                    stage = VkShaderStageFlagBits::VK_SHADER_STAGE_RAYGEN_BIT_NV;
-                }
-                break;
-                case 7:
-                {
-                    stage = VkShaderStageFlagBits::VK_SHADER_STAGE_ANY_HIT_BIT_NV;
-                }
-                break;
-                case 8:
-                {
-                    stage = VkShaderStageFlagBits::VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
-                }
-                break;
-                case 9:
-                {
-                    stage = VkShaderStageFlagBits::VK_SHADER_STAGE_MISS_BIT_NV;
-                }
-                break;
-                case 10:
-                {
-                    stage = VkShaderStageFlagBits::VK_SHADER_STAGE_INTERSECTION_BIT_NV;
-                }
-                break;
-                case 11:
-                {
-                    stage = VkShaderStageFlagBits::VK_SHADER_STAGE_CALLABLE_BIT_NV;
-                }
-                break;
+                    break;
                 case 12:
-                {
                     stage = VkShaderStageFlagBits::VK_SHADER_STAGE_TASK_BIT_NV;
-                }
-                break;
+                    break;
                 case 13:
-                {
                     stage = VkShaderStageFlagBits::VK_SHADER_STAGE_MESH_BIT_NV;
-                }
-                break;
+                    break;
+                default:
+                    continue;
             }
 
             VkPipelineShaderStageCreateInfo shaderStageInfo = {};
@@ -1276,6 +1229,12 @@ namespace ElecNeko
             shaderStageInfo.pName = "main";
 
             shaderStages.push_back(shaderStageInfo);
+        }
+
+        if (shaderStages.empty())
+        {
+            printf("ERROR: No shader stages for graphics pipeline\n");
+            return false;
         }
 
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
@@ -1371,44 +1330,40 @@ namespace ElecNeko
         depthStencil.depthBoundsTestEnable = VK_FALSE;
         depthStencil.stencilTestEnable = VK_FALSE;
 
-        VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+        // create color blend attachments array based on parms.colorAttachmentCount
+        int colorCount = parms.colorAttachmentCount > 0 ? parms.colorAttachmentCount : 1;
+        std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(colorCount);
+        // decide blend enable per usage
+        for (int i = 0; i < colorCount; i++)
+        {
+            colorBlendAttachments[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+            if (usage == USAGE_TRANSPARENCY && colorCount == 1)
+            {
+                colorBlendAttachments[i].blendEnable = VK_TRUE;
+                colorBlendAttachments[i].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+                colorBlendAttachments[i].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+                colorBlendAttachments[i].colorBlendOp = VK_BLEND_OP_ADD;
+                colorBlendAttachments[i].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+                colorBlendAttachments[i].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+                colorBlendAttachments[i].alphaBlendOp = VK_BLEND_OP_ADD;
+            }
+            else
+            {
+                colorBlendAttachments[i].blendEnable = VK_FALSE;
+            }
+        }
+
         VkPipelineColorBlendStateCreateInfo colorBlending = {};
-        if (usage == USAGE_TRANSPARENCY)
-        {
-            colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-            colorBlendAttachment.blendEnable = VK_TRUE;
-            colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-            colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA;
-            colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-            colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-            colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-            colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-            colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-            colorBlending.logicOpEnable = VK_FALSE;
-            colorBlending.logicOp = VK_LOGIC_OP_COPY;
-            colorBlending.attachmentCount = 1;
-            colorBlending.pAttachments = &colorBlendAttachment;
-            colorBlending.blendConstants[0] = 0.0f;
-            colorBlending.blendConstants[1] = 0.0f;
-            colorBlending.blendConstants[2] = 0.0f;
-            colorBlending.blendConstants[3] = 0.0f;
-        }
-        else
-        {
-            colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-            colorBlendAttachment.blendEnable = VK_FALSE;
-
-            colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-            colorBlending.logicOpEnable = VK_FALSE;
-            colorBlending.logicOp = VK_LOGIC_OP_COPY;
-            colorBlending.attachmentCount = 1;
-            colorBlending.pAttachments = &colorBlendAttachment;
-            colorBlending.blendConstants[0] = 0.0f;
-            colorBlending.blendConstants[1] = 0.0f;
-            colorBlending.blendConstants[2] = 0.0f;
-            colorBlending.blendConstants[3] = 0.0f;
-        }
+        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.logicOpEnable = VK_FALSE;
+        colorBlending.logicOp = VK_LOGIC_OP_COPY;
+        colorBlending.attachmentCount = static_cast<uint32_t>(colorBlendAttachments.size());
+        colorBlending.pAttachments = colorBlendAttachments.data();
+        colorBlending.blendConstants[0] = 0.0f;
+        colorBlending.blendConstants[1] = 0.0f;
+        colorBlending.blendConstants[2] = 0.0f;
+        colorBlending.blendConstants[3] = 0.0f;
 
         VkPushConstantRange pushConstantRange = {};
         if (parms.pushConstantSize > 0)
@@ -1416,6 +1371,12 @@ namespace ElecNeko
             pushConstantRange.stageFlags = parms.pushConstantShaderStages;
             pushConstantRange.size = parms.pushConstantSize;
             pushConstantRange.offset = 0;
+        }
+
+        if (!parms.descriptors || parms.descriptors->m_vkDescriptorSetLayout == VK_NULL_HANDLE)
+        {
+            printf("ERROR: invalid descriptor set layout\n");
+            return false;
         }
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -1457,13 +1418,17 @@ namespace ElecNeko
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = &dynamicState;
         pipelineInfo.layout = m_vkPipelineLayout;
-        if (parms.framebuffer == nullptr)
+        if (parms.framebuffer == nullptr && parms.gFramebuffer == nullptr)
         {
             pipelineInfo.renderPass = parms.renderPass;
         }
-        else
+        else if (parms.framebuffer)
         {
             pipelineInfo.renderPass = parms.framebuffer->m_vkRenderPass;
+        }
+        else
+        {
+            pipelineInfo.renderPass = parms.gFramebuffer->m_vkRenderPass;
         }
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
@@ -1485,30 +1450,68 @@ namespace ElecNeko
     {
         VkResult result;
 
+        if (!parms.shader)
+        {
+            printf("ERROR: No shader for compute pipeline\n");
+            return false;
+        }
+
+        VkShaderModule compShaderModule = parms.shader->m_vkShaderModules[ElecNekoShader::SHADER_STAGE_COMPUTE];
+        if (compShaderModule == VK_NULL_HANDLE)
+        {
+            printf("ERROR: No compute shader module for compute pipeline\n");
+            return false;
+        }
+
         m_parms = parms;
 
         VkPipelineShaderStageCreateInfo shaderStageInfo = {};
         shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         shaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-        shaderStageInfo.module = parms.shader->m_vkShaderModules[ElecNekoShader::SHADER_STAGE_COMPUTE];
+        shaderStageInfo.module = compShaderModule;
         shaderStageInfo.pName = "main";
+        shaderStageInfo.pSpecializationInfo = nullptr;
 
         VkPushConstantRange pushConstantRange = {};
         if (parms.pushConstantSize > 0)
         {
             pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-            pushConstantRange.size = parms.pushConstantSize;
+            pushConstantRange.size = static_cast<uint32_t>(parms.pushConstantSize);
             pushConstantRange.offset = 0;
         }
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &parms.descriptors->m_vkDescriptorSetLayout;
+
+        VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
+        if (parms.descriptorsCompute && parms.descriptorsCompute->m_vkDescriptorSetLayout != VK_NULL_HANDLE)
+        {
+            setLayout = parms.descriptorsCompute->m_vkDescriptorSetLayout;
+        }
+        else if (parms.descriptors && parms.descriptors->m_vkDescriptorSetLayout != VK_NULL_HANDLE)
+        {
+            setLayout = parms.descriptors->m_vkDescriptorSetLayout;
+        }
+
+        if (setLayout != VK_NULL_HANDLE)
+        {
+            pipelineLayoutInfo.setLayoutCount = 1;
+            pipelineLayoutInfo.pSetLayouts = &setLayout;
+        }
+        else
+        {
+            pipelineLayoutInfo.setLayoutCount = 0;
+            pipelineLayoutInfo.pSetLayouts = nullptr;
+        }
         if (parms.pushConstantSize > 0)
         {
             pipelineLayoutInfo.pushConstantRangeCount = 1;
             pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+        }
+        else
+        {
+            pipelineLayoutInfo.pushConstantRangeCount = 0;
+            pipelineLayoutInfo.pPushConstantRanges = nullptr;
         }
 
         result = vkCreatePipelineLayout(device->m_vkDevice, &pipelineLayoutInfo, nullptr, &m_vkPipelineLayout);
@@ -1524,11 +1527,19 @@ namespace ElecNeko
         pipelineInfo.stage = shaderStageInfo;
         pipelineInfo.layout = m_vkPipelineLayout;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+        pipelineInfo.basePipelineIndex = -1;
 
-        result = vkCreateComputePipelines(device->m_vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_vkPipeline);
+        VkPipelineCache pipelineCache = VK_NULL_HANDLE;
+
+        result = vkCreateComputePipelines(device->m_vkDevice, pipelineCache, 1, &pipelineInfo, nullptr, &m_vkPipeline);
         if (result != VK_SUCCESS)
         {
             printf("ERROR: Failed to create compute pipeline\n");
+            if (m_vkPipelineLayout != VK_NULL_HANDLE)
+            {
+                vkDestroyPipelineLayout(device->m_vkDevice, m_vkPipelineLayout, nullptr);
+                m_vkPipelineLayout = VK_NULL_HANDLE;
+            }
             assert(0);
             return false;
         }
@@ -1538,8 +1549,16 @@ namespace ElecNeko
 
     void ElecNekoPipeline::Cleanup(DeviceContext *device)
     {
-        vkDestroyPipeline(device->m_vkDevice, m_vkPipeline, nullptr);
-        vkDestroyPipelineLayout(device->m_vkDevice, m_vkPipelineLayout, nullptr);
+        if (m_vkPipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(device->m_vkDevice, m_vkPipeline, nullptr);
+            m_vkPipeline = VK_NULL_HANDLE;
+        }
+        if (m_vkPipelineLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyPipelineLayout(device->m_vkDevice, m_vkPipelineLayout, nullptr);
+            m_vkPipelineLayout = VK_NULL_HANDLE;
+        }
     }
 
     void ElecNekoPipeline::BindPipeline(VkCommandBuffer cmdBuffer) { vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline); }

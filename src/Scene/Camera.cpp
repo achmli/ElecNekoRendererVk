@@ -1,7 +1,7 @@
 #include "Camera.h"
 
-#include "Math/LCP.h"
 #include <cmath>
+#include "Math/LCP.h"
 #include "Math/Matrix.h"
 #include "Math/Vector.h"
 
@@ -9,8 +9,8 @@
 
 namespace ElecNeko
 {
-    Camera::Camera(const Vec3& eye, const Vec3& lookAt, const float _fov, const float _aspect, const float near, const float far)
-    { 
+    Camera::Camera(const Vec3 &eye, const Vec3 &lookAt, const float _fov, const float _aspect, const float near, const float far)
+    {
         position = eye;
         pivot = lookAt;
         worldUp = (0, 1, 0);
@@ -37,8 +37,8 @@ namespace ElecNeko
         UpdateCamera();
     }
 
-    Camera::Camera(const Camera& other)
-    { 
+    Camera::Camera(const Camera &other)
+    {
         position = other.position;
         up = other.up;
         right = other.right;
@@ -62,7 +62,7 @@ namespace ElecNeko
         UpdateCamera();
     }
 
-    Camera& Camera::operator=(const Camera& other)
+    Camera &Camera::operator=(const Camera &other)
     {
         position = other.position;
         up = other.up;
@@ -89,7 +89,7 @@ namespace ElecNeko
         return *this;
     }
 
-    void Camera::Initialize(const Vec3& eye, const Vec3& lookAt, const float _fov, const float _aspect, const float near, const float far)
+    void Camera::Initialize(const Vec3 &eye, const Vec3 &lookAt, const float _fov, const float _aspect, const float near, const float far)
     {
         position = eye;
         pivot = lookAt;
@@ -114,31 +114,31 @@ namespace ElecNeko
     }
 
     void Camera::OffsetOrientation(const float dx, const float dy)
-    { 
+    {
         // yaw -= dx;
 
         yaw = fmod(yaw + dx, 360.f);
         pitch -= dy;
 
-        pitch=std::clamp(pitch, -89.9f, 89.9f);
+        pitch = std::clamp(pitch, -89.9f, 89.9f);
 
         UpdateCamera();
     }
 
-    void Camera::Strafe(const float dx, const float dy) 
-    { 
+    void Camera::Strafe(const float dx, const float dy)
+    {
         pivot += (right * -dx) + up * dy;
         UpdateCamera();
     }
 
     void Camera::SetRadius(const float dr)
-    { 
+    {
         radius += dr;
         UpdateCamera();
     }
 
-    void Camera::UpdateCamera() 
-    { 
+    void Camera::UpdateCamera()
+    {
         float yawRad = Radians(yaw);
         float pitchRad = Radians(pitch);
 
@@ -150,25 +150,25 @@ namespace ElecNeko
     }
 
     Mat4 Camera::ComputeViewMatrix()
-    { 
+    {
         Mat4 matView;
 
         matView.LookAt(position, position + forward, up);
-        //matView = matView.Transpose();
+        // matView = matView.Transpose();
 
         return matView.Transpose();
     }
 
     Mat4 Camera::ComputeProjectionMatrix()
-    { 
+    {
         Mat4 matProj;
 
         matProj.PerspectiveVulkan(fov, aspect, zNear, zFar);
-        
+
         return matProj.Transpose();
     }
 
-    void OrthoCamera::Initialize(const Vec3& eye, const Vec3& lookAt, const float _width, const float _height, const float near, const float far)
+    void OrthoCamera::Initialize(const Vec3 &eye, const Vec3 &lookAt, const float _width, const float _height, const float near, const float far)
     {
         position = eye;
 
@@ -201,7 +201,7 @@ namespace ElecNeko
     }
 
     Mat4 OrthoCamera::ComputeProjctionMatrix()
-    { 
+    {
         float halfWidth = 60.f;
 
         Mat4 matProj;
@@ -218,9 +218,9 @@ namespace ElecNeko
         up = right.Cross(forward).Normalize();
     }
 
-    void OrthoCamera::UpdateCamera(const Vec3& lookAt, const Vec3& lightDir)
-    { 
-        position = lookAt + lightDir * 20;
+    void OrthoCamera::UpdateCamera(const Vec3 &lookAt, const Vec3 &lightDir)
+    {
+        position = lookAt + lightDir * 10;
         forward = lookAt - position;
         right = forward.Cross(Vec3(0, 1, 0)).Normalize();
         up = right.Cross(forward).Normalize();
@@ -238,4 +238,4 @@ namespace ElecNeko
 
         UpdateCamera();
     }
-}
+} // namespace ElecNeko

@@ -452,7 +452,7 @@ namespace ElecNeko
         }
 
         // glTF pbr factors
-        float metal = 0.f, rough = 1.f;
+        float metal = 0.f, rough = .5f;
         aim->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_METALLIC_FACTOR, metal);
         aim->Get(AI_MATKEY_GLTF_PBRMETALLICROUGHNESS_ROUGHNESS_FACTOR, rough);
         mat.metallic = metal;
@@ -472,41 +472,70 @@ namespace ElecNeko
             mat.alphaCutoff = alphaCutoff;
         }
 
+        //
+        float specTrans = 0.f;
+        if (aim->Get(AI_MATKEY_GLTF_MATERIAL_TRANSMISSION_FACTOR, specTrans) == AI_SUCCESS)
+        {
+            mat.specTrans = specTrans;
+        }
+
+        float anisotropy = 0.f;
+        if (aim->Get(AI_MATKEY_ANISOTROPY_FACTOR, anisotropy) == AI_SUCCESS)
+        {
+            mat.anisotropic = anisotropy;
+        }
+
         // alphaMode: try to read property; Assimp may keep "alphaMode" string as a property name
         // default keep Opaque; we'll try to find a property that contains "alpha"
         mat.alphaMode = AlphaMode::Opaque;
-        for (uint32_t p = 0; p < aim->mNumProperties; ++p)
+        // for (uint32_t p = 0; p < aim->mNumProperties; ++p)
+        // {
+        //     aiMaterialProperty *prop = aim->mProperties[p];
+        //     if (!prop || !prop->mKey.length)
+        //     {
+        //         continue;
+        //     }
+        //     std::string key = prop->mKey.C_Str();
+        //     std::string kl = ToLowerStr(key);
+        //     if (kl.find("alphamode") != std::string::npos || kl.find("alpha_mode") != std::string::npos)
+        //     {
+        //         // data is stored as string
+        //         std::string val(reinterpret_cast<const char *>(prop->mData), prop->mDataLength);
+        //         // trim null/newline
+        //         while (!val.empty() && (val.back() == '\0' || std::isspace((unsigned char) val.back())))
+        //         {
+        //             val.pop_back();
+        //         }
+        //         val = ToLowerStr(val);
+        //         if (val.find("blend") != std::string::npos)
+        //         {
+        //             mat.alphaMode = AlphaMode::Blend;
+        //         }
+        //         else if (val.find("mask") != std::string::npos)
+        //         {
+        //             mat.alphaMode = AlphaMode::Mask;
+        //         }
+        //         else
+        //         {
+        //             mat.alphaMode = AlphaMode::Opaque;
+        //         }
+        //         break;
+        //     }
+        // }
+        uint32_t alphaMode = 0;
+        if (aim->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaMode))
         {
-            aiMaterialProperty *prop = aim->mProperties[p];
-            if (!prop || !prop->mKey.length)
+            if (alphaMode == 1)
             {
-                continue;
+                mat.alphaMode = AlphaMode::Mask;
             }
-            std::string key = prop->mKey.C_Str();
-            std::string kl = ToLowerStr(key);
-            if (kl.find("alphamode") != std::string::npos || kl.find("alpha_mode") != std::string::npos)
+            else if (alphaMode == 2)
             {
-                // data is stored as string
-                std::string val(reinterpret_cast<const char *>(prop->mData), prop->mDataLength);
-                // trim null/newline
-                while (!val.empty() && (val.back() == '\0' || std::isspace((unsigned char) val.back())))
-                {
-                    val.pop_back();
-                }
-                val = ToLowerStr(val);
-                if (val.find("blend") != std::string::npos)
-                {
-                    mat.alphaMode = AlphaMode::Blend;
-                }
-                else if (val.find("mask") != std::string::npos)
-                {
-                    mat.alphaMode = AlphaMode::Mask;
-                }
-                else
-                {
-                    mat.alphaMode = AlphaMode::Opaque;
-                }
-                break;
+                mat.alphaMode = AlphaMode::Blend;
+            }
+            else
+            {
+                mat.alphaMode = AlphaMode::Opaque;
             }
         }
 
@@ -1444,7 +1473,7 @@ namespace ElecNeko
         delete defaultEmission;
     }
 
-    void World::LightClean(DeviceContext* device)
+    void World::LightClean(DeviceContext *device)
     {
         defaultAlbedo->Cleanup(device);
         defaultNormal->Cleanup(device);
