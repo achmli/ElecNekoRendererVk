@@ -1,0 +1,116 @@
+#version 450
+#extension GL_ARB_compute_shader : enable
+#extension GL_ARB_separate_shader_objects : enable
+
+layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform writeonly imageCube outImage;
+layout(binding = 1) uniform samplerCube uEnvMap;
+
+layout(push_constant) uniform PC
+{
+    uint width;
+    uint height;
+    float roughness;
+    uint sampleCount;
+    uint mipLevel;
+}pc;
+
+const float PI = 3.14159265359;
+
+uint ReverseBits32(uint bits)
+{
+    bits = ((bits << 16) | (bits >> 16));
+    bits = ((bits & 0x00ff00ffu) << 8) | ((bits & 0xff00ff00u) >> 8);
+    bits = ((bits & 0x0f0f0f0fu) << 4) | ((bits & 0xf0f0f0f0u) >> 4);
+    bits = ((bits & 0x33333333u) << 2) | ((bits & 0xccccccccu) >> 2);
+    bits = ((bits & 0x55555555u) << 1) | ((bits & 0xaaaaaaaau) >> 1);
+    return bits;
+}
+
+float RadicalInverse_VdC(uint bits)
+{
+    bits = ReverseBits32(bits);
+    return float(bits) * 2.3283064365386963e-10;// / 0x100000000
+}
+
+vec2 Hammersley(uint i, uint N)
+{
+    return vec2(float(i) / float(N), RadicalInverse_VdC(i));
+}
+
+// importance sample GGX
+
+vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
+{
+    float a = roughness * roughness;
+    float phi = 2.0 * PI * Xi.x;
+    float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y));
+    float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
+
+    // spherical to cartesian
+    vec3 H;
+    H.x = cos(phi) * sinTheta;
+    H.y = sin(phi) * sinTheta;
+    H.z = cosTheta;
+
+    // from tangent-space H vector to world-space sample vector
+    vec3 up = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(up, N));
+    vec3 bitangent = cross(N, tangent);
+
+    vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
+    return normalize(sampleVec);
+}
+
+void main()
+{
+    uvec3 gid = gl_GlobalInvocationID;
+    uint px = gid.x;
+    uint py = gid.y;
+    uint face = gl_WorkGroupID.z;
+
+    if (px >= pc.width || py >= pc.height) {
+        return;
+    }
+
+    vec2 uv = (vec2(px, py) + 0.5) / vec2(pc.width, pc.height);
+
+    float u = uv.x * 2.0 - 1.0;
+    float v = -(uv.y * 2.0 - 1.0);
+    vec3 R;
+
+    if (face == 0) R = normalize(vec3(1.0, v, -u));
+    else if (face == 1) R = normalize(vec3(-1.0, v, u));
+    else if (face == 2) R = normalize(vec3(u, 1.0, -v));
+    else if (face == 3) R = normalize(vec3(u, -1.0, v));
+    else if (face == 4) R = normalize(vec3(u, v, 1.0));
+    else R = normalize(vec3(-u, v, -1.0));
+
+    // Surface Normal N = R (prefilter around the direction)
+    vec3 N = R;
+    vec3 V = R;// view direction same as reflection direction
+
+    // accumulated color
+    vec3 prefilteredColor = vec3(0.0);
+    float totalWeight = 0.0;
+
+    uint SAMPLE_COUNT = pc.sampleCount;
+    for (uint i = 0u; i < SAMPLE_COUNT; ++i)
+    {
+        vec2 Xi = Hammersley(i, SAMPLE_COUNT);
+        vec3 H = ImportanceSampleGGX(Xi, N, pc.roughness);
+        vec3 L = normalize(2.0 * dot(V, H) * H - V);
+
+        float NdotL = max(dot(N, L), 0.0);
+        if (NdotL > 0.0)
+        {
+            prefilteredColor += texture(uEnvMap, L).rgb * NdotL;
+            totalWeight += NdotL;
+        }
+    }
+
+    vec3 color = prefilteredColor / max(totalWeight, 1e-6);
+
+    imageStore(outImage, ivec3(int(px), int(py), int(face)), vec4(color, 1.0));
+}

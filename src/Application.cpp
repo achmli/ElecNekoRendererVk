@@ -1197,27 +1197,75 @@ void Application::DrawFrame()
         {
             if (ImGui::CollapsingHeader("Sun Parameters"))
             {
-                ImGui::ColorEdit3("SunColor", renderOption.sunColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-                ImGui::DragFloat3("SunDirection", renderOption.sunDirection, 0.01f, -1.f, 1.f);
-                ImGui::SliderFloat("SunIntensity", &renderOption.sunIntensity, 1.f, 20.f);
-                ImGui::SliderFloat("SunAngularRadius", &renderOption.sunAngularRadius, .28f, 1.14f);
-                ImGui::SliderFloat("SunGlowSpread", &renderOption.sunGlowSpread, 0.02f, 0.12f);
+                if (ImGui::ColorEdit3("SunColor", renderOption.sunColor, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::DragFloat3("SunDirection", renderOption.sunDirection, 0.01f, -1.f, 1.f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("SunIntensity", &renderOption.sunIntensity, 1.f, 20.f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("SunAngularRadius", &renderOption.sunAngularRadius, .28f, 1.14f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("SunGlowSpread", &renderOption.sunGlowSpread, 0.02f, 0.12f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
                 ImGui::SliderFloat("Explosure", &renderOption.explosure, 0.8f, 1.6f);
             }
 
             if (ImGui::CollapsingHeader("Sky Parameters"))
             {
-                ImGui::ColorEdit3("SkyColor", renderOption.skyColor, ImGuiColorEditFlags_Float);
-                ImGui::SliderFloat("ZenithBrighten", &renderOption.expStrengthA, 0, 10.f);
-                ImGui::SliderFloat("HorizonBrighten", &renderOption.expAAttenuationB, -1.f, -.2f);
-                ImGui::SliderFloat("BaseSkyBrightness", &renderOption.baseConstantC, .1f, 1.f);
-                ImGui::SliderFloat("ExponentialScattering", &renderOption.expGammaAttenuationD, 0.05f, .5f);
-                ImGui::SliderFloat("CircumsolarGlow", &renderOption.expAttenuationSpeedE, -5.f, -1.f);
-                ImGui::SliderFloat("AngularScattering", &renderOption.gammaScatteringF, 0.01f, 0.2f);
-                ImGui::SliderFloat("HenyeyGreenstein", &renderOption.chiContributeG, 0.01f, 0.1f);
-                ImGui::SliderFloat("HGParm", &renderOption.chiParmH, .5f, .9f);
-                ImGui::SliderFloat("HorizonFalloff", &renderOption.thetaFixI, .05f, .2f);
-                ImGui::SliderFloat("ReferenceRadiance", &renderOption.Lm, 1.f, 20.f);
+                if (ImGui::ColorEdit3("SkyColor", renderOption.skyColor, ImGuiColorEditFlags_Float))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("ZenithBrighten", &renderOption.expStrengthA, 0, 10.f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("HorizonBrighten", &renderOption.expAAttenuationB, -1.f, -.2f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("BaseSkyBrightness", &renderOption.baseConstantC, .1f, 1.f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("ExponentialScattering", &renderOption.expGammaAttenuationD, 0.05f, .5f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("CircumsolarGlow", &renderOption.expAttenuationSpeedE, -5.f, -1.f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("AngularScattering", &renderOption.gammaScatteringF, 0.01f, 0.2f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("HenyeyGreenstein", &renderOption.chiContributeG, 0.01f, 0.1f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("HGParm", &renderOption.chiParmH, .5f, .9f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("HorizonFalloff", &renderOption.thetaFixI, .05f, .2f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
+                if (ImGui::SliderFloat("ReferenceRadiance", &renderOption.Lm, 1.f, 20.f))
+                {
+                    renderOption.isSkyChanged = true;
+                }
             }
         }
 
@@ -1236,6 +1284,12 @@ void Application::DrawFrame()
                     }
                 }
             }
+        }
+
+        if (ImGui::CollapsingHeader("Ambient Occlusion"))
+        {
+            ImGui::Checkbox("Use Ambient Occlusion", &renderOption.useAO);
+            ImGui::Checkbox("Use Contact Shadow", &renderOption.useCT);
         }
 
         ImGui::End();

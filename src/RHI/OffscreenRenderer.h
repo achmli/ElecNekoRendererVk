@@ -21,5 +21,5 @@ namespace ElecNeko
 
     bool ReinitializeSky(DeviceContext *device, const RenderOption &renderOption);
 
-    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, Scene *scene, const RenderOption &renderOption);
+    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, Scene *scene, RenderOption &renderOption);
 } // namespace ElecNeko

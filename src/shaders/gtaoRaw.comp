@@ -1,0 +1,181 @@
+#version 450
+#extension GL_ARB_compute_shader : enable
+#extension GL_ARB_separate_shader_objects : enable
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(std140, binding = 0) uniform uboCamera
+{
+    mat4 view;
+    mat4 proj;
+    mat4 viewNoTrans;
+    mat4 invView;
+    mat4 invProj;
+} camera;
+
+layout(set = 0, binding = 1, r16f) uniform writeonly image2D outAO;
+
+layout(set = 0, binding = 2) uniform sampler2D tNormal;
+layout(set = 0, binding = 3) uniform sampler2D tDepth;
+
+layout(push_constant) uniform PushConstants {
+    uint width;
+    uint height;
+    float radius;
+    uint sampleCount;
+    float bias;
+    float intensity;
+    float maxDistance;
+} pc;
+
+const float PI = 3.14159265359;
+
+// RNG Helper
+uint wangHash(uint seed)
+{
+    seed = (seed ^ 61u) ^ (seed >> 16u);
+    seed *= 9u;
+    seed = seed ^ (seed >> 4u);
+    seed *= 0x27d4eb2du;
+    seed = seed ^ (seed >> 15u);
+    return seed;
+}
+
+float randf(inout uint seed)
+{
+    seed = wangHash(seed);
+    return float(seed) / 4294967296.0;
+}
+
+float RadicalInverse_Vdc(uint bits)
+{
+    bits = (bits << 16u) | (bits >> 16u);
+    bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xaaaaaaaau) >> 1u);
+    bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xccccccccu) >> 2u);
+    bits = ((bits & 0x0f0f0f0fu) << 4u) | ((bits & 0xf0f0f0f0u) >> 4u);
+    bits = ((bits & 0x00ff00ffu) << 8u) | ((bits & 0xff00ff00u) >> 8u);
+    return float(bits) * 2.3283064365386963e-10;// / 0x100000000
+}
+
+vec2 Hammersley(uint i, uint N)
+{
+    return vec2(float(i) / float(N), RadicalInverse_Vdc(i));
+}
+
+vec3 ImportanceSampleHemisphere(vec2 Xi)
+{
+    float phi = 2.0 * PI * Xi.x;
+    float cosTheta = sqrt(1.0 - Xi.y);
+    float sinTheta = sqrt(max(1.0 - cosTheta * cosTheta, 0.0));
+
+    // spherical to cartesian
+    vec3 H;
+    H.x = cos(phi) * sinTheta;
+    H.y = sin(phi) * sinTheta;
+    H.z = cosTheta;
+
+    return H;
+}
+
+vec3 reconstructViewPosition(vec2 uv, float depth)
+{
+    // depth from depth buffer in [0,1]
+    vec4 ndcPos = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    vec4 viewPos = camera.invProj * ndcPos;
+    // perspective divide
+    viewPos /= viewPos.w;
+    return viewPos.xyz;
+}
+
+void main()
+{
+    uvec2 gid = gl_GlobalInvocationID.xy;
+    uint px = gid.x;
+    uint py = gid.y;
+    if (px >= pc.width || py >= pc.height)
+    {
+        return;
+    }
+
+    vec2 uv = (vec2(px, py) + 0.5) / vec2(pc.width, pc.height);
+
+    float depth = texture(tDepth, uv).r;
+    if (depth > 0.9999) {
+        imageStore(outAO, ivec2(px, py), vec4(1.0));
+        return;
+    }
+
+    vec3 normal = texture(tNormal, uv).xyz;
+    vec3 N_world = normalize(normal);
+    vec3 N = normalize((camera.view*vec4(N_world, 0.0)).xyz);
+
+    vec3 Vpos = reconstructViewPosition(uv, depth);
+
+    vec3 up = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 T = normalize(cross(up, N));
+    vec3 B = cross(N, T);
+
+    uint seed = uint(px * 1973u + py * 9277u) ^ uint(pc.sampleCount * 26699u);
+
+    float occlusion = 0.0;
+    uint SAMPLE_COUNT = pc.sampleCount;
+    float radius = pc.radius;
+    float maxDist = max(pc.maxDistance, radius * 2.0);
+
+    for (uint i = 0u; i < SAMPLE_COUNT; ++i)
+    {
+        vec2 xi = Hammersley(i, SAMPLE_COUNT);
+
+        xi += vec2(randf(seed), randf(seed)) * (1.0 / float(SAMPLE_COUNT));
+        xi = fract(xi);
+
+        vec3 sampleDir_t = ImportanceSampleHemisphere(xi);
+        vec3 L = normalize(sampleDir_t.x * T + sampleDir_t.y * B + sampleDir_t.z * N);
+
+        float scale = float(i) / float(SAMPLE_COUNT);
+        float dist = radius * (0.1 + scale * 0.9);// closer samples more important
+
+        if (dist > maxDist)
+        {
+            dist = maxDist;
+        }
+
+        vec3 samplePosView = Vpos + L * dist;
+
+        vec4 clip = camera.proj * vec4(samplePosView, 1.0);
+        if (clip.w <= 0.0)
+        {
+            continue;
+        }
+        vec3 ndc = clip.xyz / clip.w;
+        vec2 sampleUV = ndc.xy * 0.5 + 0.5;
+        if (sampleUV.x < 0.0 || sampleUV.x > 1.0 || sampleUV.y < 0.0 || sampleUV.y > 1.0)
+        {
+            continue;
+        }
+
+        float sampleDepth = texture(tDepth, sampleUV).r;
+
+        vec3 ndc_s;
+        ndc_s.xy = ndc.xy;
+        ndc_s.z = sampleDepth;
+        vec4 clip_s = vec4(ndc_s, 1.0);
+        vec4 viewPos_s = camera.invProj * clip_s;
+        viewPos_s /= viewPos_s.w;
+        float sceneZ = viewPos_s.z;
+
+        float bias = pc.bias;
+        if (samplePosView.z + bias < sceneZ)
+        {
+            float NdotL = max(dot(N, L), 0.0);
+            float w = NdotL * (1.0 - (dist / maxDist));
+            occlusion += w;
+        }
+    }
+
+    float ao = 1.0 -(occlusion / max(1.0, float(SAMPLE_COUNT)));
+    ao = pow(clamp(ao, 0.0, 1.0), 1.0);
+    ao = mix(1.0, ao, pc.intensity);
+
+    imageStore(outAO, ivec2(px, py), vec4(ao));
+}

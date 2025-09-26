@@ -16,7 +16,7 @@ layout(std140, binding = 0) uniform lightParms{
     int simpleACESFit;
 } lightParm;
 
-layout (set = 0, binding = 1, rgba16f) uniform image2D outImage;
+layout (set = 0, binding = 1, rgba16f) uniform writeonly image2D outImage;
 layout (set = 0, binding = 2) uniform sampler2D texAlbedo;
 
 mat3 ACESInputMat = mat3

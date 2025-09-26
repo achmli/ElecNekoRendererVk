@@ -1,14 +1,14 @@
 #pragma once
 
-#include "Loader/Mesh.h"
 #include "Light.h"
+#include "Loader/Mesh.h"
 
 #include <unordered_map>
 
 namespace ElecNeko
 {
-	class ElecNekoMesh
-	{
+    class ElecNekoMesh
+    {
     public:
         ElecNekoMesh() = default;
         ~ElecNekoMesh() = default;
@@ -17,18 +17,19 @@ namespace ElecNeko
         void Cleanup(DeviceContext *device);
 
         void DrawIndexed(VkCommandBuffer vkCommandBuffer);
+
     public:
         std::vector<VVertex> m_vertices;
         std::vector<uint32_t> m_indices;
 
-		std::string name;
+        std::string name;
 
-		Buffer m_vertexBuffer;
+        Buffer m_vertexBuffer;
         Buffer m_indexBuffer;
-	};
+    };
 
-	class ElecNekoMeshInstance
-	{
+    class ElecNekoMeshInstance
+    {
     public:
         ElecNekoMeshInstance(const std::string &instanceName, const Mat4 &xform, int meshID, int materialID) :
             name(instanceName), transform(xform), meshId(meshID), materialId(materialID)
@@ -36,35 +37,35 @@ namespace ElecNeko
         ElecNekoMeshInstance() = delete;
         ~ElecNekoMeshInstance() = default;
 
-        bool MakeUBO(DeviceContext* device);
+        bool MakeUBO(DeviceContext *device);
 
         void Cleanup(DeviceContext *device);
 
     public:
         Mat4 transform;
 
-		std::string name;
-		
-		int meshId;
+        std::string name;
+
+        int meshId;
         int materialId;
 
         Buffer uniformBuffer;
-	};
+    };
 
     class World
     {
     public:
-        World() : m_cam(nullptr),defaultAlbedo(nullptr),defaultNormal(nullptr),defaultMetalRough(nullptr),defaultEmission(nullptr){}
+        World() : m_cam(nullptr), defaultAlbedo(nullptr), defaultNormal(nullptr), defaultMetalRough(nullptr), defaultEmission(nullptr) {}
         ~World() = default;
 
-        int AddTexture(DeviceContext *device, const std::string& filename);
+        int AddTexture(DeviceContext *device, const std::string &filename);
         int AddMaterial(const Material &material);
         // int AddMeshInstance(const ElecNekoMeshInstance &meshInstance);
-        
+
         int LoadMeshGeometryOnly(DeviceContext *device, const std::string &filename);
         int LoadMeshWithMaterials(DeviceContext *device, const std::string &filename, Mat4 transMat);
 
-        void AddCamera(Vec3 eye, Vec3 lookAt, float fov, float aspecRatio = (9.f / 16.f), float zNear = .1f, float zFar = 1000.f);
+        void AddCamera(Vec3 eye, Vec3 lookAt, float fov, float aspecRatio = (9.f / 16.f), float zNear = .1f, float zFar = 100.f);
 
         int EnsureTextureCached(DeviceContext *device, const std::string &filename);
 
@@ -78,11 +79,11 @@ namespace ElecNeko
         void LightClean(DeviceContext *device);
 
     public:
-        std::vector<ElecNekoMesh*> m_meshes;
+        std::vector<ElecNekoMesh *> m_meshes;
         std::unordered_map<std::string, int> m_meshIndexByKey;
 
         std::vector<Material> m_materials;
-        std::vector<Texture*> m_textures;
+        std::vector<Texture *> m_textures;
         Texture *defaultAlbedo;
         Texture *defaultNormal;
         Texture *defaultMetalRough;
@@ -91,9 +92,9 @@ namespace ElecNeko
         std::vector<ElecNekoMeshInstance> m_meshInstances;
 
         std::vector<Light *> m_lights;
-        
-        std::unordered_map<std::string,int> m_textureCache;
+
+        std::unordered_map<std::string, int> m_textureCache;
 
         Camera *m_cam;
     };
-}
+} // namespace ElecNeko

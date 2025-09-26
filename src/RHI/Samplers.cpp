@@ -10,6 +10,7 @@ VkSampler Samplers::m_samplerDepth;
 VkSampler ElecNeko::ElecNekoSampler::m_samplerTexture;
 VkSampler ElecNeko::ElecNekoSampler::m_samplerCubemap;
 VkSampler ElecNeko::ElecNekoSampler::m_samplerShadow;
+VkSampler ElecNeko::ElecNekoSampler::m_samplerIBL;
 
 /*
 ====================================================
@@ -162,10 +163,39 @@ namespace ElecNeko
         return true;
     }
 
+    bool ElecNekoSampler::InitializeIBLSampler(DeviceContext *device, float maxLod)
+    {
+        VkSamplerCreateInfo samplerInfo = {};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = maxLod; // for IBL, we have mipmaps
+        samplerInfo.mipLodBias = 0.0f;
+        if (vkCreateSampler(device->m_vkDevice, &samplerInfo, nullptr, &m_samplerIBL))
+        {
+            printf("failed to create m_samplerIBL!\n");
+            assert(0);
+            return false;
+        }
+
+        return true;
+    }
+
+
     void ElecNekoSampler::Cleanup(DeviceContext *device)
     {
         vkDestroySampler(device->m_vkDevice, m_samplerTexture, nullptr);
         vkDestroySampler(device->m_vkDevice, m_samplerCubemap, nullptr);
         vkDestroySampler(device->m_vkDevice, m_samplerShadow, nullptr);
+        vkDestroySampler(device->m_vkDevice, m_samplerIBL, nullptr);
     }
 } // namespace ElecNeko

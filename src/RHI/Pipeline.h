@@ -163,9 +163,13 @@ namespace ElecNeko
         ElecNekoDescriptor GetFreeDescriptor() { return m_parms.descriptors->GetFreeDescriptor(); }
         ElecNekoDescriptorCompute GetFreeDescriptorCompute() { return m_parms.descriptorsCompute->GetFreeDescriptor(); }
 
+        void PushConstants(VkCommandBuffer cmdBuffer, const void *data, uint32_t size, uint32_t offset = 0);
+
         void BindPipeline(VkCommandBuffer cmdBuffer);
         void BindPipelineCompute(VkCommandBuffer cmdBuffer);
         void DispatchCompute(VkCommandBuffer cmdBuffer, int groupCountX, int groupCountY, int groupCountZ);
+
+        void DrawFullScreen(VkCommandBuffer cmdBuffer, uint32_t vertexCount, uint32_t indexCount, uint32_t firstVertex = 0, uint32_t firstIndex = 0);
 
         CreateParms_t m_parms;
 

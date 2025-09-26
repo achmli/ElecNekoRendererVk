@@ -1476,6 +1476,7 @@ namespace ElecNeko
         if (parms.pushConstantSize > 0)
         {
             pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            m_parms.pushConstantShaderStages = VK_SHADER_STAGE_COMPUTE_BIT;
             pushConstantRange.size = static_cast<uint32_t>(parms.pushConstantSize);
             pushConstantRange.offset = 0;
         }
@@ -1561,6 +1562,31 @@ namespace ElecNeko
         }
     }
 
+    void ElecNekoPipeline::PushConstants(VkCommandBuffer cmdBuffer, const void *data, uint32_t size, uint32_t offset)
+    {
+        if (m_vkPipelineLayout == VK_NULL_HANDLE || size == 0)
+        {
+            return;
+        }
+
+        if (size + offset > m_parms.pushConstantSize)
+        {
+            printf("ERROR: Push constant size exceeds allocated size\n");
+            assert(0);
+            size = (m_parms.pushConstantSize > offset) ? (m_parms.pushConstantSize - offset) : 0;
+            if (size == 0)
+                return;
+        }
+
+        if (m_parms.pushConstantSize == 0)
+        {
+            return;
+        }
+
+        vkCmdPushConstants(cmdBuffer, m_vkPipelineLayout, m_parms.pushConstantShaderStages, offset, size, data);
+    }
+
+
     void ElecNekoPipeline::BindPipeline(VkCommandBuffer cmdBuffer) { vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline); }
 
     void ElecNekoPipeline::BindPipelineCompute(VkCommandBuffer cmdBuffer) { vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_vkPipeline); }
@@ -1569,4 +1595,10 @@ namespace ElecNeko
     {
         vkCmdDispatch(cmdBuffer, groupCountX, groupCountY, groupCountZ);
     }
+
+    void ElecNekoPipeline::DrawFullScreen(VkCommandBuffer cmdBuffer, uint32_t vertexCount, uint32_t indexCount, uint32_t firstVertex, uint32_t firstIndex)
+    {
+        vkCmdDraw(cmdBuffer, vertexCount, indexCount, firstVertex, firstIndex);
+    }
+
 } // namespace ElecNeko

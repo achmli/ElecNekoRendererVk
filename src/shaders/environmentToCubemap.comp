@@ -1,0 +1,112 @@
+#version 450
+#extension GL_ARB_compute_shader : enable
+#extension GL_ARB_separate_shader_objects : enable
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(std140, binding = 0) uniform LightParms
+{
+    vec2 viewport;
+    vec2 _pad0;
+    vec3 sunDir;
+    float sunIntensity;
+    vec3 sunColor;
+    float sunAngularRadius;
+    float sunGlowSpread;
+    float explosure;
+} lightParms;
+
+layout(std140, binding = 1) uniform SkyParms
+{
+    vec3 skyColor;
+    float zenithBrightenA;
+    float horizonBrightenB;
+    float baseSkyBrightnessC;
+    float exponentialScatteringD;
+    float circumsolarGlowE;
+    float angularScatteringF;
+    float HG;
+    float HGParmH;
+    float horizonFalloffI;
+    float lm;
+}uSky;
+
+layout(binding=2, rgba16f) uniform writeonly imageCube outImage;
+
+const float PI = 3.14159265359;
+
+float HenyeyGreenStein(float g, float cosGamma)
+{
+    float g2 = g * g;
+    float denom = pow(1.0 + g2 - 2.0 * g * cosGamma, 1.5);
+    return (1.0 - g2) / (4.0 * PI * denom);
+}
+
+vec3 directionFromFace(int face, vec2 uv)
+{
+    float u = uv.x * 2.0 - 1.0;
+    float v = -(uv.y * 2.0 - 1.0);
+    if (face == 0) return normalize(vec3(1.0, v, -u));
+    if (face == 1) return normalize(vec3(-1.0, v, u));
+    if (face == 2) return normalize(vec3(u, 1.0, -v));
+    if (face == 3) return normalize(vec3(u, -1.0, v));
+    if (face == 4) return normalize(vec3(u, v, 1.0));
+    return normalize(vec3(-u, v, -1.0));
+}
+
+vec3 evalSky(vec3 worldDir)
+{
+    float cosTheta=clamp(worldDir.y, 0.0, 1.0);
+    float theta = acos(cosTheta);
+
+    float cosGamma = clamp(dot(worldDir, normalize(lightParms.sunDir)), -1.0, 1.0);
+    float gamma = acos(cosGamma);
+
+    float FHorizon = 1.0 + (uSky.zenithBrightenA) * exp((uSky.horizonBrightenB) / (cosTheta + 0.01));
+    float scattering = uSky.baseSkyBrightnessC + uSky.exponentialScatteringD * exp(uSky.circumsolarGlowE * gamma);
+    scattering += uSky.angularScatteringF * (cosGamma * cosGamma);
+    scattering += uSky.HG * HenyeyGreenStein(uSky.HGParmH, cosGamma);
+    scattering += uSky.horizonFalloffI * sqrt(cosTheta);
+
+    float fval = FHorizon * scattering;
+    fval = clamp(fval, 0.0, 6.0);
+
+    vec3 skyRadiance = uSky.skyColor * (fval * uSky.lm);
+
+    float r = max(lightParms.sunAngularRadius, 1e-5);
+    float glow = max(lightParms.sunGlowSpread, r * 2.0);
+    float coreSigma=max(r * 0.6, 1e-6);
+    float core = exp(-(gamma * gamma) / (2.0 * coreSigma * coreSigma));
+    float glowFactor = exp(-gamma / glow);
+    float sunShape = clamp(core + 0.12 * glowFactor, 0.0, 20.0);
+    vec3 sunRadiance = lightParms.sunColor * lightParms.sunIntensity * sunShape;
+
+    vec3 hdrColor = skyRadiance + sunRadiance;
+    return hdrColor;
+}
+
+void main()
+{
+    uvec3 gid = gl_GlobalInvocationID;
+    uint px = gid.x;
+    uint py = gid.y;
+    uint face = gl_WorkGroupID.z;
+
+    if (px>512 || py>512 || face>5) {
+        return;
+    }
+
+    vec2 uv = (vec2(px, py) + 0.5) / vec2(512.0, 512.0);
+    vec3 dir = directionFromFace(int(face), uv);
+    vec3 color = evalSky(dir);
+
+    //    vec3 faceColor;
+    //    if (face==0) faceColor = vec3(1.0, 0.0, 0.0);// red
+    //    else if (face==1) faceColor = vec3(0.0, 1.0, 0.0);// green
+    //    else if (face==2) faceColor = vec3(0.0, 0.0, 1.0);// blue
+    //    else if (face==3) faceColor = vec3(1.0, 1.0, 0.0);// yellow
+    //    else if (face==4) faceColor = vec3(1.0, 0.0, 1.0);// magenta
+    //    else faceColor = vec3(0.0, 1.0, 1.0);// cyan
+
+    imageStore(outImage, ivec3(int(px), int(py), int(face)), vec4(color, 1.0));
+}

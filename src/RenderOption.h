@@ -14,6 +14,9 @@ namespace ElecNeko
             simpleACESFit = false;
             enableExplosure = false;
             isDeferred = true;
+            isSkyChanged = true;
+            useAO = true;
+            useCT = false;
 
             sunDirection[0] = 1.f;
             sunDirection[1] = 1.f;
@@ -48,6 +51,9 @@ namespace ElecNeko
         bool simpleACESFit;
         bool enableExplosure;
         bool isDeferred;
+        bool isSkyChanged;
+        bool useAO;
+        bool useCT;
 
         float sunDirection[3];
         float sunIntensity;

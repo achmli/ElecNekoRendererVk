@@ -26,10 +26,12 @@ namespace ElecNeko
     {
     public:
         static bool InitializeSampler(DeviceContext *device);
+        static bool InitializeIBLSampler(DeviceContext *device, float maxLod);
         static void Cleanup(DeviceContext *device);
 
         static VkSampler m_samplerTexture;
         static VkSampler m_samplerCubemap;
         static VkSampler m_samplerShadow;
+        static VkSampler m_samplerIBL;
     };
 } // namespace ElecNeko

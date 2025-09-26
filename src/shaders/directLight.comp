@@ -32,6 +32,14 @@ layout(set = 0, binding = 6) uniform sampler2D uMaterial;
 layout(set = 0, binding = 7) uniform sampler2D uDepth;
 // shadow map - use sampler2DShadow with compare enabled on Vulkan side for hardware PCF
 layout(set = 0, binding = 8) uniform sampler2DShadow uShadowMap;
+layout(set = 0, binding = 9) uniform samplerCube uEnvMap;
+layout(set = 0, binding = 10) uniform sampler2D uAO;
+
+layout(push_constant) uniform PC
+{
+    int useAO;
+    int useContactShadow;
+}pc;
 
 const float PI = 3.14159265359;
 
@@ -141,6 +149,76 @@ float ComputeShadowPCF(vec3 shadowPos, float NdotL)
     return sum / 9.0;
 }
 
+vec3 getWorldDirFromUV(vec2 uv)
+{
+    vec3 ndc;
+    ndc.xy = uv * 2.0 -1.0;
+    ndc.z = 1.0;// looking forward in view space
+
+    vec4 clip = vec4(ndc, 1.0);
+
+    vec4 viewPos = camera.invProj * clip;
+    viewPos /= viewPos.w;
+
+    vec3 dirView = normalize(vec3(viewPos.x, viewPos.y, viewPos.z));
+
+    vec3 dirWorld = (camera.invView * vec4(dirView, 0.0)).xyz;
+    return normalize(dirWorld);
+}
+
+// ssct
+float ScreenSpaceContactShadow(vec3 viewPos, vec3 N)
+{
+    const float MAX_DIST = 0.08;// 减小搜索范围
+    const float START_OFFSET = 0.002;
+
+    // 调试参数 - 可以暴露为uniform
+    const float DEPTH_BIAS = 0.0005;// 非常小的偏差
+    const float INTENSITY = 0.8;// 阴影强度
+
+    float t = START_OFFSET;
+    float shadow = 1.0;
+
+    vec3 samplePosView = viewPos + N * t;
+
+    // 投影到裁剪空间
+    vec4 clip = camera.proj * vec4(samplePosView, 1.0);
+    if (clip.w <= 0.0) {
+        return 1.0;
+    }
+
+    // 转换为NDC和UV
+    vec3 ndc = clip.xyz / clip.w;
+    vec2 sampleUV = ndc.xy * 0.5 + 0.5;
+
+    // 检查是否在屏幕内
+    if (any(lessThan(sampleUV, vec2(0.0))) || any(greaterThan(sampleUV, vec2(1.0)))) {
+        return 1.0;
+    }
+
+    // 采样深度
+    float sceneDepth = texture(uDepth, sampleUV).r;
+
+    // 重建场景点的视图空间位置
+    vec4 clip_scene = vec4(ndc.xy, sceneDepth, 1.0);
+    vec4 viewPos_scene = camera.invProj * clip_scene;
+    viewPos_scene /= viewPos_scene.w;
+
+    // 计算深度差异（使用线性深度）
+    float sampleDepth = -samplePosView.z;// 采样点深度
+    float sceneDepthLinear = -viewPos_scene.z;// 场景点深度
+
+    float depthDiff = sampleDepth - sceneDepthLinear;
+
+    // 检测遮挡（使用很小的偏差）
+    if (depthDiff > DEPTH_BIAS) {
+        // 简单的硬阴影
+        return 1.0 - INTENSITY;
+    }
+
+    return 1.0;// 无遮挡
+}
+
 void main(){
     ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
     ivec2 vp = ivec2(int(lightParm.viewport.x), int(lightParm.viewport.y));
@@ -158,7 +236,11 @@ void main(){
 
     if (depth >= 0.9999) {
         // background (sky) - no lighting
-        imageStore(outImage, pix, vec4(albedo, 1.0));
+        vec3 viewDirWorld = getWorldDirFromUV(uv);
+
+        vec3 skyColor = textureLod(uEnvMap, viewDirWorld, 0.0).rgb;
+
+        imageStore(outImage, pix, vec4(skyColor, 1.0));
         return;
     }
     // Normal sampling:
@@ -225,7 +307,36 @@ void main(){
         visibility = ComputeShadowPCF(shadowPos, NdotL);
     }
 
-    vec3 color = ambient + Lo * visibility;
+    //vec3 color = ambient + Lo * visibility;
+    // IBL contribution -----------------------------------
+    vec3 irradiance = textureLod(uEnvMap, nrm, 4.5).rgb;
+    vec3 diffuseIBL = irradiance * albedo;
+
+    vec3 R = reflect(-V, nrm);
+
+    float mip = clamp(roughness, 0.0, 1.0) * 9.0;
+    vec3 prefilterColor = textureLod(uEnvMap, R, mip).rgb;
+
+    vec3 F_ibl = F_Schlick(max(dot(nrm, V), 0.0), F0);
+    vec3 specIBL = prefilterColor * F_ibl;// * envBRDF.x + envBRDF.y;
+
+    vec3 kD_ibl = (vec3(1.0) - F_ibl) * (1.0 - metallic);
+
+    vec3 iblColor = kD_ibl * diffuseIBL + specIBL;
+
+    // ao and ct
+    float ao = texture(uAO, uv).r;
+
+    vec3 viewPosPixel = (camera.view * vec4(worldPos, 1.0)).xyz;
+    vec3 N_view = normalize((camera.view * vec4(nrm, 0.0)).xyz);
+    float contact = ScreenSpaceContactShadow(viewPosPixel, N_view);
+
+    vec3 diffuseAndAmbient = pc.useAO > 0 ? (ambient + diffuse) * ao : (ambient + diffuse);
+
+    vec3 directLight = pc.useContactShadow > 0 ? Lo * visibility * contact : Lo * visibility;
+
+    // vec3 color = ambient + Lo * visibility + iblColor;
+    vec3 color = diffuseAndAmbient + directLight + iblColor;
 
     imageStore(outImage, pix, vec4(color, 1.0));
 }

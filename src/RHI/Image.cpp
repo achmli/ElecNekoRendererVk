@@ -26,7 +26,7 @@ namespace ElecNeko
             case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
                 return {VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT};
             case VK_IMAGE_LAYOUT_GENERAL:
-                return {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
+                return {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT};
             case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
                 return {VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0};
             default:
@@ -319,109 +319,164 @@ void Image::TransitionLayoutEN(VkCommandBuffer cmdBuffer, VkImageLayout newLayou
 
 namespace ElecNeko
 {
-    bool CubeImage::Create(DeviceContext *device, const int width, const int height)
+    bool CubeImage::Create(DeviceContext *device, const int width, const int height, const int mipLevels, VkFormat format)
     {
-        // Create Image
-        VkImageCreateInfo imageCI{};
-        imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageCI.imageType = VK_IMAGE_TYPE_2D;
-        imageCI.format = VK_FORMAT_R8G8B8A8_UNORM;
-        imageCI.extent.width = width;
-        imageCI.extent.height = height;
-        imageCI.extent.depth = 1;
-        imageCI.mipLevels = 1;
-        imageCI.arrayLayers = 6;
-        imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageCI.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-        imageCI.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-        imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        assert(width > 0 && height > 0 && width == height);
 
-        if (vkCreateImage(device->m_vkDevice, &imageCI, nullptr, &m_vkImage) != VK_SUCCESS)
+        m_width = width;
+        m_height = height;
+        m_mipLevels = mipLevels > 0 ? mipLevels : 1;
+        m_format = format;
+
+        // create image
+        VkImageCreateInfo imageInfo = {};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.format = m_format;
+        imageInfo.extent.width = static_cast<uint32_t>(m_width);
+        imageInfo.extent.height = static_cast<uint32_t>(m_height);
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = static_cast<uint32_t>(m_mipLevels);
+        imageInfo.arrayLayers = 6; // 6 faces
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        // usage: color attachment (for render-to-face), sampled (for shader read),
+        // transfer src/dst for blit/copy if needed
+        imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        if (vkCreateImage(device->m_vkDevice, &imageInfo, nullptr, &m_vkImage) != VK_SUCCESS)
         {
-            printf("ERROR: Failed to Create Cube Image! \n");
+            printf("ERROR: Failed to create cube image!\n");
             assert(0);
             return false;
         }
 
-        //	Allocate memory on the GPU and attach it to the
-        VkMemoryAllocateInfo memAlloc = {};
-        memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        // allocate memory for images
         VkMemoryRequirements memReqs;
         vkGetImageMemoryRequirements(device->m_vkDevice, m_vkImage, &memReqs);
+
+        VkMemoryAllocateInfo memAlloc{};
+        memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         memAlloc.allocationSize = memReqs.size;
         memAlloc.memoryTypeIndex = device->FindMemoryTypeIndex(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
         if (vkAllocateMemory(device->m_vkDevice, &memAlloc, nullptr, &m_vkDeviceMemory) != VK_SUCCESS)
         {
-            printf("ERROR: Failed to allocate memory\n");
+            printf("ERROR: Failed to allocate cube image memory!\n");
             assert(0);
             return false;
         }
 
         if (vkBindImageMemory(device->m_vkDevice, m_vkImage, m_vkDeviceMemory, 0) != VK_SUCCESS)
         {
-            printf("ERROR: Failed to bind image memory\n");
+            printf("ERROR: Failed to bind cube image memory!\n");
             assert(0);
             return false;
         }
 
-        // Create Image View
-        VkImageViewCreateInfo viewCI{};
-        viewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewCI.image = m_vkImage;
-        viewCI.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-        viewCI.format = imageCI.format;
-        viewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        viewCI.subresourceRange.baseMipLevel = 0;
-        viewCI.subresourceRange.levelCount = 1;
-        viewCI.subresourceRange.baseArrayLayer = 0;
-        viewCI.subresourceRange.layerCount = 6;
+        // create cube view for sampling
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = m_vkImage;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+        viewInfo.format = m_format;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = static_cast<uint32_t>(m_mipLevels);
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 6; // 6 faces
 
-        if (vkCreateImageView(device->m_vkDevice, &viewCI, nullptr, &m_vkImageView) != VK_SUCCESS)
+        if (vkCreateImageView(device->m_vkDevice, &viewInfo, nullptr, &m_vkImageView) != VK_SUCCESS)
         {
-            printf("ERROR: Failed to Create Cube Image View! \n");
+            printf("ERROR: Failed to create cube image view!\n");
             assert(0);
             return false;
         }
 
+        // create per-face-per-mip views for rendering
+        m_faceMipViews.clear();
+        m_faceMipViews.resize(m_mipLevels, VK_NULL_HANDLE);
+
+        for (int mip = 0; mip < m_mipLevels; ++mip)
+        {
+            VkImageViewCreateInfo faceViewInfo{};
+            faceViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            faceViewInfo.image = m_vkImage;
+            faceViewInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+            faceViewInfo.format = m_format;
+            faceViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            faceViewInfo.subresourceRange.baseMipLevel = mip;
+            faceViewInfo.subresourceRange.levelCount = 1;
+            faceViewInfo.subresourceRange.baseArrayLayer = 0;
+            faceViewInfo.subresourceRange.layerCount = 6;
+
+            VkImageView faceView = VK_NULL_HANDLE;
+            if (vkCreateImageView(device->m_vkDevice, &faceViewInfo, nullptr, &faceView) != VK_SUCCESS)
+            {
+                printf("ERROR: Failed to create cube face image view!\n");
+                assert(0);
+                // cleanup previously created views
+                for (VkImageView v: m_faceMipViews)
+                {
+                    if (v != VK_NULL_HANDLE)
+                    {
+                        vkDestroyImageView(device->m_vkDevice, v, nullptr);
+                    }
+                }
+                vkDestroyImageView(device->m_vkDevice, m_vkImageView, nullptr);
+                vkDestroyImage(device->m_vkDevice, m_vkImage, nullptr);
+                vkFreeMemory(device->m_vkDevice, m_vkDeviceMemory, nullptr);
+                m_faceMipViews.clear();
+                return false;
+            }
+            m_faceMipViews[mip] = faceView;
+        }
+
+        m_vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        m_mipLayouts.resize(m_mipLevels, VK_IMAGE_LAYOUT_UNDEFINED);
         return true;
     }
 
     void CubeImage::Cleanup(DeviceContext *device)
     {
-        vkDestroyImageView(device->m_vkDevice, m_vkImageView, nullptr);
-        vkDestroyImage(device->m_vkDevice, m_vkImage, nullptr);
-        vkFreeMemory(device->m_vkDevice, m_vkDeviceMemory, nullptr);
+        for (VkImageView v: m_faceMipViews)
+        {
+            if (v != VK_NULL_HANDLE)
+            {
+                vkDestroyImageView(device->m_vkDevice, v, nullptr);
+            }
+        }
+        m_faceMipViews.clear();
+
+        if (m_vkImageView != VK_NULL_HANDLE)
+        {
+            vkDestroyImageView(device->m_vkDevice, m_vkImageView, nullptr);
+            m_vkImageView = VK_NULL_HANDLE;
+        }
+
+        if (m_vkImage != VK_NULL_HANDLE)
+        {
+            vkDestroyImage(device->m_vkDevice, m_vkImage, nullptr);
+            m_vkImage = VK_NULL_HANDLE;
+        }
+
+        if (m_vkDeviceMemory != VK_NULL_HANDLE)
+        {
+            vkFreeMemory(device->m_vkDevice, m_vkDeviceMemory, nullptr);
+            m_vkDeviceMemory = VK_NULL_HANDLE;
+        }
+
+        m_vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     }
 
-    void CubeImage::TransitionLayout(DeviceContext *device)
+    void CubeImage::TransitionLayout(DeviceContext *device, VkImageLayout newLayout)
     {
         VkCommandBuffer cmdBuffer = device->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
-
-        VkImageMemoryBarrier barrier = {};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = m_vkImage;
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 6;
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-        VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
-        vkCmdPipelineBarrier(cmdBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-
+        TransitionLayout(cmdBuffer, newLayout);
         device->FlushCommandBuffer(cmdBuffer, device->m_vkGraphicsQueue);
-
-        m_vkImageLayout = VK_IMAGE_LAYOUT_GENERAL;
     }
 
     void CubeImage::TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout)
@@ -461,6 +516,39 @@ namespace ElecNeko
 
         m_vkImageLayout = newLayout;
     }
+
+    void CubeImage::TransitionMipLayout(VkCommandBuffer cmdBuffer, int mip, VkImageLayout newLayout)
+    {
+        if (mip < 0 || mip >= m_mipLevels)
+        {
+            return;
+        }
+
+        VkImageMemoryBarrier barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = m_mipLayouts[mip];
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = m_vkImage;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = mip;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 6;
+
+        LayoutBarrierInfo srcInfo = GetStageAccessForLayout(m_mipLayouts[mip]);
+        LayoutBarrierInfo dstInfo = GetStageAccessForLayout(newLayout);
+        barrier.srcAccessMask = srcInfo.access;
+        barrier.dstAccessMask = dstInfo.access;
+        VkPipelineStageFlags sourceStage = srcInfo.stage;
+        VkPipelineStageFlags destinationStage = dstInfo.stage;
+
+        vkCmdPipelineBarrier(cmdBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        m_mipLayouts[mip] = newLayout;
+    }
+
 
     bool ArrayImage::Create(DeviceContext *device, const CreateParms_t &parms)
     {
