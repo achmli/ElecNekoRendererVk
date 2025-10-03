@@ -3,6 +3,7 @@
 //
 #include "FrameBuffer.h"
 #include <assert.h>
+#include <iostream>
 #include <stdio.h>
 #include "../Fileio.h"
 
@@ -349,6 +350,7 @@ namespace ElecNeko
         m_imageAlbedo.Cleanup(device);
         m_imageMaterial.Cleanup(device);
         m_imageNormal.Cleanup(device);
+        m_imageLinearDepth.Cleanup(device);
         m_imageDepth.Cleanup(device);
 
         if (m_vkFrameBuffer != VK_NULL_HANDLE)
@@ -420,6 +422,23 @@ namespace ElecNeko
         }
         imageViews.push_back(m_imageMaterial.m_vkImageView);
 
+        // linear depth
+        {
+            Image::CreateParms_t p = {};
+            p.width = m_parms.width;
+            p.height = m_parms.height;
+            p.depth = 1;
+            p.format = VK_FORMAT_R16_SFLOAT;
+            p.usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            if (!m_imageLinearDepth.Create(device, p))
+            {
+                std::cerr << "Failed to create linear depth image\n";
+                assert(0);
+                return false;
+            }
+        }
+        imageViews.push_back(m_imageLinearDepth.m_vkImageView);
+
         // depth
         {
             Image::CreateParms_t p = {};
@@ -468,7 +487,7 @@ namespace ElecNeko
     bool GFrameBuffer::CreateRenderPass(DeviceContext *device)
     {
         // attachments: albedo, normal, material, depth
-        VkAttachmentDescription attachments[4] = {};
+        VkAttachmentDescription attachments[5] = {};
 
         // create albedo attachment descriptions
         attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -500,18 +519,28 @@ namespace ElecNeko
         attachments[2].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachments[2].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        // create depth attachment descriptions
-        attachments[3].format = DEPTH_FORMAT;
+        // create linear depth attachment descriptions
+        attachments[3].format = VK_FORMAT_R16_SFLOAT;
         attachments[3].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         attachments[3].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         attachments[3].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[3].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachments[3].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        // create depth attachment descriptions
+        attachments[4].format = DEPTH_FORMAT;
+        attachments[4].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[4].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[4].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
         // attachment references for subpass
-        VkAttachmentReference colorAttachmentRefs[3] = {};
+        VkAttachmentReference colorAttachmentRefs[4] = {};
 
         colorAttachmentRefs[0].attachment = 0;
         colorAttachmentRefs[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -522,13 +551,16 @@ namespace ElecNeko
         colorAttachmentRefs[2].attachment = 2;
         colorAttachmentRefs[2].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+        colorAttachmentRefs[3].attachment = 3;
+        colorAttachmentRefs[3].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
         VkAttachmentReference depthAttachmentRef = {};
-        depthAttachmentRef.attachment = 3;
+        depthAttachmentRef.attachment = 4;
         depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
         VkSubpassDescription subpass = {};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpass.colorAttachmentCount = 3;
+        subpass.colorAttachmentCount = 4;
         subpass.pColorAttachments = colorAttachmentRefs;
         subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
@@ -552,7 +584,7 @@ namespace ElecNeko
 
         VkRenderPassCreateInfo rpInfo = {};
         rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        rpInfo.attachmentCount = 4;
+        rpInfo.attachmentCount = 5;
         rpInfo.pAttachments = attachments;
         rpInfo.subpassCount = 1;
         rpInfo.pSubpasses = &subpass;
@@ -593,6 +625,11 @@ namespace ElecNeko
         {
             VkClearValue clearValue = {};
             clearValue.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+            clearValues.push_back(clearValue);
+        }
+        {
+            VkClearValue clearValue = {};
+            clearValue.color = {{1000.f, 0.0f, 0.0f, 0.0f}};
             clearValues.push_back(clearValue);
         }
         {

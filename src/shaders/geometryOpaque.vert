@@ -22,6 +22,7 @@ layout(location = 4) in uint inModelMatrixIdx;
 layout(location = 0) out vec3 worldNormal;
 layout(location = 1) out vec2 texCoords;
 layout(location = 2) flat out uint materialIdx;
+layout(location = 3) out vec3 viewPos;
 
 void main(){
     mat4 model;
@@ -33,5 +34,8 @@ void main(){
     texCoords = inTexCoord;
     materialIdx = inMaterialIdx;
 
-    gl_Position = camera.proj * camera.view * model * vec4(inPosition, 1.0);
+    vec4 viewPos4 = camera.view * model * vec4(inPosition, 1.0);
+    viewPos = viewPos4.xyz;
+
+    gl_Position = camera.proj * viewPos4;
 }

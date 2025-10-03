@@ -466,7 +466,7 @@ namespace ElecNeko
         }
 
         // alpha cutoff
-        float alphaCutoff = 0.f;
+        float alphaCutoff = 0.5f;
         if (aim->Get(AI_MATKEY_GLTF_ALPHACUTOFF, alphaCutoff) == AI_SUCCESS)
         {
             mat.alphaCutoff = alphaCutoff;
@@ -586,7 +586,7 @@ namespace ElecNeko
             {
                 mat.alphaMode = AlphaMode::Blend;
             }
-            else if (mat.alphaCutoff < 0.999f)
+            else if (mat.alphaCutoff < (1.f - 1e-4f))
             {
                 mat.alphaMode = AlphaMode::Mask;
             }
@@ -1310,7 +1310,7 @@ namespace ElecNeko
                     continue;
                 }
             }
-            if (token == "gltf")
+            if (token == "gltf" || token == "obj")
             {
                 auto block = ReadBlock(ifs, t);
                 std::string fileTok;

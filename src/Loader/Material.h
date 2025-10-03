@@ -96,7 +96,7 @@ namespace ElecNeko
 
             opacity = 1.f;
             alphaMode = AlphaMode::Opaque;
-            alphaCutoff = 0.f;
+            alphaCutoff = 0.5f;
             padding1 = 0.f;
         }
 

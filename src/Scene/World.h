@@ -65,7 +65,7 @@ namespace ElecNeko
         int LoadMeshGeometryOnly(DeviceContext *device, const std::string &filename);
         int LoadMeshWithMaterials(DeviceContext *device, const std::string &filename, Mat4 transMat);
 
-        void AddCamera(Vec3 eye, Vec3 lookAt, float fov, float aspecRatio = (9.f / 16.f), float zNear = .1f, float zFar = 100.f);
+        void AddCamera(Vec3 eye, Vec3 lookAt, float fov, float aspecRatio = (9.f / 16.f), float zNear = .1f, float zFar = 1000.f);
 
         int EnsureTextureCached(DeviceContext *device, const std::string &filename);
 

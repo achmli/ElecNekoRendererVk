@@ -40,6 +40,8 @@ public:
     void TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
     void TransitionLayoutEN(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
 
+    bool ReadPixelRGToCPU(DeviceContext *device, float out[2]);
+
     CreateParms_t m_parms;
     VkImage m_vkImage;
     VkImageView m_vkImageView;

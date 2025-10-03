@@ -2,3 +2,4 @@
 * text=auto
 thirdParty/shaderc/lib/shaderc_combined.lib filter=lfs diff=lfs merge=lfs -text
 thirdParty/shaderc/lib/SPIRV-Tools-opt.lib filter=lfs diff=lfs merge=lfs -text
+res/scenes/rungholt/rungholt.obj filter=lfs diff=lfs merge=lfs -text

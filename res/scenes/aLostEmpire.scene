@@ -1,0 +1,23 @@
+renderer
+{
+	resolution 1280 720
+	windowresolution 1280 720
+	maxdepth 2
+	tilewidth 256
+	tileheight 144
+	envmapfile HDR/san_giuseppe_bridge_blurred.hdr
+	envmapintensity 2.0
+	#independentrendersize true
+}
+
+camera
+{
+	position 16.4741096 45.4231529 51.8900452
+	lookat 0.3466573 11.385169 -40.7453747
+	fov 80
+}
+
+obj
+{
+	file lost_empire/lost_empire.obj
+}

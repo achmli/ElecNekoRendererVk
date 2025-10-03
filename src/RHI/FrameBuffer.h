@@ -69,6 +69,7 @@ namespace ElecNeko
         Image m_imageNormal;
         Image m_imageAlbedo;
         Image m_imageMaterial;
+        Image m_imageLinearDepth;
         Image m_imageDepth;
 
         VkFramebuffer m_vkFrameBuffer = VK_NULL_HANDLE;

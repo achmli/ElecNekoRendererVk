@@ -1,0 +1,69 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0, rg32f) uniform writeonly image2D outImage;
+layout(binding = 1) uniform sampler2D uDepth;
+
+shared float smin[256];
+shared float smax[256];
+
+const float LARGE_POS = 1000.0;
+const float LARGE_NEG = -1000.0;
+
+void main()
+{
+    ivec2 localID = ivec2(gl_LocalInvocationID.xy);
+    uint lidx = gl_LocalInvocationIndex;
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+
+    ivec2 imgSize = textureSize(uDepth, 0);
+    float d;
+    if (gid.x >= imgSize.x || gid.y >= imgSize.y)
+    {
+        d = LARGE_POS;
+        smax[lidx] = LARGE_NEG;
+    }
+    else
+    {
+        d=texelFetch(uDepth, gid, 0).r;
+        smax[lidx] = d;
+    }
+    smin[lidx] = d;
+
+    memoryBarrierShared();
+    barrier();
+
+    uint stride = (gl_WorkGroupSize.x * gl_WorkGroupSize.y) / 2u;
+    while (stride > 0u)
+    {
+        if (lidx < stride)
+        {
+            float a = smin[lidx];
+            float b = smin[lidx + stride];
+
+            smin[lidx]=min(a, b);
+
+            float ca = smax[lidx];
+            float cb = smax[lidx];
+            if (ca < 9999.9999 && cb< 9999.9999)
+            {
+                smax[lidx] = max(ca, cb);
+            }
+            else
+            {
+                smax[lidx] = min(ca, cb);
+            }
+        }
+        memoryBarrierShared();
+        barrier();
+        stride >>= 1u;
+    }
+
+    if (lidx == 0u)
+    {
+        ivec2 outCoord = ivec2(gl_WorkGroupID.xy);
+        vec2 v = vec2(smin[0], smax[0]);
+        imageStore(outImage, outCoord, vec4(v, 0.0, 0.0));
+    }
+}

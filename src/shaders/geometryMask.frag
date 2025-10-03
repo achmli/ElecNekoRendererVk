@@ -3,6 +3,7 @@
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outMaterial;
+layout(location = 3) out vec4 outLinearDepth;
 
 struct Material {
     vec3 baseColor;
@@ -48,7 +49,8 @@ layout(binding = 3) uniform sampler2DArray textureArray;
 
 layout(location = 0) in vec3 worldNormal;
 layout(location = 1) in vec2 uv;
-layout(location = 2) in flat int materialId;
+layout(location = 2) flat in int materialId;
+layout(location = 3) in vec3 inViewPos;
 
 vec3 GetNormalFromMap(vec3 n, vec3 nm) {
     nm = nm * 2.0 - 1.0;
@@ -102,4 +104,5 @@ void main() {
     outColor = vec4(albedo, opacity);
     outNormal = vec4(N, 0.0);
     outMaterial = vec4(metallic, roughness, specTrans, anisotropic);
+    outLinearDepth = vec4(-inViewPos.z, 0.0, 0.0, 0.0);
 }

@@ -33,6 +33,50 @@ namespace ElecNeko
                 return {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
         }
     }
+
+    static float HalfToFloat(uint16_t h)
+    {
+        uint32_t sign = (h & 0x8000u) << 16;
+        uint32_t exp = (h & 0x7c00u) >> 10;
+        uint32_t mant = (h & 0x03ffu);
+
+        uint32_t outBits = 0;
+
+        if (exp == 0u)
+        {
+            if (mant == 0u)
+            {
+                outBits = sign;
+            }
+            else
+            {
+                int32_t e = -14;
+                while ((mant & 0x0400u) == 0u)
+                {
+                    mant <<= 1;
+                    e -= 1;
+                }
+
+                mant &= 0x03ffu;
+                uint32_t exp32 = static_cast<uint32_t>(e + 127);
+                outBits = sign | (exp32 << 23) | (mant << 13);
+            }
+        }
+        else if (exp == 0x1fu)
+        {
+            uint32_t exp32 = 0xffu;
+            outBits = sign | (exp32 << 23) | (mant << 13);
+        }
+        else
+        {
+            uint32_t exp32 = exp + (127 - 15);
+            outBits = sign | (exp32 << 23) | (mant << 13);
+        }
+
+        float result;
+        memcpy(&result, &outBits, sizeof(result));
+        return result;
+    }
 } // namespace ElecNeko
 
 /*
@@ -60,11 +104,11 @@ bool Image::Create(DeviceContext *device, const CreateParms_t &parms)
 
     VkImageCreateInfo image = {};
     image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image.imageType = VK_IMAGE_TYPE_1D;
-    if (m_parms.height > 1)
-    {
-        image.imageType = VK_IMAGE_TYPE_2D;
-    }
+    // image.imageType = VK_IMAGE_TYPE_1D;
+    // if (m_parms.height > 1)
+    //{
+    image.imageType = VK_IMAGE_TYPE_2D;
+    //}
     if (m_parms.depth > 1)
     {
         image.imageType = VK_IMAGE_TYPE_3D;
@@ -129,11 +173,11 @@ bool Image::Create(DeviceContext *device, const CreateParms_t &parms)
 
     VkImageViewCreateInfo imageView = {};
     imageView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    imageView.viewType = VK_IMAGE_VIEW_TYPE_1D;
-    if (m_parms.height > 1)
-    {
-        imageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    }
+    // imageView.viewType = VK_IMAGE_VIEW_TYPE_1D;
+    // if (m_parms.height > 1)
+    //{
+    imageView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    //}
     if (m_parms.depth > 1)
     {
         imageView.viewType = VK_IMAGE_VIEW_TYPE_3D;
@@ -316,6 +360,177 @@ void Image::TransitionLayoutEN(VkCommandBuffer cmdBuffer, VkImageLayout newLayou
 
     m_vkImageLayout = newLayout;
 }
+
+bool Image::ReadPixelRGToCPU(DeviceContext *device, float out[2])
+{
+    if (!device || m_vkImage == VK_NULL_HANDLE)
+    {
+        return false;
+    }
+
+    const uint32_t width = static_cast<uint32_t>(m_parms.width);
+    const uint32_t height = static_cast<uint32_t>(m_parms.height);
+    if (width == 0 || height == 0)
+    {
+        return false;
+    }
+
+    VkFormat fmt = m_parms.format;
+    VkDeviceSize pixelBytes = 0;
+    bool isHalf = false;
+
+    if (fmt == VK_FORMAT_R32G32_SFLOAT)
+    {
+        pixelBytes = 2 * sizeof(float);
+    }
+    else if (fmt == VK_FORMAT_R16G16_SFLOAT)
+    {
+        pixelBytes = 2 * sizeof(uint16_t);
+        isHalf = true;
+    }
+    else
+    {
+        return false;
+    }
+
+    VkDevice dev = device->m_vkDevice;
+    VkDeviceSize bufSize = pixelBytes * static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height);
+
+    // create staging buffer
+    VkBufferCreateInfo bufCI{};
+    bufCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufCI.size = bufSize;
+    bufCI.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VkBuffer stagingBuf = VK_NULL_HANDLE;
+    if (vkCreateBuffer(dev, &bufCI, nullptr, &stagingBuf) != VK_SUCCESS)
+    {
+        return false;
+    }
+
+    VkMemoryRequirements memReq = {};
+    vkGetBufferMemoryRequirements(dev, stagingBuf, &memReq);
+
+    VkMemoryAllocateInfo alloc = {};
+    alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc.allocationSize = memReq.size;
+    alloc.memoryTypeIndex = device->FindMemoryTypeIndex(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    VkDeviceMemory stagingMem = VK_NULL_HANDLE;
+    if (vkAllocateMemory(dev, &alloc, nullptr, &stagingMem) != VK_SUCCESS)
+    {
+        vkDestroyBuffer(dev, stagingBuf, nullptr);
+        return false;
+    }
+
+    vkBindBufferMemory(dev, stagingBuf, stagingMem, 0);
+
+    // record commands
+    VkCommandBuffer cmd = device->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+
+    vkResetCommandBuffer(cmd, 0);
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmd, &beginInfo);
+
+    // image barrier
+    VkImageMemoryBarrier barrierToCopy = {};
+    barrierToCopy.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrierToCopy.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrierToCopy.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrierToCopy.image = m_vkImage;
+    barrierToCopy.subresourceRange.baseMipLevel = 0;
+    barrierToCopy.subresourceRange.levelCount = 1;
+    barrierToCopy.subresourceRange.baseArrayLayer = 0;
+    barrierToCopy.subresourceRange.layerCount = 1;
+    barrierToCopy.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    VkImageLayout oldLayout = m_vkImageLayout;
+    if (oldLayout == (VkImageLayout) 0)
+    {
+        oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    }
+    barrierToCopy.oldLayout = oldLayout;
+    barrierToCopy.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
+    barrierToCopy.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_NONE;
+    barrierToCopy.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrierToCopy);
+
+    // copy region
+    VkBufferImageCopy region = {};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {width, height, 1};
+
+    vkCmdCopyImageToBuffer(cmd, m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuf, 1, &region);
+
+    // barrier back to original layout
+    VkImageMemoryBarrier barrierBack = barrierToCopy;
+    barrierBack.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    barrierBack.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    barrierBack.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrierBack.newLayout = oldLayout;
+
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrierBack);
+
+    vkEndCommandBuffer(cmd);
+
+    // submit and wait
+    VkFenceCreateInfo fci = {};
+    fci.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    VkFence fence = VK_NULL_HANDLE;
+    vkCreateFence(dev, &fci, nullptr, &fence);
+
+    VkSubmitInfo submit = {};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &cmd;
+
+    vkQueueSubmit(device->m_vkGraphicsQueue, 1, &submit, fence);
+    vkWaitForFences(dev, 1, &fence, VK_TRUE, UINT64_MAX);
+
+    // map staging and read
+    void *mapped = nullptr;
+    vkMapMemory(dev, stagingMem, 0, bufSize, 0, &mapped);
+
+    if (isHalf)
+    {
+        uint16_t *h = reinterpret_cast<uint16_t *>(mapped);
+        float f0 = ElecNeko::HalfToFloat(h[0]);
+        float f1 = ElecNeko::HalfToFloat(h[1]);
+        out[0] = f0;
+        out[1] = f1;
+    }
+    else
+    {
+        float *f = reinterpret_cast<float *>(mapped);
+        out[0] = f[0];
+        out[1] = f[1];
+    }
+
+    vkUnmapMemory(dev, stagingMem);
+
+    // clean up
+    vkDestroyFence(dev, fence, nullptr);
+    vkFreeCommandBuffers(dev, device->m_vkCommandPool, 1, &cmd);
+    vkDestroyBuffer(dev, stagingBuf, nullptr);
+    vkFreeMemory(dev, stagingMem, nullptr);
+
+    m_vkImageLayout = oldLayout;
+
+    return true;
+}
+
 
 namespace ElecNeko
 {

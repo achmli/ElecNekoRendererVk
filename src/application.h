@@ -23,6 +23,7 @@
 
 #include "Loader/Mesh.h"
 
+#include "Scene/CascadedShadow.h"
 #include "Scene/SkyBox.h"
 #include "Scene/World.h"
 
@@ -116,6 +117,7 @@ private:
     // ElecNeko::Camera m_camera;
     ElecNeko::OrthoCamera m_shadowCamera;
     // ElecNeko::Camera m_shadowCam;
+    ElecNeko::CascadeShadow m_csm;
 
     ElecNeko::RenderOption renderOption;
 

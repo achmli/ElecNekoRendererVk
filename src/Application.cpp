@@ -179,6 +179,8 @@ void Application::Initialize()
     m_shadowCamera.Initialize(world->m_cam->position + Vec3(renderOption.sunDirection) * 10, world->m_cam->position, static_cast<float>(WINDOW_WIDTH),
                               static_cast<float>(WINDOW_HEIGHT), 25, 175);
 
+    m_csm.Initialize(&m_deviceContext);
+
     m_mousePosition = Vec2(0, 0);
 
     m_isPaused = true;
@@ -499,6 +501,8 @@ void Application::Cleanup()
 
     world->LightClean(&m_deviceContext);
     delete world;
+
+    m_csm.Cleanup(&m_deviceContext);
 
     // Delete Uniform Buffer Memory
     m_uniformBuffer.Cleanup(&m_deviceContext);
@@ -957,6 +961,8 @@ void Application::UpdateUniforms()
 
             // update offset into the buffer
             uboByteOffset += m_deviceContext.GetAligendUniformByteOffset(sizeof(camera));
+
+            m_csm.UpdateMainView(camera.matView, camera.invView, world->m_cam->fov);
         }
 
         //
@@ -1113,7 +1119,7 @@ void Application::DrawFrame()
     // Draw everything in an offscreen buffer
     // DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
     // ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes, renderOption);
-    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_scene, renderOption);
+    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_scene, renderOption, m_csm);
     //
     //	Draw the offscreen framebuffer to the swap chain frame buffer
     //
@@ -1290,6 +1296,15 @@ void Application::DrawFrame()
         {
             ImGui::Checkbox("Use Ambient Occlusion", &renderOption.useAO);
             ImGui::Checkbox("Use Contact Shadow", &renderOption.useCT);
+        }
+
+        if (ImGui::CollapsingHeader("Shadow"))
+        {
+            ImGui::SliderFloat("uniform to logarithmic", &m_csm.lambda, 0.0, 1.0);
+            ImGui::SliderFloat("kNear", &m_csm.mergeN, 0.5f, 10.0f);
+            ImGui::SliderFloat("kFar", &m_csm.mergeF, 0.5f, 10.0f);
+            ImGui::Checkbox("Visualize Cascade", &m_csm.visualizeCascade);
+            ImGui::Checkbox("Stabilize Shadow", &m_csm.stabilizeTexels);
         }
 
         ImGui::End();

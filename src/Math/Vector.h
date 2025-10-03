@@ -2,6 +2,7 @@
 //	Vector.h
 //
 #pragma once
+#include <algorithm>
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -218,6 +219,7 @@ public:
     const Vec3 &operator/=(const float rhs);
     float operator[](const int idx) const;
     float &operator[](const int idx);
+    Vec3 operator-() const;
 
     void Zero()
     {
@@ -234,6 +236,9 @@ public:
     float GetLengthSqr() const { return Dot(*this); }
     bool IsValid() const;
     void GetOrtho(Vec3 &u, Vec3 &v) const;
+
+    static Vec3 ElecNekoMin(const Vec3 &a, const Vec3 &b);
+    static Vec3 ElecNekoMax(const Vec3 &a, const Vec3 &b);
 
     const float *ToPtr() const { return &x; }
 
@@ -379,6 +384,8 @@ inline float &Vec3::operator[](const int idx)
     return (&x)[idx];
 }
 
+inline Vec3 Vec3::operator-() const { return Vec3(-x, -y, -z); }
+
 inline Vec3 Vec3::Cross(const Vec3 &rhs) const
 {
     // This cross product is A x B, where this is A and rhs is B
@@ -451,6 +458,24 @@ inline void Vec3::GetOrtho(Vec3 &u, Vec3 &v) const
     v.Normalize();
     u = v.Cross(n);
     u.Normalize();
+}
+
+inline Vec3 Vec3::ElecNekoMin(const Vec3 &a, const Vec3 &b)
+{
+    Vec3 ret;
+    ret.x = std::min(a.x, b.x);
+    ret.y = std::min(a.y, b.y);
+    ret.z = std::min(a.z, b.z);
+    return ret;
+}
+
+inline Vec3 Vec3::ElecNekoMax(const Vec3 &a, const Vec3 &b)
+{
+    Vec3 ret;
+    ret.x = std::max(a.x, b.x);
+    ret.y = std::max(a.y, b.y);
+    ret.z = std::max(a.z, b.z);
+    return ret;
 }
 
 /*

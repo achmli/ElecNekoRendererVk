@@ -92,7 +92,7 @@ void main()
     uint py = gid.y;
     uint face = gl_WorkGroupID.z;
 
-    if (px>512 || py>512 || face>5) {
+    if (px > 512 || py > 512 || face > 5) {
         return;
     }
 
