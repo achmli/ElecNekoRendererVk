@@ -29,9 +29,12 @@ file(GLOB_RECURSE SHADER_FILES
         CONFIGURE_DEPENDS
         ${SOURCE_ROOT}/shaders/*.glsl
         ${SOURCE_ROOT}/shaders/*.hlsl
-)
+        ${SOURCE_ROOT}/shaders/*.frag
+        ${SOURCE_ROOT}/shaders/*.vert
+        ${SOURCE_ROOT}/shaders/*.comp
+        )
 
-set(SRCS ${SRC_FILES} ${SHADERS_FILES})
+set(SRCS ${SRC_FILES} ${SHADER_FILES})
 
 if (MSVC)
     foreach (f ${SRCS})

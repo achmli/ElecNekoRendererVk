@@ -1,0 +1,110 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(std140, binding = 0) uniform uCamera
+{
+    mat4 view;
+    mat4 proj;
+    mat4 viewNoTrans;
+    mat4 invView;
+    mat4 invProj;
+} camera;
+
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outComposite;
+
+layout(set = 0, binding = 2) uniform sampler2D uLit;
+layout(set = 0, binding = 3) uniform sampler2D uSpecular;
+layout(set = 0, binding = 4) uniform sampler2D uSSR;
+layout(set = 0, binding = 5) uniform sampler2D uMaterial;
+layout(set = 0, binding = 6) uniform sampler2D uLinearDepth;
+layout(set = 0, binding = 7) uniform sampler2D uNormal;
+layout(set = 0, binding = 8) uniform sampler2D uAlbedo;
+
+layout(push_constant) uniform PC
+{
+    int width;
+    int height;
+    float ssrStrength;
+    float envIntensity;
+} pc;
+
+vec3 reconstructViewDir(vec2 uv)
+{
+    vec2 ndc = uv * 2.0 - 1.0;
+    vec4 clip = vec4(ndc, 1.0, 1.0);
+    vec4 v = camera.invProj * clip;
+    return normalize(v.xyz);
+}
+
+vec3 viewToWorldDir(vec3 dir)
+{
+    return normalize((camera.invView * vec4(dir, 0.0)).xyz);
+}
+
+vec3 FresnelF0(vec3 albedo, float metallic)
+{
+    return mix(vec3(0.04), albedo, metallic);
+}
+
+vec3 F_Schlick(float VdotH, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
+}
+
+void main()
+{
+    ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pix, ivec2(pc.width, pc.height))))
+    {
+        return;
+    }
+
+    vec2 uv = (vec2(pix) + 0.5) / vec2(pc.width, pc.height);
+
+    vec3 diffuse = texture(uLit, uv).rgb;
+    vec3 specular = texture(uSpecular, uv).rgb;
+    vec4 ssr = texture(uSSR, uv);
+    vec3 ssrRGB = ssr.rgb;
+    float hitConf = ssr.a;
+
+    vec4 mat = texture(uMaterial, uv);
+    float metallic = clamp(mat.r, 0.0, 1.0);
+    float roughness = clamp(mat.g, 0.04, 1.0);
+    vec3 N_view = normalize(texture(uNormal, uv).xyz);
+    vec3 V_view = normalize(-reconstructViewDir(uv));
+    float NdotV = max(dot(N_view, V_view), 0.0);
+
+    // vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    vec3 albedo = texture(uAlbedo, uv).rgb;
+    vec3 F0 = FresnelF0(albedo, metallic);
+
+    vec3 F = F_Schlick(NdotV, F0);
+    float F_lum=dot(F, vec3(0.2126, 0.7152, 0.0722));
+
+    float gloss = (1.0 - roughness);
+
+    float w = 1.0 / float(pc.width);
+    float h = 1.0 / float(pc.height);
+    float dC = texture(uLinearDepth, uv).r;
+    float dR = texture(uLinearDepth, uv + vec2(w, 0.0)).r;
+    float dU = texture(uLinearDepth, uv + vec2(0.0, h)).r;
+    float edgeMag = max(abs(dC - dR), abs(dC - dU));
+    float edgeFade = clamp(1.0 - smoothstep(0.01, 0.02, edgeMag), 0.0, 1.0);
+
+    float ssrWeight = hitConf * pc.ssrStrength * gloss * hitConf * edgeFade;
+    ssrWeight = ssrWeight * (1.0 - F_lum * 0.5);
+    ssrWeight = clamp(ssrWeight, 0.0, 1.0);
+
+    vec3 specularFinal = mix(specular, ssrRGB, ssrWeight);
+
+    if (hitConf < 0.2)
+    {
+        specularFinal *= pc.envIntensity;
+    }
+
+    vec3 color = diffuse + specularFinal;
+    imageStore(outComposite, pix, vec4(color, 1.0));
+    //    vec3 dbg = vec3(hitConf);// hitConf 从 uSSR.a
+    //    imageStore(outComposite, pix, vec4(dbg, 1.0));
+    //    return;
+}

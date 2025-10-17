@@ -42,6 +42,16 @@ namespace ElecNeko
             chiParmH = 0.75f;
             thetaFixI = 0.1f;
             Lm = 1.5f;
+
+            // ssr
+            maxSSRSteps = 64;
+            maxSSRDistance = 10.f;
+            strideSSRScale = 0.5f;
+            thicknessSSR = 0.012f;
+            binarySearchSSRIters = 3;
+            roughnessSSREnabled = 0.7f;
+            ssrStrength = 1.0f;
+            envIntensity = 0.1f;
         }
 
         bool skyBox;
@@ -73,5 +83,15 @@ namespace ElecNeko
         float chiParmH;
         float thetaFixI;
         float Lm;
+
+        // ssr
+        int maxSSRSteps;
+        float maxSSRDistance;
+        float strideSSRScale;
+        float thicknessSSR;
+        int binarySearchSSRIters;
+        float roughnessSSREnabled;
+        float ssrStrength;
+        float envIntensity;
     };
 } // namespace ElecNeko

@@ -1,0 +1,108 @@
+renderer
+{
+	resolution 1280 720
+	windowresolution 1280 720
+	maxdepth 2
+	tilewidth 256
+	tileheight 144
+	envmapfile HDR/san_giuseppe_bridge_blurred.hdr
+	envmapintensity 2.0
+	#independentrendersize true
+}
+
+camera
+{
+	position 0.0 1.6 10.0
+	lookat 0.0 1.0 -4.0
+	fov 60
+}
+
+material ground
+{
+    color 1.0 1.0 1.0
+    metallic 0.0
+    roughness 0.6
+}
+
+material mirror_ball
+{
+    color 0.95 0.95 0.95
+    metallic 1.0
+    roughness 0.0
+}
+
+material rough_ball
+{
+    color 0.8 0.5 0.4
+    metallic 0.0
+    roughness 0.45
+}
+
+material slippery_cube
+{
+    color 0.9 0.9 0.9
+    metallic 0.0
+    roughness 0.05
+}
+
+material thin_cube
+{
+    color 0.4 0.4 0.4
+    metallic 0.0
+    roughness 0.9
+}
+
+material back_wall
+{
+    color 0.98 0.98 0.98
+    metallic 1.0
+    roughness 0.05
+}
+
+mesh
+{
+    file ssr_test/unit_plane.obj
+    material ground
+    position 0.0 0.0 0.0
+    scale 50.0 50.0 1.0
+    rotation -0.7071 0.0 0.0 0.7071
+}
+
+mesh
+{
+    file ssr_test/orange.obj
+    material mirror_ball
+    position -2.0 1.0 -4.0
+    scale 0.5 0.5 0.5
+}
+
+mesh
+{
+    file ssr_test/orange.obj
+    material rough_ball
+    position 2.0 1.0 -4.0
+    scale 0.5 0.5 0.5
+}
+
+mesh
+{
+    file ssr_test/unit_cube.obj
+    material slippery_cube
+    position 0.0 0.5 -2.0
+}
+
+mesh
+{
+    file ssr_test/unit_cube.obj
+    material thin_cube
+    position 0.5 1.0 -3.0
+    scale 0.001 2.0 2.0
+}
+
+mesh
+{
+    file ssr_test/unit_plane.obj
+    material back_wall
+    position 0.0 0.0 -10.0
+    scale 20.0 10.0 1.0
+}

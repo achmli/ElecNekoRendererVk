@@ -21,7 +21,7 @@ layout(set = 0, binding = 3) uniform samplerCube uEnvMap;
 layout(set = 0, binding = 4) uniform sampler2D uAlbedo;
 layout(set = 0, binding = 5) uniform sampler2D uNormal;
 layout(set = 0, binding = 6) uniform sampler2D uMaterial;
-layout(set = 0, binding = 7) uniform sampler2D uDepth;
+layout(set = 0, binding = 7) uniform sampler2D uLinearDepth;
 
 layout(push_constant) uniform PC
 {
@@ -34,11 +34,20 @@ layout(push_constant) uniform PC
     int binaryIters;
     float roughnessThreshold;
     float prefilterMaxMip;
-    int useLinearDepth;
 } pc;
 
-const float EPS = 1e-5;
+const float EPS = 1e-6;
+const float DEPTH_INVALID = 1e6;
 const float PI = 3.14159265359;
+
+vec3 reconstructViewDir(vec2 uv)
+{
+    vec2 ndcxy = uv * 2.0 - 1.0;
+    vec4 clip = vec4(ndcxy, 1.0, 1.0);
+    vec4 v = camera.invProj * clip;
+    vec3 dir = normalize(v.xyz);
+    return dir;
+}
 
 // reconstruct view space position from screen uv and non-linear depth (vulkan depth 0..1)
 vec3 reconstructViewPosition(vec2 uv, float depth)
@@ -50,6 +59,12 @@ vec3 reconstructViewPosition(vec2 uv, float depth)
     vec4 viewPos = camera.invProj * clip;
     viewPos /= viewPos.w;
     return viewPos.xyz;
+}
+
+vec3 reconstructViewPositionLinear(vec2 uv, float linearDepth)
+{
+    vec3 dir = reconstructViewDir(uv);
+    return dir * linearDepth;
 }
 
 // project view space position to screen uv and view space z
@@ -67,20 +82,28 @@ vec3 projectViewPosToScreenUV(vec3 viewPos)
     return vec3(uv, viewDist);
 }
 
-// sample scene view space positive distance at given uv
-float sampleSceneViewDist(vec2 uv)
+float sampleSceneViewDistLinear(vec2 uv)
 {
-    if (any(lessThan(uv, vec2(0.0)))|| any(greaterThan(uv, vec2(1.0))))
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
     {
         return 1e6;
     }
-    float d=texture(uDepth, uv).r;
-    // reconstruct view space z
-    vec3 ndc = vec3(uv * 2.0 - 1.0, d);
-    vec4 clip = vec4(ndc, 1.0);
-    vec4 viewPos = camera.invProj * clip;
-    viewPos /= viewPos.w;
-    return -viewPos.z;
+    float linearDepth=texture(uLinearDepth, uv).r;
+    return linearDepth;
+}
+
+float sampleSceneViewDistLinearSafe(vec2 sUV)
+{
+    if (any(lessThan(sUV, vec2(0.0))) || any(greaterThan(sUV, vec2(1.0))))
+    {
+        return DEPTH_INVALID;
+    }
+    float ld = texture(uLinearDepth, sUV).r;
+    if (ld <= 0.0)
+    {
+        return DEPTH_INVALID;
+    }
+    return ld;
 }
 
 // sample color at uv from lit image
@@ -95,233 +118,192 @@ vec3 viewDirToWorld(vec3 dirView)
     return normalize((camera.invView * vec4(dirView, 0.0)).xyz);
 }
 
+vec3 sampleNormalView(vec2 sUV)
+{
+    vec3 nS = texture(uNormal, sUV).xyz;
+    vec3 n_view = normalize((camera.view * vec4(nS, 0.0)).xyz);
+    return n_view;
+}
+
 void main()
 {
     ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
-    if (any(greaterThan(pix, vec2(pc.width, pc.height))))
+    if (any(greaterThanEqual(pix, ivec2(pc.width, pc.height))))
     {
         return;
     }
 
     vec2 uv = (vec2(pix) + 0.5) / vec2(pc.width, pc.height);
 
-    // read depth
-    float depth = texture(uDepth, uv).r;
-    if (depth >= 0.99999)
+
+    float linearDepth = texture(uLinearDepth, uv).r;
+
+    if (linearDepth <= 0.0 || linearDepth >= 1000.f)
     {
-        //        vec3 ndc = vec3(uv * 2.0 - 1.0, 1.0);
-        //        vec4 clip = vec4(ndc, 1.0);
-        //        vec4 viewPos = camera.invProj * clip;
-        //        viewPos /= viewPos.w;
-        //        vec3 dirView = normalize(viewPos.xyz);
-        //        vec3 dirWorld = viewDirToWorld(viewPos.xyz);
-        //        vec3 env = textureLod(uEnvMap, dirWorld, 0.0).rgb;
-        //        imageStore(outSSR, pix, vec4(env, 0.0));
-        //        return;
-        vec3 env = texture(uLitMap, uv).rgb;
-        imageStore(outSSR, pix, vec4(env, 0.0));
+        vec3 dirView = reconstructViewDir(uv);
+        vec3 R_world = viewDirToWorld(dirView);
+        vec3 envCol = textureLod(uEnvMap, R_world, 0.0).rgb;
+        imageStore(outSSR, pix, vec4(envCol, 0.0));
         return;
     }
 
-    // reconstruct view space position & normal & material
-    vec3 viewPos = reconstructViewPosition(uv, depth);
-    vec3 nSample = texture(uNormal, uv).xyz;
-    vec3 nrm = normalize(nSample);
+    vec3 viewPos = reconstructViewPositionLinear(uv, linearDepth);
 
-    vec3 N_view = normalize((camera.view * vec4(nrm, 0.0)).xyz);
+    vec3 N = texture(uNormal, uv).xyz;
+    vec3 nrm = normalize(N);
 
-    // view vector in view space
-    vec3 V =normalize(-viewPos);
+    vec3 N_View = normalize((camera.view * vec4(nrm, 0.0)).xyz);
+
+    vec3 V = normalize(-viewPos);
     vec4 mat = texture(uMaterial, uv);
-    float roughness = clamp(mat.g, 0.04, 1.0);
+    float roughness = mat.g;
 
     if (roughness > pc.roughnessThreshold)
     {
-        vec3 env = texture(uLitMap, uv).rgb;
-        imageStore(outSSR, pix, vec4(env, 0.0));
+        vec3 R_world = viewDirToWorld(reflect(-V, N_View));
+        float mip = clamp(roughness, 0.0, 1.0) * pc.prefilterMaxMip;
+        vec3 envCol = textureLod(uEnvMap, R_world, mip).rgb;
+        imageStore(outSSR, pix, vec4(envCol, 0.0));
         return;
     }
 
-    // compute reflection direction in view space
-    vec3 R_view = normalize(reflect(V, N_view));
+    vec3 R_View = normalize(reflect(-V, N_View));
 
-    // initial ray march settings
-    //    float maxDist = pc.maxDistance;
-    //    int maxSteps = pc.maxSteps;
-    //    float thickness = pc.thickness;
-    //    int binaryIters = pc.binaryIters;
-    //
-    //    // compute a reasonable initial stride
-    //    // project one unit along R to screen to approximate pixel step size
-    //    vec3 proj1 = projectViewPosToScreenUV(viewPos + R_view * 1.0);
-    //    vec3 proj0 = projectViewPosToScreenUV(viewPos);
-    //    float pixelStep = 1.0;
-    //    if (proj1.z > 0.0 && proj0.z > 0.0)
+    float viewDist = -viewPos.z;
+    float minWorldStep = 0.02;
     //    {
-    //        vec2 dUV = proj1.xy -proj0.xy;
-    //        float duLen = length(dUV) * float(pc.width);
-    //        pixelStep = max(1.0, duLen);
-    //    }
+    //        vec3 p1 = viewPos + R_View * 0.05;
+    //        vec3 proj1 = projectViewPosToScreenUV(p1);
+    //        vec3 proj0 = projectViewPosToScreenUV(viewPos);
     //
-    //    float stride = max(0.5 * maxDist / float(maxSteps), 0.001) * pc.strideScale;
-    //
-    //    // start marching from a small offset to avoid self hit
-    //    float t =0.01;
-    //    bool hit = false;
-    //    float hitT = 0.0;
-    //    vec2 hitUV = vec2(0.0);
-    //
-    //    for (int i = 0; i < maxSteps && t < maxDist; ++i)
-    //    {
-    //        vec3 samplePos = viewPos + R_view * t;
-    //        vec3 proj = projectViewPosToScreenUV(samplePos);
-    //        if (proj.z < 0.0)
+    //        if (proj1.z > 0.0 && proj0.z > 0.0)
     //        {
-    //            t+=stride;
-    //            continue;
-    //        }
-    //        vec2 suv = proj.xy;
-    //        if (any(lessThan(suv, vec2(0.0))) || any(greaterThan(suv, vec2(1.0))))
-    //        {
-    //            t+=stride;
-    //            continue;
-    //        }
-    //
-    //        // scene distance at suv
-    //        float sceneDist = sampleSceneViewDist(suv);
-    //        float sampleDist = proj.z;
-    //
-    //        // if scene is closer than this sample point (with tolerance thickness), hit
-    //        if (sceneDist < sampleDist + thickness)
-    //        {
-    //            // hit found between previous tPrev and t
-    //            hit = true;
-    //            hitT = t;
-    //            hitUV = suv;
-    //            // refine with binary search
-    //            float t0 = max(0.0, t - stride);
-    //            float t1 = t;
-    //            for (int b = 0; b < binaryIters; ++b)
+    //            float pixelData = length((proj1.xy - proj0.xy) * vec2(pc.width, pc.height));
+    //            if (pixelData > EPS)
     //            {
-    //                float tm = 0.5 * (t0 + t1);
-    //                vec3 pm = viewPos + R_view * tm;
-    //                vec3 projm = projectViewPosToScreenUV(pm);
-    //                if (projm.z <= 0.0)
-    //                {
-    //                    t0 = tm;
-    //                    continue;
-    //                }
-    //                vec2 suvm = projm.xy;
-    //                float sceneDistm = sampleSceneViewDist(suvm);
-    //                float sampleDistm = projm.z;
-    //                if (sceneDistm < sampleDistm + thickness)
-    //                {
-    //                    t1 = tm;
-    //                }
-    //                else
-    //                {
-    //                    t0 = tm;
-    //                }
+    //                float scale = 1.0 / pixelData;
+    //                minWorldStep = clamp(scale * pc.strideScale, 0.01, 0.5);
     //            }
-    //
-    //            hitT = 0.5 * (t0 + t1);
-    //            vec3 pHit = viewPos + R_view * hitT;
-    //            vec3 projHit = projectViewPosToScreenUV(pHit);
-    //            hitUV = projHit.xy;
-    //            break;
     //        }
-    //        t += stride;
     //    }
-    // estimate a small world-space start offset to avoid self-hit
-    float minWorldStep = 0.02;// fallback
-    {
-        // try to estimate how many world units correspond to ~1 pixel
-        vec3 p1 = viewPos + R_view * 0.05;
-        vec3 proj1 = projectViewPosToScreenUV(p1);
-        vec3 proj0 = projectViewPosToScreenUV(viewPos);
-        if (proj1.z > 0.0 && proj0.z > 0.0) {
-            float pixelDelta = length((proj1.xy - proj0.xy) * vec2(pc.width, pc.height));
-            if (pixelDelta > 1e-6) {
-                float scale = 1.0 / pixelDelta;
-                minWorldStep = clamp(0.05 * scale, 0.005, 0.5);
-            } else {
-                minWorldStep = 0.02;
-            }
-        } else {
-            minWorldStep = 0.02;
-        }
-    }
-
-    // start a bit away from surface (must be < maxDist)
-    float t = max(0.01, minWorldStep);
-
-    // marching params
+    float t = minWorldStep;
     float maxDist = pc.maxDistance;
     int maxSteps = pc.maxSteps;
-    float thickness = pc.thickness;
+    float baseThickness = max(pc.thickness, 0.05);
     int binaryIters = pc.binaryIters;
     float stride = max(0.5 * maxDist / float(maxSteps), 0.001) * pc.strideScale;
 
-    // Pixel-space rejection radius to avoid sampling very near the original pixel
-    float rejectPixelRadius = 4.0;// try 1..4
+    float thickness = baseThickness + roughness * 0.05 + viewDist * 0.00015;
+
+    float rejectPixelRadius = clamp(roughness * 3.0 + 1.0, 1.0, 6.0);
 
     bool hit = false;
     float hitT = 0.0;
     vec2 hitUV = vec2(0.0);
 
-    for (int i = 0; i < maxSteps && t < maxDist; ++i)
+    for (int i = 0; i < maxSteps && t < maxDist; i++)
     {
-        vec3 samplePos = viewPos + R_view * t;
+        vec3 samplePos = viewPos + R_View * t;
         vec3 proj = projectViewPosToScreenUV(samplePos);
-        if (proj.z <= 0.0) { t += stride; continue; }
+        if (proj.z <= 0.0)
+        {
+            t += stride;
+            continue;
+        }
         vec2 suv = proj.xy;
-        if (suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) { t += stride; continue; }
-
-        // reject self-projection (pixel distance)
-        float pxDist = length((suv - uv) * vec2(pc.width, pc.height));
-        if (pxDist < rejectPixelRadius) {
+        if (any(lessThan(suv, vec2(0.0))) || any(greaterThan(suv, vec2(1.0))))
+        {
             t += stride;
             continue;
         }
 
-        // sample scene positive view-space distance at suv
-        float sceneDist = sampleSceneViewDist(suv);// positive distance (must match proj.z convention)
-        float sampleDist = proj.z;// positive distance
+        float sceneDist = sampleSceneViewDistLinearSafe(suv);
+        if (sceneDist == DEPTH_INVALID)
+        {
+            t += stride;
+            continue;
+        }
+        float sampleDist = proj.z;// weird but sampleDist means this sample ray's hit position, sceneDist means the sample from uLinearDepth
 
-        // conservative hit test: scene must be significantly closer than the sample
         if (sceneDist < sampleDist - thickness)
         {
-            // found a hit between t - stride and t -> binary refine
             float t0 = max(0.0, t - stride);
             float t1 = t;
             for (int b = 0; b < binaryIters; ++b)
             {
                 float tm = 0.5 * (t0 + t1);
-                vec3 pm = viewPos + R_view * tm;
-                vec3 projm = projectViewPosToScreenUV(pm);
-                if (projm.z <= 0.0) { t0 = tm; continue; }
-                vec2 suvm = projm.xy;
-                // avoid refining to a UV too close to original pixel
-                float pxDistm = length((suvm - uv) * vec2(pc.width, pc.height));
-                if (pxDistm < rejectPixelRadius) { t0 = tm; continue; }
-
-                float sceneDistm = sampleSceneViewDist(suvm);
-                float sampleDistm = projm.z;
-                if (sceneDistm < sampleDistm - thickness) {
+                vec3 midPos = viewPos + R_View * tm;
+                vec3 midProj = projectViewPosToScreenUV(midPos);
+                if (midProj.z <= 0.0)
+                {
+                    t0 = tm;
+                    continue;
+                }
+                vec2 muv = midProj.xy;
+                if (any(lessThan(muv, vec2(0.0))) || any(greaterThan(muv, vec2(1.0))))
+                {
+                    t0 = tm;
+                    continue;
+                }
+                float  pxDistm = length((muv - uv) * vec2(pc.width, pc.height));
+                if (pxDistm < max(rejectPixelRadius * 0.5, 1.0))
+                {
+                    t0 = tm;
+                    continue;
+                }
+                float midSceneDist = sampleSceneViewDistLinearSafe(muv);
+                if (midSceneDist == DEPTH_INVALID)
+                {
+                    t0 = tm;
+                    continue;
+                }
+                float midSampleDist = midProj.z;
+                if (midSceneDist < midSampleDist - thickness)
+                {
                     t1 = tm;
-                } else {
+                }
+                else
+                {
                     t0 = tm;
                 }
             }
-
             hitT = 0.5 * (t0 + t1);
-            vec3 pHit = viewPos + R_view * hitT;
+            vec3 pHit = viewPos + R_View * hitT;
             vec3 projHit = projectViewPosToScreenUV(pHit);
-            hitUV = projHit.xy;
-            hit = true;
-            break;
-        }
+            //            hitUV = projHit.xy;
+            //            hit = true;
+            //            break;
+            if (projHit.z > 0.0)
+            {
+                vec2 finalUV = projHit.xy;
 
+                float pxDist = length((finalUV - uv) * vec2(pc.width, pc.height));
+                if (pxDist < 1.0)
+                {
+                    t += stride;
+                    continue;
+                }
+
+                vec3 nHitView = sampleNormalView(finalUV);
+                float nDotR = dot(nHitView, -normalize(R_View));
+                if (nDotR < 0.3)
+                {
+                    t += stride;
+                    continue;
+                }
+
+                float sceneDistAtHit = sampleSceneViewDistLinearSafe(finalUV);
+                if (sceneDistAtHit == DEPTH_INVALID || sceneDistAtHit > viewDist + maxDist)
+                {
+                    t += stride;
+                    continue;
+                }
+
+                hitUV = finalUV;
+                hit = true;
+                break;
+            }
+        }
         t += stride;
     }
 
@@ -330,16 +312,14 @@ void main()
 
     if (hit)
     {
-        outColor =sampleSceneColor(hitUV);
-        hitMask=1.0;
+        outColor = sampleSceneColor(hitUV);
+        hitMask = 1.0;
     }
     else
     {
-        vec3 R_world = viewDirToWorld(R_view);
+        vec3 R_world = viewDirToWorld(R_View);
         float mip = clamp(roughness, 0.0, 1.0) * pc.prefilterMaxMip;
         outColor = textureLod(uEnvMap, R_world, mip).rgb;
-        hitMask = 0.0;
     }
-
     imageStore(outSSR, pix, vec4(outColor, hitMask));
 }

@@ -1307,8 +1307,19 @@ void Application::DrawFrame()
             ImGui::Checkbox("Stabilize Shadow", &m_csm.stabilizeTexels);
         }
 
-        ImGui::End();
+        if (ImGui::CollapsingHeader("SSR"))
+        {
+            ImGui::SliderInt("max steps", &renderOption.maxSSRSteps, 1, 256);
+            ImGui::SliderFloat("max distance", &renderOption.maxSSRDistance, 5.f, 200.f);
+            ImGui::SliderFloat("stride scale", &renderOption.strideSSRScale, 0.1f, 4.f);
+            ImGui::SliderFloat("thickness", &renderOption.thicknessSSR, 1e-4f, .2f);
+            ImGui::SliderInt("binary iterations", &renderOption.binarySearchSSRIters, 1, 8);
+            ImGui::SliderFloat("roughness threshold", &renderOption.roughnessSSREnabled, 0.f, 1.f);
+            ImGui::SliderFloat("SSR Strength", &renderOption.ssrStrength, 0.5f, 2.f);
+            ImGui::SliderFloat("IBL Intensity", &renderOption.envIntensity, 0.1f, 1.f);
+        }
 
+        ImGui::End();
 
         ImGui::Render();
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuffer);
