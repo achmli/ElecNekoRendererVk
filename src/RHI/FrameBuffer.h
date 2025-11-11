@@ -78,4 +78,33 @@ namespace ElecNeko
     private:
         bool CreateRenderPass(DeviceContext *device);
     };
+
+    class UIFrameBuffer
+    {
+    public:
+        UIFrameBuffer() = default;
+        ~UIFrameBuffer() = default;
+
+        struct CreateParms_t
+        {
+            int width;
+            int height;
+        };
+
+        bool Create(DeviceContext *device, CreateParms_t &parms);
+        void Cleanup(DeviceContext *device);
+
+        void BeginRenderPass(DeviceContext *device, const int cmdBufferIndex);
+        void EndRenderPass(DeviceContext *device, const int cmdBufferIndex);
+
+        CreateParms_t m_parms;
+
+        Image m_imageUI;
+
+        VkFramebuffer m_vkFrameBuffer = VK_NULL_HANDLE;
+        VkRenderPass m_vkRenderPass = VK_NULL_HANDLE;
+
+    private:
+        bool CreateRenderPass(DeviceContext *device);
+    };
 } // namespace ElecNeko

@@ -385,7 +385,7 @@ namespace ElecNeko
 
             // Sky for deferred rendering
             CreateGeometry(device, "geometryRealSky", g_geometrySkyPipeline, g_geometrySkyDescriptors, g_geometrySkyShader, &g_geometryFrameBuffer,
-                           ElecNekoPipeline::CULL_MODE_NONE, false, false, 3, ElecNekoPipeline::USAGE_FULL_SCREEN, 0, 0, 3, 0, 0);
+                           ElecNekoPipeline::CULL_MODE_NONE, false, false, 4, ElecNekoPipeline::USAGE_FULL_SCREEN, 0, 0, 3, 0, 0);
 
             // opaque mesh for deferred rendering
             CreateGeometry(device, "geometryOpaque", g_geometryOpaquePipeline, g_geometryOpaqueDescriptors, g_geometryOpaqueShader, &g_geometryFrameBuffer,
@@ -408,7 +408,7 @@ namespace ElecNeko
                     imageHeight = (imageHeight + 15) / 16;
                 }
                 CreateCompute(device, "minMaxDepth", c_minMaxDepthPipeline, c_minMaxDepthDescriptors, c_minMaxDepthShader, 1, 1, 0, 0, 0, 1, 1, 8);
-                CreateCompute(device, "minMax", c_minMaxPipeline, c_minMaxDescriptors, c_minMaxShader, 1, 1, 0, 0, 0, 1, 7, 8);
+                CreateCompute(device, "minMax", c_minMaxPipeline, c_minMaxDescriptors, c_minMaxShader, 1, 1, 0, 0, 0, 1, 1, 8);
             }
 
             // lighting image for deferred rendering
@@ -423,7 +423,7 @@ namespace ElecNeko
 
             // composite
             CreateComputeStorageImage(device, c_compositeImage, width, height, VK_FORMAT_R16G16B16A16_SFLOAT);
-            CreateCompute(device, "composite", c_compositePipeline, c_compositeDescriptors, c_compositeShader, width, height, 6 * sizeof(float), 1, 0, 3, 5, 8);
+            CreateCompute(device, "composite", c_compositePipeline, c_compositeDescriptors, c_compositeShader, width, height, 6 * sizeof(float), 1, 0, 1, 7, 8);
 
             // post process
             CreateComputeStorageImage(device, c_postProcessImage, width, height, VK_FORMAT_R16G16B16A16_SFLOAT);
@@ -442,7 +442,7 @@ namespace ElecNeko
             //
             {
                 CreateGraphics(device, "sky", g_skyPipelineEN, g_skyDescriptorsEN, g_skyShaderEN, &g_offscreenFrameBuffer, ElecNekoPipeline::CULL_MODE_NONE,
-                               false, false, ElecNekoPipeline::USAGE_FULL_SCREEN, 1, 0, 0, 0, 0);
+                               false, false, ElecNekoPipeline::USAGE_MESH, 1, 0, 0, 0, 0);
 
                 ShapeSphere sphereShape(1.0f);
                 g_skyModelEN.BuildFromShape(&sphereShape);
@@ -454,7 +454,7 @@ namespace ElecNeko
             }
             {
                 CreateGraphics(device, "newSky", g_newSkyPipelineEN, g_newSkyDescriptorsEN, g_newSkyShaderEN, &g_offscreenFrameBuffer,
-                               ElecNekoPipeline::CULL_MODE_NONE, false, false, ElecNekoPipeline::USAGE_FULL_SCREEN, 1, 0, 1, 0, 1);
+                               ElecNekoPipeline::CULL_MODE_NONE, false, false, ElecNekoPipeline::USAGE_FULL_SCREEN, 1, 0, 0, 0, 1);
             }
 
             CreateGraphics(device, "meshShadowed", g_meshShadowPipelineEN, g_meshShadowDescriptorsEN, g_meshShadowShaderEN, &g_offscreenFrameBuffer,
@@ -465,7 +465,7 @@ namespace ElecNeko
 
             CreateSingleFrameBuffer(device, g_postProcessFrameBuffer, width, height, true, false);
             CreateGraphics(device, "tonemap", g_tonemapPipeline, g_tonemapDescriptors, g_tonemapShader, &g_postProcessFrameBuffer,
-                           ElecNekoPipeline::CULL_MODE_NONE, false, false, ElecNekoPipeline::USAGE_FULL_SCREEN, 0, 0, 1, 1, 0);
+                           ElecNekoPipeline::CULL_MODE_NONE, false, false, ElecNekoPipeline::USAGE_FULL_SCREEN, 0, 0, 1, 0, 1);
         }
 
         return true;
@@ -606,7 +606,7 @@ namespace ElecNeko
 
         // update shadow
         {
-            g_shadowFrameBufferEN.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            g_shadowFrameBufferEN.m_imageDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
             g_shadowFrameBufferEN.BeginRenderPass(device, cmdBufferIndex);
 
@@ -679,19 +679,18 @@ namespace ElecNeko
 
                 c_environmentCubemap.TransitionMipLayout(cmdBuffer, i, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
-
-            c_environmentCubemap.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            c_environmentCubemap.ChangeLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             renderOption.isSkyChanged = false;
         }
 
         // g-buffer pass
         if (renderOption.isDeferred)
         {
-            g_geometryFrameBuffer.m_imageAlbedo.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            g_geometryFrameBuffer.m_imageNormal.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            g_geometryFrameBuffer.m_imageMaterial.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            g_geometryFrameBuffer.m_imageLinearDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            g_geometryFrameBuffer.m_imageDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            // g_geometryFrameBuffer.m_imageAlbedo.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            // g_geometryFrameBuffer.m_imageNormal.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            // g_geometryFrameBuffer.m_imageMaterial.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            // g_geometryFrameBuffer.m_imageLinearDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            // g_geometryFrameBuffer.m_imageDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
             g_geometryFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
 
@@ -760,11 +759,18 @@ namespace ElecNeko
 
             g_geometryFrameBuffer.EndRenderPass(device, cmdBufferIndex);
 
-            g_geometryFrameBuffer.m_imageAlbedo.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-            g_geometryFrameBuffer.m_imageNormal.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-            g_geometryFrameBuffer.m_imageMaterial.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-            g_geometryFrameBuffer.m_imageLinearDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-            g_geometryFrameBuffer.m_imageDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+            g_geometryFrameBuffer.m_imageAlbedo.ChangeLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            g_geometryFrameBuffer.m_imageNormal.ChangeLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            g_geometryFrameBuffer.m_imageMaterial.ChangeLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            g_geometryFrameBuffer.m_imageLinearDepth.ChangeLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            g_geometryFrameBuffer.m_imageDepth.ChangeLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+
+            float minMaxDepth[2];
+            c_minMaxDepthImages[c_minMaxDepthImages.size() - 1].ReadPixelRGToCPU(device, cmdBufferIndex, minMaxDepth);
+            csm.UpdateDistance(minMaxDepth[0], minMaxDepth[1]);
+            csm.Update(renderOption.sunDirection,
+                       static_cast<float>(g_geometryFrameBuffer.m_parms.height) / static_cast<float>(g_geometryFrameBuffer.m_parms.width));
+            csm.MakeUBO(device);
 
             {
                 {
@@ -797,12 +803,6 @@ namespace ElecNeko
                 }
             }
 
-            float minMaxDepth[2];
-            c_minMaxDepthImages[c_minMaxDepthImages.size() - 1].ReadPixelRGToCPU(device, minMaxDepth);
-            csm.UpdateDistance(minMaxDepth[0], minMaxDepth[1]);
-            csm.Update(renderOption.sunDirection,
-                       static_cast<float>(g_geometryFrameBuffer.m_parms.height) / static_cast<float>(g_geometryFrameBuffer.m_parms.width));
-            csm.MakeUBO(device);
 
             {
                 for (int i = 0; i < csm.numCascade; i++)
@@ -925,7 +925,7 @@ namespace ElecNeko
             }
 
             c_lightingImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
-
+            c_specularLightingImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
             {
                 c_directLightPipeline.BindPipelineCompute(cmdBuffer);
                 ElecNekoDescriptorCompute descriptor = c_directLightPipeline.GetFreeDescriptorCompute();
@@ -942,7 +942,7 @@ namespace ElecNeko
                                                ElecNekoSampler::m_samplerTexture);
                 descriptor.BindingSampledImage(9, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageMaterial.m_vkImageView,
                                                ElecNekoSampler::m_samplerTexture);
-                descriptor.BindingSampledImage(10, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageLinearDepth.m_vkImageView,
+                descriptor.BindingSampledImage(10, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageLinearDepth.m_vkImageView,
                                                ElecNekoSampler::m_samplerTexture);
                 descriptor.BindingSampledImage(11, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageDepth.m_vkImageView,
                                                ElecNekoSampler::m_samplerTexture);
@@ -953,7 +953,7 @@ namespace ElecNeko
                                                ElecNekoSampler::m_samplerTexture);
                 for (int i = 14; i < 14 + csm.numCascade; ++i)
                 {
-                    descriptor.BindingSampledImage(i, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, csm.m_shadowMaps[i - 14].m_imageDepth.m_vkImageView,
+                    descriptor.BindingSampledImage(i, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, csm.m_shadowMaps[i - 14].m_imageDepth.m_vkImageView,
                                                    ElecNekoSampler::m_samplerShadow);
                 }
                 descriptor.BindDescriptor(device, cmdBuffer, &c_directLightPipeline);
@@ -971,6 +971,7 @@ namespace ElecNeko
             }
 
             c_lightingImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            c_specularLightingImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
             {
                 c_ssrImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
@@ -987,7 +988,7 @@ namespace ElecNeko
                                                ElecNekoSampler::m_samplerTexture);
                 descriptor.BindingSampledImage(6, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageMaterial.m_vkImageView,
                                                ElecNekoSampler::m_samplerTexture);
-                descriptor.BindingSampledImage(7, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageLinearDepth.m_vkImageView,
+                descriptor.BindingSampledImage(7, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageLinearDepth.m_vkImageView,
                                                ElecNekoSampler::m_samplerTexture);
                 descriptor.BindDescriptor(device, cmdBuffer, &c_ssrPipeline);
                 struct PushConstant_t
@@ -1041,7 +1042,10 @@ namespace ElecNeko
                                                ElecNekoSampler::m_samplerTexture);
                 descriptor.BindingSampledImage(7, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageNormal.m_vkImageView,
                                                ElecNekoSampler::m_samplerTexture);
-                descriptor.BindingSampledImage(8, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_environmentCubemap.m_vkImageView, ElecNekoSampler::m_samplerIBL);
+                // descriptor.BindingSampledImage(8, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_environmentCubemap.m_vkImageView,
+                // ElecNekoSampler::m_samplerIBL);
+                descriptor.BindingSampledImage(8, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageAlbedo.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
                 descriptor.BindDescriptor(device, cmdBuffer, &c_compositePipeline);
                 struct pushConst_t
                 {

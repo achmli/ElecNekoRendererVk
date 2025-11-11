@@ -40,7 +40,7 @@ namespace ElecNeko
 
         VkCommandBuffer cmdBuffer = device->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
-        m_image.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        m_image.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         {
             VkBufferImageCopy region{};
@@ -57,7 +57,7 @@ namespace ElecNeko
             vkCmdCopyBufferToImage(cmdBuffer, stagingBuffer.m_vkBuffer, m_image.m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
         }
 
-        m_image.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        m_image.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         device->FlushCommandBuffer(cmdBuffer, device->m_vkGraphicsQueue);
 
@@ -127,7 +127,7 @@ namespace ElecNeko
 
         VkCommandBuffer cmdBuffer = device->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
-        m_image.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        m_image.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         {
             VkBufferImageCopy region = {};
@@ -144,7 +144,7 @@ namespace ElecNeko
             vkCmdCopyBufferToImage(cmdBuffer, stagingBuffer.m_vkBuffer, m_image.m_vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
         }
 
-        m_image.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        m_image.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         device->FlushCommandBuffer(cmdBuffer, device->m_vkGraphicsQueue);
 

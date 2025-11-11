@@ -316,7 +316,7 @@ void Image::TransitionLayoutEN(VkCommandBuffer cmdBuffer, VkImageLayout newLayou
         return;
     }
 
-    if (oldLayout == (VkImageLayout) 0)
+    if (oldLayout <= (VkImageLayout) 0)
     {
         oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     }
@@ -361,7 +361,10 @@ void Image::TransitionLayoutEN(VkCommandBuffer cmdBuffer, VkImageLayout newLayou
     m_vkImageLayout = newLayout;
 }
 
-bool Image::ReadPixelRGToCPU(DeviceContext *device, float out[2])
+void Image::ChangeLayout(VkImageLayout newLayout) { m_vkImageLayout = newLayout; }
+
+
+bool Image::ReadPixelRGToCPU(DeviceContext *device, int cmdBufferIdx, float out[2])
 {
     if (!device || m_vkImage == VK_NULL_HANDLE)
     {
@@ -428,6 +431,7 @@ bool Image::ReadPixelRGToCPU(DeviceContext *device, float out[2])
 
     // record commands
     VkCommandBuffer cmd = device->CreateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    // VkCommandBuffer cmd = device->m_vkCommandBuffers[cmdBufferIdx];
 
     vkResetCommandBuffer(cmd, 0);
     VkCommandBufferBeginInfo beginInfo = {};
@@ -764,6 +768,8 @@ namespace ElecNeko
         m_mipLayouts[mip] = newLayout;
     }
 
+    void CubeImage::ChangeLayout(VkImageLayout newLayout) { m_vkImageLayout = newLayout; }
+
 
     bool ArrayImage::Create(DeviceContext *device, const CreateParms_t &parms)
     {
@@ -883,9 +889,16 @@ namespace ElecNeko
             return;
         }
 
+        VkImageLayout oldLayout = m_vkImageLayout;
+
+        if (oldLayout <= (VkImageLayout) 0)
+        {
+            oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        }
+
         VkImageMemoryBarrier barrier = {};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = m_vkImageLayout;
+        barrier.oldLayout = oldLayout;
         barrier.newLayout = newLayout;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

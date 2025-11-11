@@ -39,8 +39,9 @@ public:
     void TransitionLayout(DeviceContext *device);
     void TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
     void TransitionLayoutEN(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
+    void ChangeLayout(VkImageLayout newLayout);
 
-    bool ReadPixelRGToCPU(DeviceContext *device, float out[2]);
+    bool ReadPixelRGToCPU(DeviceContext *device, int cmdBufferIdx, float out[2]);
 
     CreateParms_t m_parms;
     VkImage m_vkImage;
@@ -62,6 +63,7 @@ namespace ElecNeko
         void Cleanup(DeviceContext *device);
         void TransitionLayout(DeviceContext *device, VkImageLayout newLayout = VK_IMAGE_LAYOUT_GENERAL);
         void TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout newLayout);
+        void ChangeLayout(VkImageLayout newLayout);
 
         void TransitionMipLayout(VkCommandBuffer cmdBuffer, int mip, VkImageLayout newLayout);
 

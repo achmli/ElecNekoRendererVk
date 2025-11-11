@@ -1354,10 +1354,10 @@ namespace ElecNeko
             }
         }
 
-        if (colorCount >= 4)
+        if (colorCount >= 5)
         {
-            colorBlendAttachments[3].colorWriteMask = VK_COLOR_COMPONENT_R_BIT;
-            colorBlendAttachments[3].blendEnable = VK_FALSE;
+            colorBlendAttachments[4].colorWriteMask = VK_COLOR_COMPONENT_R_BIT;
+            colorBlendAttachments[4].blendEnable = VK_FALSE;
         }
 
         VkPipelineColorBlendStateCreateInfo colorBlending = {};

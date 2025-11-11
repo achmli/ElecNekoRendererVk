@@ -23,10 +23,8 @@ vfs::Link
 */
 void vfs::Link(VkInstance instance)
 {
-    vfs::vkCreateDebugReportCallbackEXT =
-            (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
-    vfs::vkDestroyDebugReportCallbackEXT =
-            (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+    vfs::vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+    vfs::vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
 }
 
 /*
@@ -73,8 +71,7 @@ bool PhysicalDeviceProperties::AcquireProperties(VkPhysicalDevice device, VkSurf
         }
 
         m_vkSurfaceFormats.resize(numFormats);
-        result = vkGetPhysicalDeviceSurfaceFormatsKHR(m_vkPhysicalDevice, vkSurface, &numFormats,
-                                                      m_vkSurfaceFormats.data());
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(m_vkPhysicalDevice, vkSurface, &numFormats, m_vkSurfaceFormats.data());
         if (VK_SUCCESS != result || 0 == numFormats)
         {
             printf("ERROR: Failed to vkGetPhysicalDeviceSurfaceFormatsKHR\n");
@@ -95,8 +92,7 @@ bool PhysicalDeviceProperties::AcquireProperties(VkPhysicalDevice device, VkSurf
         }
 
         m_vkPresentModes.resize(numPresentModes);
-        result = vkGetPhysicalDeviceSurfacePresentModesKHR(m_vkPhysicalDevice, vkSurface, &numPresentModes,
-                                                           m_vkPresentModes.data());
+        result = vkGetPhysicalDeviceSurfacePresentModesKHR(m_vkPhysicalDevice, vkSurface, &numPresentModes, m_vkPresentModes.data());
         if (VK_SUCCESS != result || 0 == numPresentModes)
         {
             printf("ERROR: Failed to vkGetPhysicalDeviceSurfacePresentModesKHR\n");
@@ -138,8 +134,7 @@ bool PhysicalDeviceProperties::AcquireProperties(VkPhysicalDevice device, VkSurf
         }
 
         m_vkExtensionProperties.resize(numExtensions);
-        result = vkEnumerateDeviceExtensionProperties(m_vkPhysicalDevice, NULL, &numExtensions,
-                                                      m_vkExtensionProperties.data());
+        result = vkEnumerateDeviceExtensionProperties(m_vkPhysicalDevice, NULL, &numExtensions, m_vkExtensionProperties.data());
         if (VK_SUCCESS != result || 0 == numExtensions)
         {
             printf("ERROR: Failed to vkEnumerateDeviceExtensionProperties\n");
@@ -198,10 +193,8 @@ const std::vector<const char *> DeviceContext::m_deviceExtensions = {
 VulkanErrorMessage
 ====================================================
 */
-static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanErrorMessage(VkDebugReportFlagsEXT flags,
-                                                         VkDebugReportObjectTypeEXT objType, uint64_t obj,
-                                                         size_t location, int32_t code, const char *layerPrefix,
-                                                         const char *msg, void *userData)
+static VKAPI_ATTR VkBool32 VKAPI_CALL VulkanErrorMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location,
+                                                         int32_t code, const char *layerPrefix, const char *msg, void *userData)
 {
     printf("ERROR: VulkanErrorMessage: %s\n", msg);
     assert(0);
@@ -477,8 +470,7 @@ bool DeviceContext::CreatePhysicalDevice()
             }
 
             VkBool32 supportsPresentQueue = VK_FALSE;
-            vkGetPhysicalDeviceSurfaceSupportKHR(deviceProperties.m_vkPhysicalDevice, j, m_vkSurface,
-                                                 &supportsPresentQueue);
+            vkGetPhysicalDeviceSurfaceSupportKHR(deviceProperties.m_vkPhysicalDevice, j, m_vkSurface, &supportsPresentQueue);
             if (supportsPresentQueue)
             {
                 presentIdx = j;
@@ -511,8 +503,7 @@ bool DeviceContext::CreatePhysicalDevice()
         printf("Physical Device Chosen: %s\n", deviceProperties.m_vkDeviceProperties.deviceName);
         printf("API Version: %i.%i.%i\n", apiMajor, apiMinor, apiPatch);
         printf("Driver Version: %i.%i.%i\n", driverMajor, driverMinor, driverPatch);
-        printf("Vendor ID: %i  %s\n", deviceProperties.m_vkDeviceProperties.vendorID,
-               VendorStr(deviceProperties.m_vkDeviceProperties.vendorID));
+        printf("Vendor ID: %i  %s\n", deviceProperties.m_vkDeviceProperties.vendorID, VendorStr(deviceProperties.m_vkDeviceProperties.vendorID));
         printf("Device ID: %i\n", deviceProperties.m_vkDeviceProperties.deviceID);
         return true;
     }
@@ -551,13 +542,15 @@ bool DeviceContext::CreateLogicalDevice()
 
     VkPhysicalDeviceFeatures deviceFeatures = {};
     deviceFeatures.samplerAnisotropy = VK_TRUE;
+    deviceFeatures.shaderStorageImageWriteWithoutFormat = VK_TRUE;
 
     VkDeviceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     if (m_presentFamilyIdx != m_graphicsFamilyIdx)
     {
         createInfo.queueCreateInfoCount = 2;
-    } else
+    }
+    else
     {
         createInfo.queueCreateInfoCount = 1;
     }

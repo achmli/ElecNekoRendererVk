@@ -537,7 +537,7 @@ namespace ElecNeko
         attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         attachments[4].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[4].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachments[4].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
         // attachment references for subpass
         VkAttachmentReference colorAttachmentRefs[4] = {};
@@ -660,4 +660,165 @@ namespace ElecNeko
     }
 
     void GFrameBuffer::EndRenderPass(DeviceContext *device, const int cmdBufferIndex) { vkCmdEndRenderPass(device->m_vkCommandBuffers[cmdBufferIndex]); }
+
+    void UIFrameBuffer::Cleanup(DeviceContext *device)
+    {
+        m_imageUI.Cleanup(device);
+
+        if (m_vkFrameBuffer != VK_NULL_HANDLE)
+        {
+            vkDestroyFramebuffer(device->m_vkDevice, m_vkFrameBuffer, nullptr);
+            m_vkFrameBuffer = VK_NULL_HANDLE;
+        }
+        if (m_vkRenderPass != VK_NULL_HANDLE)
+        {
+            vkDestroyRenderPass(device->m_vkDevice, m_vkRenderPass, nullptr);
+            m_vkRenderPass = VK_NULL_HANDLE;
+        }
+    }
+
+    bool UIFrameBuffer::Create(DeviceContext *device, CreateParms_t &parms)
+    {
+        VkResult result;
+
+        m_parms = parms;
+
+        {
+            Image::CreateParms_t imageParms;
+            imageParms.width = m_parms.width;
+            imageParms.height = m_parms.height;
+            imageParms.depth = 1;
+            imageParms.format = VK_FORMAT_R8G8B8A8_UNORM;
+            imageParms.usageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            if (!m_imageUI.Create(device, imageParms))
+            {
+                printf("ERROR: Failed to create UI image\n");
+                assert(0);
+                return false;
+            }
+        }
+
+        if (!CreateRenderPass(device))
+        {
+            printf("ERROR: Failed to create render pass\n");
+            assert(0);
+            return false;
+        }
+
+        VkFramebufferCreateInfo framebufferInfo = {};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = m_vkRenderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = &m_imageUI.m_vkImageView;
+        framebufferInfo.width = parms.width;
+        framebufferInfo.height = parms.height;
+        framebufferInfo.layers = 1;
+        result = vkCreateFramebuffer(device->m_vkDevice, &framebufferInfo, nullptr, &m_vkFrameBuffer);
+        if (VK_SUCCESS != result)
+        {
+            printf("ERROR: Failed to create framebuffer\n");
+            assert(0);
+            return false;
+        }
+
+        return true;
+    }
+
+    bool UIFrameBuffer::CreateRenderPass(DeviceContext *device)
+    {
+        VkResult result;
+
+        VkAttachmentDescription colorAttachment = {};
+        colorAttachment.format = m_imageUI.m_parms.format;
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        m_imageUI.m_vkImageLayout = colorAttachment.finalLayout;
+
+        VkAttachmentReference colorAttachmentRef = {};
+        colorAttachmentRef.attachment = 0;
+        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &colorAttachmentRef;
+
+        VkSubpassDependency dependencies[2];
+        {
+            dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+            dependencies[0].dstSubpass = 0;
+            dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+            dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+            dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+            dependencies[1].srcSubpass = 0;
+            dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+            dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+            dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+            dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+        }
+
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = 1;
+        renderPassInfo.pAttachments = &colorAttachment;
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+        renderPassInfo.dependencyCount = 2;
+        renderPassInfo.pDependencies = dependencies;
+        result = vkCreateRenderPass(device->m_vkDevice, &renderPassInfo, nullptr, &m_vkRenderPass);
+        if (VK_SUCCESS != result)
+        {
+            printf("ERROR: Failed to create render pass\n");
+            assert(0);
+            return false;
+        }
+
+        return true;
+    }
+
+    void UIFrameBuffer::BeginRenderPass(DeviceContext *device, const int cmdBufferIndex)
+    {
+        VkRenderPassBeginInfo renderPassBeginInfo = {};
+        renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassBeginInfo.renderPass = m_vkRenderPass;
+        renderPassBeginInfo.framebuffer = m_vkFrameBuffer;
+        renderPassBeginInfo.renderArea.offset = {0, 0};
+        renderPassBeginInfo.renderArea.extent.width = m_parms.width;
+        renderPassBeginInfo.renderArea.extent.height = m_parms.height;
+
+        VkClearValue clearValue = {};
+        clearValue.color = {0.0f, 0.0f, 0.0f, 0.0f};
+
+        renderPassBeginInfo.clearValueCount = 1;
+        renderPassBeginInfo.pClearValues = &clearValue;
+        vkCmdBeginRenderPass(device->m_vkCommandBuffers[cmdBufferIndex], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        VkViewport viewport = {};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float) m_parms.width;
+        viewport.height = (float) m_parms.height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(device->m_vkCommandBuffers[cmdBufferIndex], 0, 1, &viewport);
+
+        VkRect2D scissor = {};
+        scissor.offset.x = 0;
+        scissor.offset.y = 0;
+        scissor.extent.width = m_parms.width;
+        scissor.extent.height = m_parms.height;
+        vkCmdSetScissor(device->m_vkCommandBuffers[cmdBufferIndex], 0, 1, &scissor);
+    }
+
+    void UIFrameBuffer::EndRenderPass(DeviceContext *device, const int cmdBufferIndex) { vkCmdEndRenderPass(device->m_vkCommandBuffers[cmdBufferIndex]); }
 } // namespace ElecNeko
