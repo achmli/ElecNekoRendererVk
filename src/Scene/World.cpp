@@ -1506,6 +1506,15 @@ namespace ElecNeko
             }
         }
 
+        for (auto *mesh: m_meshes)
+        {
+            if (mesh)
+            {
+                mesh->Cleanup(device);
+                delete mesh;
+            }
+        }
+
         if (m_cam)
         {
             delete m_cam;

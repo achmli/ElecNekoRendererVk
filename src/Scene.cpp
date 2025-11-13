@@ -313,6 +313,7 @@ namespace ElecNeko
     {
         if (world)
         {
+            // world->Cleanup(device);
             world = nullptr;
         }
 

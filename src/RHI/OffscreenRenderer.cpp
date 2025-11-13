@@ -473,20 +473,20 @@ namespace ElecNeko
 
     bool CleanupOffscreen(DeviceContext *device, const RenderOption &renderOption)
     {
-        if (!renderOption.skyBox && !renderOption.simpleRealSky)
+        // if (!renderOption.skyBox && !renderOption.simpleRealSky)
         {
             g_skyPipelineEN.Cleanup(device);
             g_skyDescriptorsEN.Cleanup(device);
             g_skyShaderEN.Cleanup(device);
             g_skyModelEN.Cleanup(*device);
         }
-        else if (!renderOption.skyBox)
+        // else if (!renderOption.skyBox)
         {
             g_simpleSkyPipeline.Cleanup(device);
             g_simpleSkyDescriptors.Cleanup(device);
             g_simpleSkyShader.Cleanup(device);
         }
-        else
+        // else
         {
             g_newSkyPipelineEN.Cleanup(device);
             g_newSkyDescriptorsEN.Cleanup(device);

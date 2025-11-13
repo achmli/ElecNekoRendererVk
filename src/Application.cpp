@@ -164,12 +164,10 @@ void Application::Initialize()
     // }
 
     world->CreateDefaultTextures(&m_deviceContext);
-
     for (auto *light: world->m_lights)
     {
         light->UpdateUBO(&m_deviceContext);
     }
-
     m_scene = new ElecNeko::Scene();
     m_scene->Initialize(&m_deviceContext, world);
     m_scene->MakeVBO(&m_deviceContext);

@@ -101,7 +101,8 @@ namespace ElecNeko
         }
 
         Material_t MakeStrcut();
-        bool MakeBuffer(DeviceContext *device);
+        // bool MakeBuffer(DeviceContext *device);
+        // void Cleanup(DeviceContext *device) { matBuffer.Cleanup(device); }
 
     public:
         std::string name;
@@ -140,7 +141,7 @@ namespace ElecNeko
         float alphaCutoff;
         float padding1;
 
-        Buffer matBuffer;
+        // Buffer matBuffer;
     };
 
     inline Material_t Material::MakeStrcut()
@@ -192,16 +193,16 @@ namespace ElecNeko
         return mat;
     }
 
-    inline bool Material::MakeBuffer(DeviceContext *device)
-    {
-        Material_t mate = MakeStrcut();
-
-        if (!matBuffer.Allocate(device, &mate, sizeof(Material_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT))
-        {
-            std::cerr << "Failed to Allocate Material Uniform Buffer:" << name << "\n";
-            return false;
-        }
-
-        return true;
-    }
+    // inline bool Material::MakeBuffer(DeviceContext *device)
+    // {
+    //     Material_t mate = MakeStrcut();
+    //
+    //     if (!matBuffer.Allocate(device, &mate, sizeof(Material_t), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT))
+    //     {
+    //         std::cerr << "Failed to Allocate Material Uniform Buffer:" << name << "\n";
+    //         return false;
+    //     }
+    //
+    //     return true;
+    // }
 } // namespace ElecNeko

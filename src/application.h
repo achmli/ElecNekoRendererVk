@@ -102,7 +102,7 @@ private:
     //	Model
     //
     Model m_modelFullScreen;
-    std::vector<Model *> m_models; // models for the bodies
+    // std::vector<Model *> m_models; // models for the bodies
 
     ElecNeko::World *world;
     ElecNeko::World *deletingWorld = nullptr;

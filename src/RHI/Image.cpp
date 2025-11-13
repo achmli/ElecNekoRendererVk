@@ -208,6 +208,8 @@ bool Image::Create(DeviceContext *device, const CreateParms_t &parms)
         return false;
     }
 
+    m_vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
     return true;
 }
 
@@ -452,7 +454,7 @@ bool Image::ReadPixelRGToCPU(DeviceContext *device, int cmdBufferIdx, float out[
     barrierToCopy.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
     VkImageLayout oldLayout = m_vkImageLayout;
-    if (oldLayout == (VkImageLayout) 0)
+    if (oldLayout <= (VkImageLayout) 0)
     {
         oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     }
@@ -843,14 +845,34 @@ namespace ElecNeko
             return false;
         }
 
+        m_vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
         return true;
     }
 
     void ArrayImage::Cleanup(DeviceContext *device)
     {
-        vkDestroyImageView(device->m_vkDevice, m_vkImageView, nullptr);
-        vkDestroyImage(device->m_vkDevice, m_vkImage, nullptr);
-        vkFreeMemory(device->m_vkDevice, m_vkDeviceMemory, nullptr);
+        // vkDestroyImageView(device->m_vkDevice, m_vkImageView, nullptr);
+        // vkDestroyImage(device->m_vkDevice, m_vkImage, nullptr);
+        // vkFreeMemory(device->m_vkDevice, m_vkDeviceMemory, nullptr);
+        if (m_vkImageView != VK_NULL_HANDLE)
+        {
+            vkDestroyImageView(device->m_vkDevice, m_vkImageView, nullptr);
+            m_vkImageView = VK_NULL_HANDLE;
+        }
+
+        if (m_vkImage != VK_NULL_HANDLE)
+        {
+            vkDestroyImage(device->m_vkDevice, m_vkImage, nullptr);
+            m_vkImage = VK_NULL_HANDLE;
+        }
+        if (m_vkDeviceMemory != VK_NULL_HANDLE)
+        {
+            vkFreeMemory(device->m_vkDevice, m_vkDeviceMemory, nullptr);
+            m_vkDeviceMemory = VK_NULL_HANDLE;
+        }
+
+        m_vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     }
 
     void ArrayImage::TransitionLayout(DeviceContext *device)
