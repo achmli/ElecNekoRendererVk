@@ -642,6 +642,7 @@ namespace ElecNeko
         if (renderOption.isSkyChanged)
         {
             // sky cubemap
+            c_environmentCubemap.ChangeLayout(VK_IMAGE_LAYOUT_GENERAL);
             c_environmentCubemap.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
 
             c_environmentCubemap.TransitionMipLayout(cmdBuffer, 0, VK_IMAGE_LAYOUT_GENERAL);
