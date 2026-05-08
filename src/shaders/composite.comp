@@ -95,12 +95,12 @@ void main()
     ssrWeight = ssrWeight * (1.0 - F_lum * 0.5);
     ssrWeight = clamp(ssrWeight, 0.0, 1.0);
 
-    vec3 specularFinal = mix(specular, ssrRGB, ssrWeight);
+    // Reduce overall specular weight when SSR is strong
+    // This prevents IBL+SSR from being too dominant
+    float specularBaseWeight = 1.0 - ssrWeight * 0.85;// Min 0.3 when SSR is max (reduced)
 
-    if (hitConf < 0.2)
-    {
-        specularFinal *= pc.envIntensity;
-    }
+    vec3 baseSpecular = specular * specularBaseWeight;
+    vec3 specularFinal = mix(baseSpecular, ssrRGB, ssrWeight);
 
     vec3 color = diffuse + specularFinal;
     imageStore(outComposite, pix, vec4(color, 1.0));

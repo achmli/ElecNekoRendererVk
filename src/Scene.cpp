@@ -347,34 +347,55 @@ namespace ElecNeko
         textureArray->Cleanup(device);
     }
 
-    void Scene::DrawOpaqueIndexed(VkCommandBuffer vkCommandBuffer)
-    {
-        VkBuffer vertexBuffers[] = {opaqueVertexBuffer.m_vkBuffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(vkCommandBuffer, opaqueIndexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
+    // void Scene::DrawOpaqueIndexed(VkCommandBuffer vkCommandBuffer)
+    // {
+    //     VkBuffer vertexBuffers[] = {opaqueVertexBuffer.m_vkBuffer};
+    //     VkDeviceSize offsets[] = {0};
+    //     vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+    //     vkCmdBindIndexBuffer(vkCommandBuffer, opaqueIndexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(opaqueIndices.size()), 1, 0, 0, 0);
+    //     vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(opaqueIndices.size()), 1, 0, 0, 0);
+    // }
+    void Scene::DrawOpaqueIndexed(RHICommandList &cmd)
+    {
+        cmd.SetVertexBuffer(opaqueVertexBuffer, 0);
+        cmd.SetIndexBuffer(opaqueIndexBuffer, RHIIndexFormat::UInt32);
+
+        cmd.DrawIndexed(static_cast<uint32_t>(opaqueIndices.size()), 1, 0, 0, 0);
     }
 
-    void Scene::DrawMaskIndexed(VkCommandBuffer vkCommandBuffer)
-    {
-        VkBuffer vertexBuffers[] = {maskVertexBuffer.m_vkBuffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(vkCommandBuffer, maskIndexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
+    // void Scene::DrawMaskIndexed(VkCommandBuffer vkCommandBuffer)
+    // {
+    //     VkBuffer vertexBuffers[] = {maskVertexBuffer.m_vkBuffer};
+    //     VkDeviceSize offsets[] = {0};
+    //     vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+    //     vkCmdBindIndexBuffer(vkCommandBuffer, maskIndexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(maskIndices.size()), 1, 0, 0, 0);
+    //     vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(maskIndices.size()), 1, 0, 0, 0);
+    // }
+    void Scene::DrawMaskIndexed(RHICommandList &cmd)
+    {
+        cmd.SetVertexBuffer(maskVertexBuffer, 0);
+        cmd.SetIndexBuffer(maskIndexBuffer, RHIIndexFormat::UInt32);
+
+        cmd.DrawIndexed(static_cast<uint32_t>(maskIndices.size()), 1, 0, 0, 0);
     }
 
-    void Scene::DrawTransparentIndexed(VkCommandBuffer vkCommandBuffer)
-    {
-        VkBuffer vertexBuffers[] = {transparentVertexBuffer.m_vkBuffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(vkCommandBuffer, transparentIndexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
+    // void Scene::DrawTransparentIndexed(VkCommandBuffer vkCommandBuffer)
+    // {
+    //     VkBuffer vertexBuffers[] = {transparentVertexBuffer.m_vkBuffer};
+    //     VkDeviceSize offsets[] = {0};
+    //     vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+    //     vkCmdBindIndexBuffer(vkCommandBuffer, transparentIndexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(transparentIndices.size()), 1, 0, 0, 0);
+    //     vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(transparentIndices.size()), 1, 0, 0, 0);
+    // }
+    void Scene::DrawTransparentIndexed(RHICommandList &cmd)
+    {
+        cmd.SetVertexBuffer(transparentVertexBuffer, 0);
+        cmd.SetIndexBuffer(transparentIndexBuffer, RHIIndexFormat::UInt32);
+
+        cmd.DrawIndexed(static_cast<uint32_t>(transparentIndices.size()), 1, 0, 0, 0);
     }
 
 } // namespace ElecNeko

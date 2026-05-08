@@ -15,6 +15,7 @@ namespace ElecNeko
     class SkyBox;
     class World;
     class Scene;
+    class ElecNekoWorld;
     class CascadeShadow;
 
     bool InitOffscreen(DeviceContext *device, const RenderOption &renderOption, int width, int height);
@@ -24,4 +25,6 @@ namespace ElecNeko
 
     void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, Scene *scene, RenderOption &renderOption,
                        CascadeShadow &csm);
+
+    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, ElecNekoWorld *scene, RenderOption &renderOption, CascadeShadow &csm);
 } // namespace ElecNeko

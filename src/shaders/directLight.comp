@@ -541,13 +541,19 @@ void main(){
 
     // specular IBL
     vec3 R = reflect(-V, nrm);
-    float mip = clamp(roughness, 0.0, 1.0) * 9.0;
+    // Use squared roughness for more aggressive blurring at low roughness
+    float mip = roughness * roughness * 11.0;
     vec3 prefilterColor = textureLod(uEnvMap, R, mip).rgb;
 
     vec3 F_ibl = F_Schlick(max(dot(nrm, V), 0.0), F0);
-    vec3 specIBL = prefilterColor * F_ibl;// * envBRDF.x + envBRDF.y;
+    // For metals, strongly blend with albedo to preserve metal color against blue environment
+    vec3 F_colored = mix(F_ibl, albedo, metallic * 0.7);
+    vec3 specIBL = prefilterColor * F_colored;
 
-    vec3 iblColor = (1.0 - metallic) * diffuseIBL + specIBL;
+    // Energy conservation for IBL: separate diffuse and specular
+    kD = (vec3(1.0) - F_ibl) * (1.0 - metallic);
+    vec3 iblDiffuse = kD * diffuseIBL;
+    vec3 iblSpecular = specIBL;
 
     // ao and ct
     float ao = texture(uAO, uv).r;
@@ -556,16 +562,18 @@ void main(){
     vec3 N_view = normalize((camera.view * vec4(nrm, 0.0)).xyz);
     float contact = ScreenSpaceContactShadow(viewPosPixel, N_view);
 
-    // vec3 diffuseAndAmbient = (ambient + diffuse) * ao * pc.useAO;
-    vec3 diffuseAndAmbient = pc.useAO > 0 ? (ambient + diffuse + iblColor) * ao : (ambient + diffuse + iblColor);
+    // Ambient + Direct Diffuse + IBL Diffuse (all in diffuse buffer)
+    vec3 diffuseAndAmbient = pc.useAO > 0
+    ? (ambient + diffuse + iblDiffuse) * ao
+    : (ambient + diffuse + iblDiffuse);
 
     vec3 directLight = pc.useContactShadow > 0 ? directDiffuse * visibility * contact : directDiffuse * visibility;
 
-    // vec3 color = ambient + Lo * visibility + iblColor;
-    //vec3 color = diffuseAndAmbient + directLight + iblColor;
+    vec3 outDiffuseRGB = diffuseAndAmbient + directLight;
 
-    vec3 outDiffuseRGB = diffuseAndAmbient + directDiffuse;
-    vec3 outSpecularRGB = directSpecular;// + specIBL;
+    // Direct Specular + IBL Specular (all in specular buffer)
+    // Note: directSpecular already multiplied by visibility at line 518
+    vec3 outSpecularRGB = directSpecular + iblSpecular;
 
     if (shadowParm.visualizeCascade > 0)
     {

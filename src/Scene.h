@@ -9,6 +9,8 @@
 #include "Physics/Manifold.h"
 #include "Physics/Shapes.h"
 
+#include "RHI/RHICommandList.h"
+
 #include "Scene/World.h"
 
 namespace ElecNeko
@@ -73,9 +75,12 @@ namespace ElecNeko
         bool Initialize(DeviceContext *device, World *inWorld);
         void Cleanup(DeviceContext *device);
 
-        void DrawOpaqueIndexed(VkCommandBuffer vkCommandBuffer);
-        void DrawMaskIndexed(VkCommandBuffer vkCommandBuffer);
-        void DrawTransparentIndexed(VkCommandBuffer vkCommandBuffer);
+        // void DrawOpaqueIndexed(VkCommandBuffer vkCommandBuffer);
+        // void DrawMaskIndexed(VkCommandBuffer vkCommandBuffer);
+        // void DrawTransparentIndexed(VkCommandBuffer vkCommandBuffer);
+        void DrawOpaqueIndexed(RHICommandList &cmd);
+        void DrawMaskIndexed(RHICommandList &cmd);
+        void DrawTransparentIndexed(RHICommandList &cmd);
 
         bool MakeVBO(DeviceContext *device);
         bool MakeUBO(DeviceContext *device);

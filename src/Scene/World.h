@@ -3,6 +3,8 @@
 #include "Light.h"
 #include "Loader/Mesh.h"
 
+#include "RHI/RHICommandList.h"
+
 #include <unordered_map>
 
 namespace ElecNeko
@@ -16,7 +18,8 @@ namespace ElecNeko
         bool MakeVBO(DeviceContext *device);
         void Cleanup(DeviceContext *device);
 
-        void DrawIndexed(VkCommandBuffer vkCommandBuffer);
+        // void DrawIndexed(VkCommandBuffer vkCommandBuffer);
+        void DrawIndexed(RHICommandList &cmd);
 
     public:
         std::vector<VVertex> m_vertices;

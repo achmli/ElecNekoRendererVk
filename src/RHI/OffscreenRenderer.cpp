@@ -591,6 +591,7 @@ namespace ElecNeko
                        CascadeShadow &csm)
     {
         VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
+        RHICommandList cmd(cmdBuffer);
 
         const int camOffset = 0;
         const int camSize = sizeof(float) * 16 * 5;
@@ -618,7 +619,7 @@ namespace ElecNeko
                 descriptor.BindUniformBuffer(0, uniforms, shadowCamOffset, shadowCamSize);
                 descriptor.BindStorageBuffer(1, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
                 descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipelineEN);
-                scene->DrawOpaqueIndexed(cmdBuffer);
+                scene->DrawOpaqueIndexed(cmd);
             }
 
             if (!scene->maskVertices.empty())
@@ -632,7 +633,7 @@ namespace ElecNeko
                 descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
                                      ElecNeko::ElecNekoSampler::m_samplerCubemap);
                 descriptor.BindDescriptor(device, cmdBuffer, &g_alphaTestShadowPipeline);
-                scene->DrawMaskIndexed(cmdBuffer);
+                scene->DrawMaskIndexed(cmd);
             }
 
             g_shadowFrameBufferEN.EndRenderPass(device, cmdBufferIndex);
@@ -642,6 +643,7 @@ namespace ElecNeko
         if (renderOption.isSkyChanged)
         {
             // sky cubemap
+            c_environmentCubemap.ChangeLayout(VK_IMAGE_LAYOUT_GENERAL);
             c_environmentCubemap.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
 
             c_environmentCubemap.TransitionMipLayout(cmdBuffer, 0, VK_IMAGE_LAYOUT_GENERAL);
@@ -741,7 +743,7 @@ namespace ElecNeko
                 descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
                                      ElecNeko::ElecNekoSampler::m_samplerCubemap);
                 descriptor.BindDescriptor(device, cmdBuffer, &g_geometryOpaquePipeline);
-                scene->DrawOpaqueIndexed(cmdBuffer);
+                scene->DrawOpaqueIndexed(cmd);
             }
             if (!scene->maskVertices.empty()) // mask meshes
             {
@@ -754,7 +756,7 @@ namespace ElecNeko
                 descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
                                      ElecNeko::ElecNekoSampler::m_samplerCubemap);
                 descriptor.BindDescriptor(device, cmdBuffer, &g_geometryMaskPipeline);
-                scene->DrawMaskIndexed(cmdBuffer);
+                scene->DrawMaskIndexed(cmd);
             }
 
             g_geometryFrameBuffer.EndRenderPass(device, cmdBufferIndex);
@@ -820,7 +822,7 @@ namespace ElecNeko
                         descriptor.BindUniformBuffer(1, &csm.m_projMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
                         descriptor.BindStorageBuffer(2, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
                         descriptor.BindDescriptor(device, cmdBuffer, &csm.m_pipelines[i]);
-                        scene->DrawOpaqueIndexed(cmdBuffer);
+                        scene->DrawOpaqueIndexed(cmd);
                     }
                     if (!scene->maskVertices.empty())
                     {
@@ -834,7 +836,7 @@ namespace ElecNeko
                         descriptor.BindImage(4, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
                                              ElecNekoSampler::m_samplerCubemap);
                         descriptor.BindDescriptor(device, cmdBuffer, &csm.m_maskPipelines[i]);
-                        scene->DrawMaskIndexed(cmdBuffer);
+                        scene->DrawMaskIndexed(cmd);
                     }
 
                     csm.m_shadowMaps[i].EndRenderPass(device, cmdBufferIndex);
@@ -1137,7 +1139,7 @@ namespace ElecNeko
                 descriptor.BindImage(6, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
                                      ElecNeko::ElecNekoSampler::m_samplerCubemap);
                 descriptor.BindDescriptor(device, cmdBuffer, &g_meshShadowPipelineEN);
-                scene->DrawOpaqueIndexed(cmdBuffer);
+                scene->DrawOpaqueIndexed(cmd);
             }
             if (!scene->maskVertices.empty())
             {
@@ -1154,7 +1156,7 @@ namespace ElecNeko
                 descriptor.BindImage(6, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
                                      ElecNeko::ElecNekoSampler::m_samplerCubemap);
                 descriptor.BindDescriptor(device, cmdBuffer, &g_alphaTestMeshPipeline);
-                scene->DrawMaskIndexed(cmdBuffer);
+                scene->DrawMaskIndexed(cmd);
             }
 
             g_offscreenFrameBuffer.EndRenderPass(device, cmdBufferIndex);
@@ -1183,4 +1185,431 @@ namespace ElecNeko
             g_postProcessFrameBuffer.m_imageColor.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
         }
     }
+
+    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, ElecNekoWorld *scene, RenderOption &renderOption, CascadeShadow &csm)
+    {
+        VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
+        RHICommandList cmd(cmdBuffer);
+
+        const int camOffset = 0;
+        const int camSize = sizeof(float) * 16 * 5;
+
+        const int shadowCamOffset = device->GetAligendUniformByteOffset(camOffset + camSize);
+        const int shadowCamSize = camSize;
+
+        const int lightParmsOffset = device->GetAligendUniformByteOffset(shadowCamOffset + shadowCamSize);
+        const int lightParmsSize = sizeof(float) * 16;
+
+        const int skyParmsOffset = device->GetAligendUniformByteOffset(lightParmsOffset + lightParmsSize);
+        const int skyParmsSize = sizeof(float) * 16;
+
+        // update shadow
+        {
+            g_shadowFrameBufferEN.m_imageDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+            g_shadowFrameBufferEN.BeginRenderPass(device, cmdBufferIndex);
+
+            // Use ElecNekoWorld's GPU-driven indirect rendering
+            if (!scene->m_instances.empty())
+            {
+                g_shadowPipelineEN.BindPipeline(cmdBuffer);
+
+                ElecNekoDescriptor descriptor = g_shadowPipelineEN.GetFreeDescriptor();
+                descriptor.BindUniformBuffer(0, uniforms, shadowCamOffset, shadowCamSize);
+                descriptor.BindStorageBuffer(1, &scene->instanceBuffer, 0, scene->instanceBuffer.m_vkBufferSize);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipelineEN);
+
+                // GPU-driven indirect draw (no material binding needed for shadow)
+                scene->DrawIndirect(cmd, nullptr);
+            }
+
+            g_shadowFrameBufferEN.EndRenderPass(device, cmdBufferIndex);
+            g_shadowFrameBufferEN.m_imageDepth.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+        }
+
+        if (renderOption.isSkyChanged)
+        {
+            // sky cubemap
+            c_environmentCubemap.ChangeLayout(VK_IMAGE_LAYOUT_GENERAL);
+            c_environmentCubemap.TransitionLayout(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+
+            c_environmentCubemap.TransitionMipLayout(cmdBuffer, 0, VK_IMAGE_LAYOUT_GENERAL);
+
+            c_environmentToCubemapPipeline.BindPipelineCompute(cmdBuffer);
+            ElecNekoDescriptorCompute descriptor = c_environmentToCubemapPipeline.GetFreeDescriptorCompute();
+
+            descriptor.BindingUniform(0, uniforms, lightParmsOffset, lightParmsSize);
+            descriptor.BindingUniform(1, uniforms, skyParmsOffset, skyParmsSize);
+            descriptor.BindingStorageImage(2, VK_IMAGE_LAYOUT_GENERAL, c_environmentCubemap.m_faceMipViews[0], VK_NULL_HANDLE);
+            descriptor.BindDescriptor(device, cmdBuffer, &c_environmentToCubemapPipeline);
+            c_environmentToCubemapPipeline.DispatchCompute(cmdBuffer, 512 / 16, 512 / 16, 6);
+            c_environmentCubemap.TransitionMipLayout(cmdBuffer, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+            c_iblBlurPipeline.BindPipelineCompute(cmdBuffer);
+
+            for (int i = 1; i < c_environmentCubemap.m_mipLevels; i++)
+            {
+                c_environmentCubemap.TransitionMipLayout(cmdBuffer, i, VK_IMAGE_LAYOUT_GENERAL);
+
+                ElecNekoDescriptorCompute descriptorIBLBlur = c_iblBlurPipeline.GetFreeDescriptorCompute();
+
+                descriptorIBLBlur.BindingStorageImage(0, VK_IMAGE_LAYOUT_GENERAL, c_environmentCubemap.m_faceMipViews[i], VK_NULL_HANDLE);
+                descriptorIBLBlur.BindingSampledImage(1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_environmentCubemap.m_faceMipViews[i - 1],
+                                                      ElecNekoSampler::m_samplerIBL);
+                descriptorIBLBlur.BindDescriptor(device, cmdBuffer, &c_iblBlurPipeline);
+                IBLBlurPushConstant_t pushConstant;
+                pushConstant.width = std::max(512 >> i, 1);
+                pushConstant.height = pushConstant.width;
+                pushConstant.roughness = float(i) / float(c_environmentCubemap.m_mipLevels - 1);
+                pushConstant.sampleCount = ComputeSampleCountForMip(256, i, c_environmentCubemap.m_faceMipViews.size());
+                pushConstant.inputMip = i - 1;
+                c_iblBlurPipeline.PushConstants(cmdBuffer, &pushConstant, sizeof(IBLBlurPushConstant_t));
+                c_iblBlurPipeline.DispatchCompute(cmdBuffer, (pushConstant.width + 15) / 16, (pushConstant.height + 15) / 16, 6);
+
+                c_environmentCubemap.TransitionMipLayout(cmdBuffer, i, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+            c_environmentCubemap.ChangeLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            renderOption.isSkyChanged = false;
+        }
+
+        // g-buffer pass
+        if (renderOption.isDeferred)
+        {
+            // g_geometryFrameBuffer.m_imageAlbedo.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            // g_geometryFrameBuffer.m_imageNormal.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            // g_geometryFrameBuffer.m_imageMaterial.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            // g_geometryFrameBuffer.m_imageLinearDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            // g_geometryFrameBuffer.m_imageDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+            g_geometryFrameBuffer.BeginRenderPass(device, cmdBufferIndex);
+
+            // opaque meshes - use GPU-driven indirect rendering
+            if (!scene->m_instances.empty())
+            {
+                g_geometryOpaquePipeline.BindPipeline(cmdBuffer);
+
+                ElecNekoDescriptor descriptor = g_geometryOpaquePipeline.GetFreeDescriptor();
+                descriptor.BindUniformBuffer(0, uniforms, camOffset, camSize);
+                descriptor.BindStorageBuffer(1, &scene->instanceBuffer, 0, scene->instanceBuffer.m_vkBufferSize);
+                descriptor.BindStorageBuffer(2, &scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize);
+                descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+                                     ElecNeko::ElecNekoSampler::m_samplerCubemap);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_geometryOpaquePipeline);
+
+                // GPU-driven indirect draw
+                scene->DrawIndirect(cmd, nullptr);
+            }
+
+            g_geometryFrameBuffer.EndRenderPass(device, cmdBufferIndex);
+
+            g_geometryFrameBuffer.m_imageAlbedo.ChangeLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            g_geometryFrameBuffer.m_imageNormal.ChangeLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            g_geometryFrameBuffer.m_imageMaterial.ChangeLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            g_geometryFrameBuffer.m_imageLinearDepth.ChangeLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            g_geometryFrameBuffer.m_imageDepth.ChangeLayout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+
+            float minMaxDepth[2];
+            c_minMaxDepthImages[c_minMaxDepthImages.size() - 1].ReadPixelRGToCPU(device, cmdBufferIndex, minMaxDepth);
+            csm.UpdateDistance(minMaxDepth[0], minMaxDepth[1]);
+            csm.Update(renderOption.sunDirection,
+                       static_cast<float>(g_geometryFrameBuffer.m_parms.height) / static_cast<float>(g_geometryFrameBuffer.m_parms.width));
+            csm.MakeUBO(device);
+
+            {
+                {
+                    c_minMaxDepthPipeline.BindPipelineCompute(cmdBuffer);
+                    c_minMaxDepthImages[0].TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+                    ElecNekoDescriptorCompute descriptor = c_minMaxDepthPipeline.GetFreeDescriptorCompute();
+                    descriptor.BindingStorageImage(0, VK_IMAGE_LAYOUT_GENERAL, c_minMaxDepthImages[0].m_vkImageView, VK_NULL_HANDLE);
+                    descriptor.BindingSampledImage(1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageLinearDepth.m_vkImageView,
+                                                   ElecNekoSampler::m_samplerTexture);
+                    descriptor.BindDescriptor(device, cmdBuffer, &c_minMaxPipeline);
+                    int groupX = (g_geometryFrameBuffer.m_parms.width + 15) / 16;
+                    int groupY = (g_geometryFrameBuffer.m_parms.height + 15) / 16;
+                    c_minMaxDepthPipeline.DispatchCompute(cmdBuffer, groupX, groupY, 1);
+                    c_minMaxDepthImages[0].TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                }
+
+                c_minMaxPipeline.BindPipelineCompute(cmdBuffer);
+                for (int i = 1; i < c_minMaxDepthImages.size(); i++)
+                {
+                    c_minMaxDepthImages[i].TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+                    ElecNekoDescriptorCompute descriptor = c_minMaxPipeline.GetFreeDescriptorCompute();
+                    descriptor.BindingStorageImage(0, VK_IMAGE_LAYOUT_GENERAL, c_minMaxDepthImages[i].m_vkImageView, VK_NULL_HANDLE);
+                    descriptor.BindingSampledImage(1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_minMaxDepthImages[i - 1].m_vkImageView,
+                                                   ElecNekoSampler::m_samplerTexture);
+                    descriptor.BindDescriptor(device, cmdBuffer, &c_minMaxPipeline);
+                    int groupX = (c_minMaxDepthImages[i - 1].m_parms.width + 15) / 16;
+                    int groupY = (c_minMaxDepthImages[i - 1].m_parms.height + 15) / 16;
+                    c_minMaxPipeline.DispatchCompute(cmdBuffer, groupX, groupY, 1);
+                    c_minMaxDepthImages[i].TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                }
+            }
+
+
+            {
+                for (int i = 0; i < csm.numCascade; i++)
+                {
+                    csm.m_shadowMaps[i].m_imageDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+                    csm.m_shadowMaps[i].BeginRenderPass(device, cmdBufferIndex);
+
+                    // Use ElecNekoWorld's GPU-driven indirect rendering
+                    if (!scene->m_instances.empty())
+                    {
+                        csm.m_pipelines[i].BindPipeline(cmdBuffer);
+
+                        ElecNekoDescriptor descriptor = csm.m_pipelines[i].GetFreeDescriptor();
+                        descriptor.BindUniformBuffer(0, &csm.m_viewMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
+                        descriptor.BindUniformBuffer(1, &csm.m_projMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
+                        descriptor.BindStorageBuffer(2, &scene->instanceBuffer, 0, scene->instanceBuffer.m_vkBufferSize);
+                        descriptor.BindDescriptor(device, cmdBuffer, &csm.m_pipelines[i]);
+
+                        // GPU-driven indirect draw
+                        scene->DrawIndirect(cmd, nullptr);
+                    }
+
+                    csm.m_shadowMaps[i].EndRenderPass(device, cmdBufferIndex);
+                    csm.m_shadowMaps[i].m_imageDepth.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+                }
+            }
+
+            {
+                c_ambientOcclusionRawImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+                c_ambientOcclusionRawPipeline.BindPipelineCompute(cmdBuffer);
+                ElecNekoDescriptorCompute descriptor = c_ambientOcclusionRawPipeline.GetFreeDescriptorCompute();
+                descriptor.BindingUniform(0, uniforms, camOffset, camSize);
+                descriptor.BindingStorageImage(1, VK_IMAGE_LAYOUT_GENERAL, c_ambientOcclusionRawImage.m_vkImageView, VK_NULL_HANDLE);
+                descriptor.BindingSampledImage(2, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageNormal.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(3, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageDepth.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindDescriptor(device, cmdBuffer, &c_ambientOcclusionRawPipeline);
+                GTAOPushConstant_t pushConstant;
+                pushConstant.width = c_ambientOcclusionRawImage.m_parms.width;
+                pushConstant.height = c_ambientOcclusionRawImage.m_parms.height;
+                pushConstant.radius = 1.5f;
+                pushConstant.sampleCount = 16;
+                pushConstant.bias = 0.02f;
+                pushConstant.intensity = 1.0f;
+                pushConstant.maxDistance = 1.5f;
+                c_ambientOcclusionRawPipeline.PushConstants(cmdBuffer, &pushConstant, sizeof(GTAOPushConstant_t));
+                int groupX = (c_ambientOcclusionRawImage.m_parms.width + 15) / 16;
+                int groupY = (c_ambientOcclusionRawImage.m_parms.height + 15) / 16;
+                c_ambientOcclusionRawPipeline.DispatchCompute(cmdBuffer, groupX, groupY, 1);
+                c_ambientOcclusionRawImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+
+            {
+                c_ambientOcclusionBlurImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+                c_ambientOcclusionBlurHPipeline.BindPipelineCompute(cmdBuffer);
+                ElecNekoDescriptorCompute descriptor = c_ambientOcclusionBlurHPipeline.GetFreeDescriptorCompute();
+                descriptor.BindingStorageImage(0, VK_IMAGE_LAYOUT_GENERAL, c_ambientOcclusionBlurImage.m_vkImageView, VK_NULL_HANDLE);
+                descriptor.BindingSampledImage(1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_ambientOcclusionRawImage.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(2, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageNormal.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(3, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageDepth.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindDescriptor(device, cmdBuffer, &c_ambientOcclusionBlurHPipeline);
+                struct PushConstant_t
+                {
+                    uint32_t width = c_ambientOcclusionBlurImage.m_parms.width;
+                    uint32_t height = c_ambientOcclusionBlurImage.m_parms.height;
+                    int radius = 4;
+                    float sigma = 4.0f;
+                    float depthSigma = 0.05f;
+                    float normalSigma = 0.2f;
+                } pushConstant;
+                c_ambientOcclusionBlurHPipeline.PushConstants(cmdBuffer, &pushConstant, sizeof(PushConstant_t));
+                int groupX = (c_ambientOcclusionBlurImage.m_parms.width + 15) / 16;
+                int groupY = (c_ambientOcclusionBlurImage.m_parms.height + 15) / 16;
+                c_ambientOcclusionBlurHPipeline.DispatchCompute(cmdBuffer, groupX, groupY, 1);
+                c_ambientOcclusionBlurImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+
+            {
+                c_ambientOcclusionRawImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+                c_ambientOcclusionBlurVPipeline.BindPipelineCompute(cmdBuffer);
+                ElecNekoDescriptorCompute descriptor = c_ambientOcclusionBlurVPipeline.GetFreeDescriptorCompute();
+                descriptor.BindingStorageImage(0, VK_IMAGE_LAYOUT_GENERAL, c_ambientOcclusionRawImage.m_vkImageView, VK_NULL_HANDLE);
+                descriptor.BindingSampledImage(1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_ambientOcclusionBlurImage.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(2, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageNormal.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(3, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageDepth.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindDescriptor(device, cmdBuffer, &c_ambientOcclusionBlurVPipeline);
+                struct PushConstant_t
+                {
+                    uint32_t width = c_ambientOcclusionBlurImage.m_parms.width;
+                    uint32_t height = c_ambientOcclusionBlurImage.m_parms.height;
+                    int radius = 4;
+                    float sigma = 4.0f;
+                    float depthSigma = 0.05f;
+                    float normalSigma = 0.2f;
+                } pushConstant;
+                c_ambientOcclusionBlurVPipeline.PushConstants(cmdBuffer, &pushConstant, sizeof(PushConstant_t));
+                int groupX = (c_ambientOcclusionBlurImage.m_parms.width + 15) / 16;
+                int groupY = (c_ambientOcclusionBlurImage.m_parms.height + 15) / 16;
+                c_ambientOcclusionBlurVPipeline.DispatchCompute(cmdBuffer, groupX, groupY, 1);
+                c_ambientOcclusionRawImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+
+            c_lightingImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+            c_specularLightingImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+            {
+                c_directLightPipeline.BindPipelineCompute(cmdBuffer);
+                ElecNekoDescriptorCompute descriptor = c_directLightPipeline.GetFreeDescriptorCompute();
+                descriptor.BindingUniform(0, uniforms, camOffset, camSize);
+                descriptor.BindingUniform(1, &csm.m_viewMatrixBuffers, 0, csm.m_viewMatrixBuffers.m_vkBufferSize);
+                descriptor.BindingUniform(2, &csm.m_projMatrixBuffers, 0, csm.m_projMatrixBuffers.m_vkBufferSize);
+                descriptor.BindingUniform(3, uniforms, lightParmsOffset, lightParmsSize);
+                descriptor.BindingUniform(4, &csm.m_uniformBuffer, 0, csm.m_uniformBuffer.m_vkBufferSize);
+                descriptor.BindingStorageImage(5, VK_IMAGE_LAYOUT_GENERAL, c_lightingImage.m_vkImageView, VK_NULL_HANDLE);
+                descriptor.BindingStorageImage(6, VK_IMAGE_LAYOUT_GENERAL, c_specularLightingImage.m_vkImageView, VK_NULL_HANDLE);
+                descriptor.BindingSampledImage(7, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageAlbedo.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(8, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageNormal.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(9, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageMaterial.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(10, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageLinearDepth.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(11, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageDepth.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                // descriptor.BindingSampledImage(8, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, g_shadowFrameBufferEN.m_imageDepth.m_vkImageView,
+                //                                ElecNekoSampler::m_samplerShadow);
+                descriptor.BindingSampledImage(12, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_environmentCubemap.m_vkImageView, ElecNekoSampler::m_samplerIBL);
+                descriptor.BindingSampledImage(13, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_ambientOcclusionRawImage.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                for (int i = 14; i < 14 + csm.numCascade; ++i)
+                {
+                    descriptor.BindingSampledImage(i, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, csm.m_shadowMaps[i - 14].m_imageDepth.m_vkImageView,
+                                                   ElecNekoSampler::m_samplerShadow);
+                }
+                descriptor.BindDescriptor(device, cmdBuffer, &c_directLightPipeline);
+                struct PushConstant_t
+                {
+                    int useAO;
+                    int useContactShadow;
+                } push_constant;
+                push_constant.useAO = renderOption.useAO;
+                push_constant.useContactShadow = renderOption.useCT;
+                c_directLightPipeline.PushConstants(cmdBuffer, &push_constant, sizeof(PushConstant_t));
+                int groupX = (c_lightingImage.m_parms.width + 15) / 16;
+                int groupY = (c_lightingImage.m_parms.height + 15) / 16;
+                c_directLightPipeline.DispatchCompute(cmdBuffer, groupX, groupY, 1);
+            }
+
+            c_lightingImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            c_specularLightingImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+            {
+                c_ssrImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+
+                c_ssrPipeline.BindPipelineCompute(cmdBuffer);
+                ElecNekoDescriptorCompute descriptor = c_ssrPipeline.GetFreeDescriptorCompute();
+                descriptor.BindingUniform(0, uniforms, camOffset, camSize);
+                descriptor.BindingStorageImage(1, VK_IMAGE_LAYOUT_GENERAL, c_ssrImage.m_vkImageView, VK_NULL_HANDLE);
+                descriptor.BindingSampledImage(2, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_lightingImage.m_vkImageView, ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_environmentCubemap.m_vkImageView, ElecNekoSampler::m_samplerIBL);
+                descriptor.BindingSampledImage(4, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageAlbedo.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageNormal.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(6, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageMaterial.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(7, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageLinearDepth.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindDescriptor(device, cmdBuffer, &c_ssrPipeline);
+                struct PushConstant_t
+                {
+                    uint32_t width;
+                    uint32_t height;
+
+                    int32_t maxSteps;
+                    float maxDistance;
+                    float strideScale;
+                    float thickness;
+
+                    int binaryIters;
+
+                    float roughnessThreshold;
+                    float prefilterMaxMip;
+                } pushConstants;
+                pushConstants.width = c_ssrImage.m_parms.width;
+                pushConstants.height = c_ssrImage.m_parms.height;
+
+                pushConstants.maxSteps = renderOption.maxSSRSteps;
+                pushConstants.maxDistance = renderOption.maxSSRDistance;
+                pushConstants.strideScale = renderOption.strideSSRScale;
+                pushConstants.thickness = renderOption.strideSSRScale;
+
+                pushConstants.binaryIters = renderOption.binarySearchSSRIters;
+                pushConstants.roughnessThreshold = renderOption.roughnessSSREnabled;
+                pushConstants.prefilterMaxMip = static_cast<float>(c_environmentCubemap.m_mipLevels - 1);
+                c_ssrPipeline.PushConstants(cmdBuffer, &pushConstants, sizeof(PushConstant_t));
+                int groupX = (c_ssrImage.m_parms.width + 15) / 16;
+                int groupY = (c_ssrImage.m_parms.height + 15) / 16;
+                c_ssrPipeline.DispatchCompute(cmdBuffer, groupX, groupY, 1);
+
+                c_ssrImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+
+            {
+                c_compositeImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+
+                c_compositePipeline.BindPipelineCompute(cmdBuffer);
+                ElecNekoDescriptorCompute descriptor = c_compositePipeline.GetFreeDescriptorCompute();
+                descriptor.BindingUniform(0, uniforms, camOffset, camSize);
+                descriptor.BindingStorageImage(1, VK_IMAGE_LAYOUT_GENERAL, c_compositeImage.m_vkImageView, VK_NULL_HANDLE);
+                descriptor.BindingSampledImage(2, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_lightingImage.m_vkImageView, ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_specularLightingImage.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(4, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_ssrImage.m_vkImageView, ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageMaterial.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(6, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageLinearDepth.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindingSampledImage(7, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageNormal.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                // descriptor.BindingSampledImage(8, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_environmentCubemap.m_vkImageView,
+                // ElecNekoSampler::m_samplerIBL);
+                descriptor.BindingSampledImage(8, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, g_geometryFrameBuffer.m_imageAlbedo.m_vkImageView,
+                                               ElecNekoSampler::m_samplerTexture);
+                descriptor.BindDescriptor(device, cmdBuffer, &c_compositePipeline);
+                struct pushConst_t
+                {
+                    int32_t width = c_compositeImage.m_parms.width;
+                    int32_t height = c_compositeImage.m_parms.height;
+                    float ssrIntensity;
+                    float envIntensity;
+                } push_const;
+                push_const.ssrIntensity = renderOption.ssrStrength;
+                push_const.envIntensity = renderOption.envIntensity;
+                c_compositePipeline.PushConstants(cmdBuffer, &push_const, sizeof(pushConst_t));
+                int groupX = (c_compositeImage.m_parms.width + 15) / 16;
+                int groupY = (c_compositeImage.m_parms.height + 15) / 16;
+                c_compositePipeline.DispatchCompute(cmdBuffer, groupX, groupY, 1);
+
+                c_compositeImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
+
+            c_postProcessImage.TransitionLayoutEN(cmdBuffer, VK_IMAGE_LAYOUT_GENERAL);
+            {
+                c_tonemapPipeline.BindPipelineCompute(cmdBuffer);
+
+                ElecNekoDescriptorCompute descriptor = c_tonemapPipeline.GetFreeDescriptorCompute();
+                descriptor.BindingUniform(0, uniforms, lightParmsOffset, lightParmsSize);
+                descriptor.BindingStorageImage(1, VK_IMAGE_LAYOUT_GENERAL, c_postProcessImage.m_vkImageView, VK_NULL_HANDLE);
+                descriptor.BindingSampledImage(2, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, c_compositeImage.m_vkImageView, ElecNekoSampler::m_samplerTexture);
+                descriptor.BindDescriptor(device, cmdBuffer, &c_tonemapPipeline);
+                int groupX = (c_postProcessImage.m_parms.width + 15) / 16;
+                int groupY = (c_postProcessImage.m_parms.height + 15) / 16;
+                c_tonemapPipeline.DispatchCompute(cmdBuffer, groupX, groupY, 1);
+            }
+        }
+    }
+
 } // namespace ElecNeko

@@ -19,44 +19,65 @@ camera
 
 material ground
 {
-    color 1.0 1.0 1.0
+    color 0.7 0.7 0.7
     metallic 0.0
-    roughness 0.6
+    roughness 0.8
 }
 
 material mirror_ball
 {
-    color 0.95 0.95 0.95
+    color 0.85 0.85 0.87
     metallic 1.0
-    roughness 0.0
+    roughness 0.05
+}
+
+material gold_ball
+{
+    color 1.0 0.86 0.57
+    metallic 1.0
+    roughness 0.2
+}
+
+material copper_ball
+{
+    color 0.95 0.64 0.54
+    metallic 1.0
+    roughness 0.25
 }
 
 material rough_ball
 {
     color 0.8 0.5 0.4
     metallic 0.0
-    roughness 0.45
+    roughness 0.6
 }
 
 material slippery_cube
 {
-    color 0.9 0.9 0.9
+    color 0.15 0.2 0.25
     metallic 0.0
-    roughness 0.05
+    roughness 0.08
+}
+
+material plastic_cube
+{
+    color 0.3 0.6 0.85
+    metallic 0.0
+    roughness 0.2
 }
 
 material thin_cube
 {
-    color 0.4 0.4 0.4
+    color 0.3 0.3 0.3
     metallic 0.0
-    roughness 0.9
+    roughness 0.95
 }
 
-material back_wall
+material metallic_wall
 {
-    color 0.98 0.98 0.98
-    metallic 1.0
-    roughness 0.05
+    color 0.9 0.85 0.75
+    metallic 0.95
+    roughness 0.15
 }
 
 mesh
@@ -72,7 +93,23 @@ mesh
 {
     file ssr_test/orange.obj
     material mirror_ball
-    position -2.0 1.0 -4.0
+    position -3.0 1.0 -4.0
+    scale 0.5 0.5 0.5
+}
+
+mesh
+{
+    file ssr_test/orange.obj
+    material gold_ball
+    position 0.0 1.0 -4.0
+    scale 0.5 0.5 0.5
+}
+
+mesh
+{
+    file ssr_test/orange.obj
+    material copper_ball
+    position 3.0 1.0 -4.0
     scale 0.5 0.5 0.5
 }
 
@@ -80,7 +117,7 @@ mesh
 {
     file ssr_test/orange.obj
     material rough_ball
-    position 2.0 1.0 -4.0
+    position 0.0 1.0 -1.5
     scale 0.5 0.5 0.5
 }
 
@@ -88,7 +125,14 @@ mesh
 {
     file ssr_test/unit_cube.obj
     material slippery_cube
-    position 0.0 0.5 -2.0
+    position -1.0 0.5 -2.0
+}
+
+mesh
+{
+    file ssr_test/unit_cube.obj
+    material plastic_cube
+    position 1.0 0.5 -2.0
 }
 
 mesh
@@ -102,7 +146,7 @@ mesh
 mesh
 {
     file ssr_test/unit_plane.obj
-    material back_wall
+    material metallic_wall
     position 0.0 0.0 -10.0
     scale 20.0 10.0 1.0
 }

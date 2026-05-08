@@ -1,15 +1,19 @@
 #pragma once
 
-#include "Texture.h"
 #include "Material.h"
+#include "Texture.h"
+
+#include "RHI/RHICommandList.h"
 
 #include "Scene/Camera.h"
 
-#include "Math/Vector.h"
 #include "Math/Quat.h"
+#include "Math/Vector.h"
 
-#include <vector>
+
 #include <array>
+#include <vector>
+
 
 namespace ElecNeko
 {
@@ -51,7 +55,7 @@ namespace ElecNeko
             return attributeDescriptions;
         }
 
-        bool operator==(const VVertex& other)const
+        bool operator==(const VVertex &other) const
         {
             return position[0] == other.position[0] && position[1] == other.position[1] && position[2] == other.position[2] && uv[0] == other.uv[0] &&
                    uv[1] == other.uv[1] && normal[0] == other.normal[0] && normal[1] == other.normal[1] && normal[2] == other.normal[2];
@@ -60,10 +64,11 @@ namespace ElecNeko
 
     struct VVertexHash
     {
-        size_t operator()(const VVertex& v)const noexcept
-        { 
+        size_t operator()(const VVertex &v) const noexcept
+        {
             size_t h = 0;
-            auto hashFloat = [](float f) {
+            auto hashFloat = [](float f)
+            {
                 // regard a float as an unsigned int to do hash
                 uint32_t u;
                 std::memcpy(&u, &f, sizeof(float));
@@ -88,14 +93,15 @@ namespace ElecNeko
     class MeshPart
     {
     public:
-        MeshPart() : m_isVBO(false) ,albTexIndex(-1),norTexIndex(-1) {}
+        MeshPart() : m_isVBO(false), albTexIndex(-1), norTexIndex(-1) {}
         ~MeshPart() = default;
 
         bool MakeVBO(DeviceContext *device);
 
         void Cleanup(DeviceContext *device);
 
-        void DrawIndexed(VkCommandBuffer vkCommandBUffer);
+        // void DrawIndexed(VkCommandBuffer vkCommandBUffer);
+        void DrawIndexed(RHICommandList &cmd);
 
     public:
         std::vector<VVertex> m_vertices;
@@ -131,6 +137,7 @@ namespace ElecNeko
         bool MakeUBO(DeviceContext *device);
 
         void Cleanup(DeviceContext *device);
+
     public:
         std::vector<MeshPart> m_meshParts;
         std::vector<Texture> albedoMaps;
@@ -158,8 +165,8 @@ namespace ElecNeko
 
         PendingMeshDeletion(Mesh *model, uint64_t loopTotal) : mesh(model), loopTime(loopTotal), currentLoop(0) {}
 
-        void DeferedCleanup(DeviceContext* device)
-        { 
+        void DeferedCleanup(DeviceContext *device)
+        {
             if (currentLoop >= loopTime)
             {
                 mesh->Cleanup(device);
@@ -168,4 +175,4 @@ namespace ElecNeko
             currentLoop++;
         }
     };
-}
+} // namespace ElecNeko

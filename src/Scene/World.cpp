@@ -81,15 +81,22 @@ namespace ElecNeko
 
     void ElecNekoMeshInstance::Cleanup(DeviceContext *device) { uniformBuffer.Cleanup(device); }
 
-    void ElecNekoMesh::DrawIndexed(VkCommandBuffer vkCommandBuffer)
-    {
-        VkBuffer vertexBuffers[] = {m_vertexBuffer.m_vkBuffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(vkCommandBuffer, m_indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
+    // void ElecNekoMesh::DrawIndexed(VkCommandBuffer vkCommandBuffer)
+    // {
+    //     VkBuffer vertexBuffers[] = {m_vertexBuffer.m_vkBuffer};
+    //     VkDeviceSize offsets[] = {0};
+    //     vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+    //     vkCmdBindIndexBuffer(vkCommandBuffer, m_indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        // issue draw command
-        vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
+    //     // issue draw command
+    //     vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
+    // }
+    void ElecNekoMesh::DrawIndexed(RHICommandList &cmd)
+    {
+        cmd.SetVertexBuffer(m_vertexBuffer, 0);
+        cmd.SetIndexBuffer(m_indexBuffer, RHIIndexFormat::UInt32);
+
+        cmd.DrawIndexed(static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
     }
 
     static std::string Trim(std::string_view v)

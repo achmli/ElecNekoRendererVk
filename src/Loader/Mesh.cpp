@@ -2,15 +2,16 @@
 
 #include "Mesh.h"
 
-#include <unordered_map>
 #include <cassert>
+#include <unordered_map>
+
 
 #include "tiny_obj_loader.h"
 
 namespace ElecNeko
 {
-    bool MeshPart::MakeVBO(DeviceContext* device) 
-    { 
+    bool MeshPart::MakeVBO(DeviceContext *device)
+    {
         // VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[0];
         if (m_vertices.empty())
             return true;
@@ -42,7 +43,7 @@ namespace ElecNeko
         {
             hasTex[1] = 1;
         }
-        
+
         bufferSize = static_cast<int>(sizeof(int) * 2);
         if (!m_uniformBuffer.Allocate(device, hasTex, bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT))
         {
@@ -67,20 +68,32 @@ namespace ElecNeko
         m_uniformBuffer.Cleanup(device);
     }
 
-    void MeshPart::DrawIndexed(VkCommandBuffer vkCommandBuffer)
-    {
-        // bind the model
-        VkBuffer vertexBuffers[] = {m_vertexBuffer.m_vkBuffer};
-        VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(vkCommandBuffer, m_indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
+    // void MeshPart::DrawIndexed(VkCommandBuffer vkCommandBuffer)
+    // {
+    //     // bind the model
+    //     VkBuffer vertexBuffers[] = {m_vertexBuffer.m_vkBuffer};
+    //     VkDeviceSize offsets[] = {0};
+    //     vkCmdBindVertexBuffers(vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+    //     vkCmdBindIndexBuffer(vkCommandBuffer, m_indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        // issue draw command
-        vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
+    //     // issue draw command
+    //     vkCmdDrawIndexed(vkCommandBuffer, static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
+    // }
+    void MeshPart::DrawIndexed(RHICommandList &cmd)
+    {
+        if (!m_isVBO)
+        {
+            return;
+        }
+
+        cmd.SetVertexBuffer(m_vertexBuffer, 0);
+        cmd.SetIndexBuffer(m_indexBuffer, RHIIndexFormat::UInt32);
+
+        cmd.DrawIndexed(static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
     }
 
     bool Mesh::LoadFromFile(DeviceContext *device, const std::string &name)
-    { 
+    {
         std::string inputFile = "../res/models/" + name + "/" + name + ".obj";
         tinyobj::ObjReaderConfig readerConfig;
         readerConfig.mtl_search_path = "../res/models/" + name + "/";
@@ -111,7 +124,7 @@ namespace ElecNeko
 
         std::unordered_map<std::string, int32_t> matAlbTex;
         std::unordered_map<std::string, int32_t> matNorTex;
-        
+
         for (size_t i = 0; i < materials.size(); i++)
         {
             // read albedo map
@@ -131,7 +144,7 @@ namespace ElecNeko
                     albedoMaps.back().LoadTexture(device, texPath + materials[i].diffuse_texname);
                 }
             }
-            //read normal map
+            // read normal map
             if (materials[i].normal_texname != "")
             {
                 // normalMaps[i].LoadTexture(device, texPath + materials[i].normal_texname);
@@ -168,7 +181,7 @@ namespace ElecNeko
         std::vector<std::unordered_map<VVertex, uint32_t, VVertexHash>> mapVec;
         mapVec.resize(materials.size() + 1);
 
-        for (const auto& shape : shapes)
+        for (const auto &shape: shapes)
         {
             size_t indexOffset = 0;
             for (size_t n = 0; n < shape.mesh.num_face_vertices.size(); n++)
@@ -247,8 +260,8 @@ namespace ElecNeko
         return true;
     }
 
-    int Mesh::LoadTexture(DeviceContext* device, const std::string& name)
-    { 
+    int Mesh::LoadTexture(DeviceContext *device, const std::string &name)
+    {
         int id = -1;
 
         for (int i = 0; i < m_textures.size(); i++)
@@ -272,7 +285,7 @@ namespace ElecNeko
         return id;
     }
 
-    int Mesh::AddMaterial(const Material& material) 
+    int Mesh::AddMaterial(const Material &material)
     {
         int id = m_materials.size();
         m_materials.push_back(material);
@@ -304,9 +317,9 @@ namespace ElecNeko
         return true;
     }
 
-    void Mesh::Cleanup(DeviceContext* device)
+    void Mesh::Cleanup(DeviceContext *device)
     {
-        for (auto& meshparts : m_meshParts)
+        for (auto &meshparts: m_meshParts)
         {
             meshparts.Cleanup(device);
         }
@@ -318,18 +331,16 @@ namespace ElecNeko
 
         uniformBuffer.Cleanup(device);
 
-        for (auto& map : albedoMaps)
+        for (auto &map: albedoMaps)
         {
             map.Cleanup(device);
         }
         albedoMaps.clear();
-        
-        for (auto& map : normalMaps)
+
+        for (auto &map: normalMaps)
         {
             map.Cleanup(device);
         }
         normalMaps.clear();
     }
-}
-
-
+} // namespace ElecNeko
