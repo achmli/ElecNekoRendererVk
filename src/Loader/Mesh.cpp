@@ -32,6 +32,9 @@ namespace ElecNeko
             return false;
         }
 
+        m_vertexBufferHandle = device->m_bufferRegistry.Register(&m_vertexBuffer);
+        m_indexBufferHandle = device->m_bufferRegistry.Register(&m_indexBuffer);
+
         int hasTex[2] = {0, 0};
 
         if (albTexIndex > -1)
@@ -86,8 +89,13 @@ namespace ElecNeko
             return;
         }
 
-        cmd.SetVertexBuffer(m_vertexBuffer, 0);
-        cmd.SetIndexBuffer(m_indexBuffer, RHIIndexFormat::UInt32);
+        if (!m_vertexBufferHandle.IsValid() || !m_indexBufferHandle.IsValid())
+        {
+            return;
+        }
+
+        cmd.SetVertexBuffer(m_vertexBufferHandle, 0);
+        cmd.SetIndexBuffer(m_indexBufferHandle, RHIIndexFormat::UInt32);
 
         cmd.DrawIndexed(static_cast<uint32_t>(m_indices.size()), 1, 0, 0, 0);
     }

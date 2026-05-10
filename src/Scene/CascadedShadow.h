@@ -39,6 +39,14 @@ namespace ElecNeko
         ElecNekoShader m_shader;
         ElecNekoDescriptors m_descriptors;
 
+        std::vector<ElecNekoPipeline> m_staticMeshPipelines;
+        ElecNekoShader m_staticMeshShader;
+        ElecNekoDescriptors m_staticMeshDescriptors;
+
+        std::vector<ElecNekoPipeline> m_staticMeshMaskPipelines;
+        ElecNekoShader m_staticMeshMaskShader;
+        ElecNekoDescriptors m_staticMeshMaskDescriptors;
+
         std::vector<ElecNekoPipeline> m_maskPipelines;
         ElecNekoShader m_maskShader;
         ElecNekoDescriptors m_maskDescriptors;

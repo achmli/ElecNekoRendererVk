@@ -1,12 +1,19 @@
 #include "CascadedShadow.h"
 
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 
 #include "Math/LCP.h"
 
 namespace ElecNeko
 {
+    struct CSMStaticMeshDrawPushConstant
+    {
+        uint32_t materialIndex;
+        uint32_t instanceIndex;
+    };
+
     static float mix(float a, float b, float t) { return (b - a) * t + a; }
 
     // world space view and invView of main camera, fov in radians, aspect(h/w), cascade range[cn,cf]
@@ -307,6 +314,106 @@ namespace ElecNeko
         }
 
         {
+            if (!m_staticMeshShader.Load(device, "csmStaticMesh"))
+            {
+                std::cerr << "Failed to Load csmStaticMesh Shader\n";
+                return false;
+            }
+
+            ElecNekoDescriptors::CreateParms_t descriptorParms{};
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+
+            // binding 0: view matrix uniform
+            // binding 1: proj matrix uniform
+            // binding 2: RenderScene instance storage buffer
+            descriptorParms.numUniformsVertex = 2;
+            descriptorParms.numStorageVertex = 1;
+            descriptorParms.numUniformsFragment = 0;
+            descriptorParms.numStorageFragment = 0;
+            descriptorParms.numImageSamplers = 0;
+
+            if (!m_staticMeshDescriptors.Create(device, descriptorParms))
+            {
+                std::cerr << "Failed to Load csmStaticMesh Descriptors\n";
+                return false;
+            }
+
+            m_staticMeshPipelines.resize(numCascade);
+
+            for (int i = 0; i < numCascade; ++i)
+            {
+                ElecNekoPipeline::CreateParms_t pipelineParms{};
+                pipelineParms.framebuffer = &m_shadowMaps[i];
+                pipelineParms.descriptors = &m_staticMeshDescriptors;
+                pipelineParms.shader = &m_staticMeshShader;
+                pipelineParms.width = 4096;
+                pipelineParms.height = 4096;
+                pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_BACK;
+                pipelineParms.depthTest = true;
+                pipelineParms.depthWrite = true;
+                pipelineParms.pushConstantSize = sizeof(CSMStaticMeshDrawPushConstant);
+                pipelineParms.pushConstantShaderStages = VK_SHADER_STAGE_VERTEX_BIT;
+
+                if (!m_staticMeshPipelines[i].Create(device, pipelineParms, ElecNekoPipeline::USAGE_STATIC_MESH))
+                {
+                    std::cerr << "Failed to Load csmStaticMesh pipeline\n";
+                    return false;
+                }
+            }
+        }
+
+        {
+            if (!m_staticMeshMaskShader.Load(device, "csmStaticMeshMasked"))
+            {
+                std::cerr << "Failed to Load csmStaticMeshMasked Shader\n";
+                return false;
+            }
+
+            ElecNekoDescriptors::CreateParms_t descriptorParms{};
+            memset(&descriptorParms, 0, sizeof(descriptorParms));
+
+            // binding 0: view matrix uniform
+            // binding 1: proj matrix uniform
+            // binding 2: RenderScene instance buffer
+            // binding 3: RenderScene material buffer
+            // binding 4: RenderScene texture array
+            descriptorParms.numUniformsVertex = 2;
+            descriptorParms.numStorageVertex = 1;
+            descriptorParms.numUniformsFragment = 0;
+            descriptorParms.numStorageFragment = 1;
+            descriptorParms.numImageSamplers = 1;
+
+            if (!m_staticMeshMaskDescriptors.Create(device, descriptorParms))
+            {
+                std::cerr << "Failed to Load csmStaticMeshMasked Descriptors\n";
+                return false;
+            }
+
+            m_staticMeshMaskPipelines.resize(numCascade);
+
+            for (int i = 0; i < numCascade; ++i)
+            {
+                ElecNekoPipeline::CreateParms_t pipelineParms{};
+                pipelineParms.framebuffer = &m_shadowMaps[i];
+                pipelineParms.descriptors = &m_staticMeshMaskDescriptors;
+                pipelineParms.shader = &m_staticMeshMaskShader;
+                pipelineParms.width = 4096;
+                pipelineParms.height = 4096;
+                pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_BACK;
+                pipelineParms.depthTest = true;
+                pipelineParms.depthWrite = true;
+                pipelineParms.pushConstantSize = sizeof(CSMStaticMeshDrawPushConstant);
+                pipelineParms.pushConstantShaderStages = VK_SHADER_STAGE_VERTEX_BIT;
+
+                if (!m_staticMeshMaskPipelines[i].Create(device, pipelineParms, ElecNekoPipeline::USAGE_STATIC_MESH))
+                {
+                    std::cerr << "Failed to Load csmStaticMeshMasked pipeline\n";
+                    return false;
+                }
+            }
+        }
+
+        {
             if (!m_maskShader.Load(device, "csmMaskGen"))
             {
                 std::cerr << "Failed to Load csmMaskGen Shader\n";
@@ -480,18 +587,40 @@ namespace ElecNeko
         m_projections.clear();
         m_splits.clear();
 
+        // for (int i = 0; i < numCascade; ++i)
+        // {
+        //     m_pipelines[i].Cleanup(device);
+        //     m_maskPipelines[i].Cleanup(device);
+        // }
+        // m_pipelines.clear();
+        // m_maskPipelines.clear();
+
+        // m_shader.Cleanup(device);
+        // m_maskShader.Cleanup(device);
+
+        // m_descriptors.Cleanup(device);
+        // m_maskDescriptors.Cleanup(device);
         for (int i = 0; i < numCascade; ++i)
         {
             m_pipelines[i].Cleanup(device);
+            m_staticMeshPipelines[i].Cleanup(device);
+            m_staticMeshMaskPipelines[i].Cleanup(device);
             m_maskPipelines[i].Cleanup(device);
         }
+
         m_pipelines.clear();
+        m_staticMeshPipelines.clear();
+        m_staticMeshMaskPipelines.clear();
         m_maskPipelines.clear();
 
         m_shader.Cleanup(device);
+        m_staticMeshShader.Cleanup(device);
+        m_staticMeshMaskShader.Cleanup(device);
         m_maskShader.Cleanup(device);
 
         m_descriptors.Cleanup(device);
+        m_staticMeshDescriptors.Cleanup(device);
+        m_staticMeshMaskDescriptors.Cleanup(device);
         m_maskDescriptors.Cleanup(device);
 
         m_viewMatrixBuffers.Cleanup(device);

@@ -4,8 +4,11 @@
 #include "OffscreenRenderer.h"
 #include "Loader/Mesh.h"
 #include "RenderOption.h"
+#include "Renderer/Mesh/MeshDrawRenderer.h"
+#include "Renderer/Scene/RenderScene.h"
 #include "Samplers.h"
 #include "model.h"
+
 
 #include <assert.h>
 #include <stdio.h>
@@ -26,6 +29,10 @@ namespace ElecNeko
     ElecNekoShader g_shadowShaderEN;
     ElecNekoDescriptors g_shadowDescriptorsEN;
 
+    ElecNekoPipeline g_shadowStaticMeshPipelineEN;
+    ElecNekoShader g_shadowStaticMeshShaderEN;
+    ElecNekoDescriptors g_shadowStaticMeshDescriptorsEN;
+
     CubeImage c_environmentCubemap;
     ElecNekoPipeline c_environmentToCubemapPipeline;
     ElecNekoShader c_environmentToCubemapShader;
@@ -41,9 +48,17 @@ namespace ElecNeko
     ElecNekoShader g_geometryOpaqueShader;
     ElecNekoDescriptors g_geometryOpaqueDescriptors;
 
+    ElecNekoPipeline g_geometryStaticMeshPipeline;
+    ElecNekoShader g_geometryStaticMeshShader;
+    ElecNekoDescriptors g_geometryStaticMeshDescriptors;
+
     ElecNekoPipeline g_geometryMaskPipeline;
     ElecNekoShader g_geometryMaskShader;
     ElecNekoDescriptors g_geometryMaskDescriptors;
+
+    ElecNekoPipeline g_geometryStaticMeshMaskedPipeline;
+    ElecNekoShader g_geometryStaticMeshMaskedShader;
+    ElecNekoDescriptors g_geometryStaticMeshMaskedDescriptors;
 
     ElecNekoPipeline g_geometrySkyPipeline;
     ElecNekoShader g_geometrySkyShader;
@@ -118,6 +133,10 @@ namespace ElecNeko
     ElecNekoShader g_alphaTestShadowShader;
     ElecNekoDescriptors g_alphaTestShadowDescriptors;
 
+    ElecNekoPipeline g_staticMeshAlphaTestShadowPipeline;
+    ElecNekoShader g_staticMeshAlphaTestShadowShader;
+    ElecNekoDescriptors g_staticMeshAlphaTestShadowDescriptors;
+
     ElecNekoPipeline g_alphaBlendMeshPipeline;
     ElecNekoShader g_alphaBlendMeshShader;
     ElecNekoDescriptors g_alphaBlendMeshDescriptors;
@@ -191,7 +210,7 @@ namespace ElecNeko
     void CreateGraphics(DeviceContext *device, const std::string &shaderName, ElecNekoPipeline &pipeline, ElecNekoDescriptors &descriptors,
                         ElecNekoShader &shader, FrameBuffer *framebuffer, ElecNekoPipeline::CullMode_t cullMode, bool depthTest, bool depthWrite,
                         ElecNekoPipeline::Usage_t usage, int numUniformsVertex, int numStorageVertex, int numUniformsFragment, int numStorageFragment,
-                        int numImageSamplers)
+                        int numImageSamplers, int pushConstantSize = 0, VkShaderStageFlagBits pushConstantShaderStages = VK_SHADER_STAGE_VERTEX_BIT)
     {
         if (!shader.Load(device, shaderName.c_str()))
         {
@@ -224,6 +243,8 @@ namespace ElecNeko
         pipelineParms.cullMode = cullMode;
         pipelineParms.depthTest = depthTest;
         pipelineParms.depthWrite = depthWrite;
+        pipelineParms.pushConstantSize = pushConstantSize;
+        pipelineParms.pushConstantShaderStages = pushConstantShaderStages;
         if (!pipeline.Create(device, pipelineParms, usage))
         {
             std::cout << "Failed to Create Pipeline: " << shaderName << std::endl;
@@ -231,10 +252,15 @@ namespace ElecNeko
         }
     }
 
+    // void CreateGeometry(DeviceContext *device, const std::string &shaderName, ElecNekoPipeline &pipeline, ElecNekoDescriptors &descriptors,
+    //                     ElecNekoShader &shader, GFrameBuffer *gFramebuffer, ElecNekoPipeline::CullMode_t cullMode, bool depthTest, bool depthWrite,
+    //                     int colorAttachmentCount, ElecNekoPipeline::Usage_t usage, int numUniformsVertex, int numStorageVertex, int numUniformsFragment,
+    //                     int numStorageFragment, int numImageSamplers)
     void CreateGeometry(DeviceContext *device, const std::string &shaderName, ElecNekoPipeline &pipeline, ElecNekoDescriptors &descriptors,
                         ElecNekoShader &shader, GFrameBuffer *gFramebuffer, ElecNekoPipeline::CullMode_t cullMode, bool depthTest, bool depthWrite,
                         int colorAttachmentCount, ElecNekoPipeline::Usage_t usage, int numUniformsVertex, int numStorageVertex, int numUniformsFragment,
-                        int numStorageFragment, int numImageSamplers)
+                        int numStorageFragment, int numImageSamplers, int pushConstantSize = 0,
+                        VkShaderStageFlagBits pushConstantShaderStages = VK_SHADER_STAGE_VERTEX_BIT)
     {
         if (!shader.Load(device, shaderName.c_str()))
         {
@@ -268,6 +294,8 @@ namespace ElecNeko
         pipelineParms.depthTest = depthTest;
         pipelineParms.depthWrite = depthWrite;
         pipelineParms.colorAttachmentCount = colorAttachmentCount;
+        pipelineParms.pushConstantSize = pushConstantSize;
+        pipelineParms.pushConstantShaderStages = pushConstantShaderStages;
         if (!pipeline.Create(device, pipelineParms, usage))
         {
             std::cout << "Failed to Create Pipeline: " << shaderName << std::endl;
@@ -333,6 +361,12 @@ namespace ElecNeko
         float maxDistance;
     };
 
+    struct StaticMeshDrawPushConstant
+    {
+        uint32_t materialIndex;
+        uint32_t instanceIndex;
+    };
+
     bool InitOffscreen(DeviceContext *device, const RenderOption &renderOption, int width, int height)
     {
 
@@ -342,8 +376,14 @@ namespace ElecNeko
         CreateSingleFrameBuffer(device, g_shadowFrameBufferEN, 4096, 4096, false, true);
         CreateGraphics(device, "shadowTest", g_shadowPipelineEN, g_shadowDescriptorsEN, g_shadowShaderEN, &g_shadowFrameBufferEN,
                        ElecNekoPipeline::CULL_MODE_FRONT, true, true, ElecNekoPipeline::USAGE_MESH, 1, 1, 0, 0, 0);
+        CreateGraphics(device, "shadowStaticMesh", g_shadowStaticMeshPipelineEN, g_shadowStaticMeshDescriptorsEN, g_shadowStaticMeshShaderEN,
+                       &g_shadowFrameBufferEN, ElecNekoPipeline::CULL_MODE_FRONT, true, true, ElecNekoPipeline::USAGE_STATIC_MESH, 1, 1, 0, 0, 0,
+                       sizeof(StaticMeshDrawPushConstant), VK_SHADER_STAGE_VERTEX_BIT);
         CreateGraphics(device, "alphaTestShadow", g_alphaTestShadowPipeline, g_alphaTestShadowDescriptors, g_alphaTestShadowShader, &g_shadowFrameBufferEN,
                        ElecNekoPipeline::CULL_MODE_FRONT, true, true, ElecNekoPipeline::USAGE_MESH, 1, 1, 0, 1, 1);
+        CreateGraphics(device, "shadowStaticMeshMasked", g_staticMeshAlphaTestShadowPipeline, g_staticMeshAlphaTestShadowDescriptors,
+                       g_staticMeshAlphaTestShadowShader, &g_shadowFrameBufferEN, ElecNekoPipeline::CULL_MODE_FRONT, true, true,
+                       ElecNekoPipeline::USAGE_STATIC_MESH, 1, 1, 0, 1, 1, sizeof(StaticMeshDrawPushConstant), VK_SHADER_STAGE_VERTEX_BIT);
 
         // IBL
         {
@@ -391,9 +431,19 @@ namespace ElecNeko
             CreateGeometry(device, "geometryOpaque", g_geometryOpaquePipeline, g_geometryOpaqueDescriptors, g_geometryOpaqueShader, &g_geometryFrameBuffer,
                            ElecNekoPipeline::CULL_MODE_BACK, true, true, 4, ElecNekoPipeline::USAGE_MESH, 1, 1, 0, 1, 1);
 
+            // static mesh path for new RenderScene
+            CreateGeometry(device, "geometryStaticMesh", g_geometryStaticMeshPipeline, g_geometryStaticMeshDescriptors, g_geometryStaticMeshShader,
+                           &g_geometryFrameBuffer, ElecNekoPipeline::CULL_MODE_BACK, true, true, 4, ElecNekoPipeline::USAGE_STATIC_MESH, 1, 1, 0, 1, 1,
+                           sizeof(StaticMeshDrawPushConstant), VK_SHADER_STAGE_VERTEX_BIT);
+
             // mask mesh
             CreateGeometry(device, "geometryMask", g_geometryMaskPipeline, g_geometryMaskDescriptors, g_geometryMaskShader, &g_geometryFrameBuffer,
                            ElecNekoPipeline::CULL_MODE_BACK, true, true, 4, ElecNekoPipeline::USAGE_MESH, 1, 1, 0, 1, 1);
+
+            // static mesh masked path for new RenderScene
+            CreateGeometry(device, "geometryStaticMeshMasked", g_geometryStaticMeshMaskedPipeline, g_geometryStaticMeshMaskedDescriptors,
+                           g_geometryStaticMeshMaskedShader, &g_geometryFrameBuffer, ElecNekoPipeline::CULL_MODE_BACK, true, true, 4,
+                           ElecNekoPipeline::USAGE_STATIC_MESH, 1, 1, 0, 1, 1, sizeof(StaticMeshDrawPushConstant), VK_SHADER_STAGE_VERTEX_BIT);
 
             {
                 int numLevels = ClacReductionLevels(width, height, 16);
@@ -497,9 +547,19 @@ namespace ElecNeko
         g_geometryOpaquePipeline.Cleanup(device);
         g_geometryOpaqueShader.Cleanup(device);
         g_geometryOpaqueDescriptors.Cleanup(device);
+
+        g_geometryStaticMeshPipeline.Cleanup(device);
+        g_geometryStaticMeshShader.Cleanup(device);
+        g_geometryStaticMeshDescriptors.Cleanup(device);
+
         g_geometryMaskPipeline.Cleanup(device);
         g_geometryMaskShader.Cleanup(device);
         g_geometryMaskDescriptors.Cleanup(device);
+
+        g_geometryStaticMeshMaskedPipeline.Cleanup(device);
+        g_geometryStaticMeshMaskedShader.Cleanup(device);
+        g_geometryStaticMeshMaskedDescriptors.Cleanup(device);
+
         g_geometrySkyPipeline.Cleanup(device);
         g_geometrySkyShader.Cleanup(device);
         g_geometrySkyDescriptors.Cleanup(device);
@@ -514,6 +574,10 @@ namespace ElecNeko
         g_alphaTestShadowShader.Cleanup(device);
         g_alphaTestShadowDescriptors.Cleanup(device);
 
+        g_staticMeshAlphaTestShadowPipeline.Cleanup(device);
+        g_staticMeshAlphaTestShadowShader.Cleanup(device);
+        g_staticMeshAlphaTestShadowDescriptors.Cleanup(device);
+
         g_alphaTestMeshPipeline.Cleanup(device);
         g_alphaTestMeshShader.Cleanup(device);
         g_alphaTestMeshDescriptors.Cleanup(device);
@@ -521,6 +585,11 @@ namespace ElecNeko
         g_shadowPipelineEN.Cleanup(device);
         g_shadowShaderEN.Cleanup(device);
         g_shadowDescriptorsEN.Cleanup(device);
+
+        g_shadowStaticMeshPipelineEN.Cleanup(device);
+        g_shadowStaticMeshShaderEN.Cleanup(device);
+        g_shadowStaticMeshDescriptorsEN.Cleanup(device);
+
         g_shadowFrameBufferEN.Cleanup(device);
 
         g_tonemapPipeline.Cleanup(device);
@@ -588,10 +657,10 @@ namespace ElecNeko
     }
 
     void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, Scene *scene, RenderOption &renderOption,
-                       CascadeShadow &csm)
+                       CascadeShadow &csm, RenderScene *renderScene)
     {
         VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
-        RHICommandList cmd(cmdBuffer);
+        RHICommandList cmd(cmdBuffer, &device->m_bufferRegistry);
 
         const int camOffset = 0;
         const int camSize = sizeof(float) * 16 * 5;
@@ -611,7 +680,29 @@ namespace ElecNeko
 
             g_shadowFrameBufferEN.BeginRenderPass(device, cmdBufferIndex);
 
-            if (!scene->opaqueVertices.empty())
+            // if (!scene->opaqueVertices.empty())
+            // {
+            //     g_shadowPipelineEN.BindPipeline(cmdBuffer);
+
+            //     ElecNekoDescriptor descriptor = g_shadowPipelineEN.GetFreeDescriptor();
+            //     descriptor.BindUniformBuffer(0, uniforms, shadowCamOffset, shadowCamSize);
+            //     descriptor.BindStorageBuffer(1, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
+            //     descriptor.BindDescriptor(device, cmdBuffer, &g_shadowPipelineEN);
+            //     scene->DrawOpaqueIndexed(cmd);
+            // }
+            // new RenderScene opaque shadow path
+            if (renderScene != nullptr && !renderScene->drawList.shadow.empty())
+            {
+                g_shadowStaticMeshPipelineEN.BindPipeline(cmdBuffer);
+
+                ElecNekoDescriptor descriptor = g_shadowStaticMeshPipelineEN.GetFreeDescriptor();
+                descriptor.BindUniformBuffer(0, uniforms, shadowCamOffset, shadowCamSize);
+                descriptor.BindStorageBuffer(1, &renderScene->instanceBuffer, 0, renderScene->instanceBuffer.m_vkBufferSize);
+                descriptor.BindDescriptor(device, cmdBuffer, &g_shadowStaticMeshPipelineEN);
+
+                ElecNeko::MeshDrawRenderer::DrawShadow(cmd, g_shadowStaticMeshPipelineEN, *renderScene);
+            }
+            else if (!scene->opaqueVertices.empty())
             {
                 g_shadowPipelineEN.BindPipeline(cmdBuffer);
 
@@ -622,7 +713,35 @@ namespace ElecNeko
                 scene->DrawOpaqueIndexed(cmd);
             }
 
-            if (!scene->maskVertices.empty())
+            // if (!scene->maskVertices.empty())
+            // {
+            //     g_alphaTestShadowPipeline.BindPipeline(cmdBuffer);
+
+            //     ElecNekoDescriptor descriptor = g_alphaTestShadowPipeline.GetFreeDescriptor();
+            //     descriptor.BindUniformBuffer(0, uniforms, shadowCamOffset, shadowCamSize);
+            //     descriptor.BindStorageBuffer(1, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
+            //     descriptor.BindStorageBuffer(2, &scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize);
+            //     descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+            //                          ElecNeko::ElecNekoSampler::m_samplerCubemap);
+            //     descriptor.BindDescriptor(device, cmdBuffer, &g_alphaTestShadowPipeline);
+            //     scene->DrawMaskIndexed(cmd);
+            // }
+            if (renderScene != nullptr && renderScene->textureArray != nullptr && !renderScene->drawList.masked.empty())
+            {
+                g_staticMeshAlphaTestShadowPipeline.BindPipeline(cmdBuffer);
+
+                ElecNekoDescriptor descriptor = g_staticMeshAlphaTestShadowPipeline.GetFreeDescriptor();
+                descriptor.BindUniformBuffer(0, uniforms, shadowCamOffset, shadowCamSize);
+                descriptor.BindStorageBuffer(1, &renderScene->instanceBuffer, 0, renderScene->instanceBuffer.m_vkBufferSize);
+                descriptor.BindStorageBuffer(2, &renderScene->materialBuffer, 0, renderScene->materialBuffer.m_vkBufferSize);
+                descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, renderScene->textureArray->m_arrayImage.m_vkImageView,
+                                     ElecNeko::ElecNekoSampler::m_samplerCubemap);
+
+                descriptor.BindDescriptor(device, cmdBuffer, &g_staticMeshAlphaTestShadowPipeline);
+
+                ElecNeko::MeshDrawRenderer::DrawMasked(cmd, g_staticMeshAlphaTestShadowPipeline, *renderScene);
+            }
+            else if (!scene->maskVertices.empty())
             {
                 g_alphaTestShadowPipeline.BindPipeline(cmdBuffer);
 
@@ -632,7 +751,9 @@ namespace ElecNeko
                 descriptor.BindStorageBuffer(2, &scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize);
                 descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
                                      ElecNeko::ElecNekoSampler::m_samplerCubemap);
+
                 descriptor.BindDescriptor(device, cmdBuffer, &g_alphaTestShadowPipeline);
+
                 scene->DrawMaskIndexed(cmd);
             }
 
@@ -732,7 +853,9 @@ namespace ElecNeko
             }
 
             // opaque meshes
-            if (!scene->opaqueVertices.empty())
+            const bool useNewRenderSceneOpaque = renderScene != nullptr;
+
+            if (!scene->opaqueVertices.empty() && !useNewRenderSceneOpaque)
             {
                 g_geometryOpaquePipeline.BindPipeline(cmdBuffer);
 
@@ -745,7 +868,61 @@ namespace ElecNeko
                 descriptor.BindDescriptor(device, cmdBuffer, &g_geometryOpaquePipeline);
                 scene->DrawOpaqueIndexed(cmd);
             }
-            if (!scene->maskVertices.empty()) // mask meshes
+
+            // new RenderScene static mesh opaque path
+            // if (renderScene != nullptr && !renderScene->drawList.opaque.empty())
+            if (renderScene != nullptr && renderScene->textureArray != nullptr && !renderScene->drawList.opaque.empty())
+            {
+                g_geometryStaticMeshPipeline.BindPipeline(cmdBuffer);
+
+                ElecNekoDescriptor descriptor = g_geometryStaticMeshPipeline.GetFreeDescriptor();
+                descriptor.BindUniformBuffer(0, uniforms, camOffset, camSize);
+                descriptor.BindStorageBuffer(1, &renderScene->instanceBuffer, 0, renderScene->instanceBuffer.m_vkBufferSize);
+                descriptor.BindStorageBuffer(2, &renderScene->materialBuffer, 0, renderScene->materialBuffer.m_vkBufferSize);
+
+                // 过渡阶段：texture array 仍然复用旧 Scene 生成的 textureArray。
+                // 后面再把 texture array 所有权迁到 RenderScene。
+                // descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+                //                      ElecNeko::ElecNekoSampler::m_samplerCubemap);
+                descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, renderScene->textureArray->m_arrayImage.m_vkImageView,
+                                     ElecNeko::ElecNekoSampler::m_samplerCubemap);
+
+                descriptor.BindDescriptor(device, cmdBuffer, &g_geometryStaticMeshPipeline);
+
+                ElecNeko::MeshDrawRenderer::DrawOpaque(cmd, g_geometryStaticMeshPipeline, *renderScene);
+            }
+
+            // if (!scene->maskVertices.empty()) // mask meshes
+            // {
+            //     g_geometryMaskPipeline.BindPipeline(cmdBuffer);
+
+            //     ElecNekoDescriptor descriptor = g_geometryMaskPipeline.GetFreeDescriptor();
+            //     descriptor.BindUniformBuffer(0, uniforms, camOffset, camSize);
+            //     descriptor.BindStorageBuffer(1, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
+            //     descriptor.BindStorageBuffer(2, &scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize);
+            //     descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+            //                          ElecNeko::ElecNekoSampler::m_samplerCubemap);
+            //     descriptor.BindDescriptor(device, cmdBuffer, &g_geometryMaskPipeline);
+            //     scene->DrawMaskIndexed(cmd);
+            // }
+            // new RenderScene static mesh masked path
+            if (renderScene != nullptr && renderScene->textureArray != nullptr && !renderScene->drawList.masked.empty())
+            {
+                g_geometryStaticMeshMaskedPipeline.BindPipeline(cmdBuffer);
+
+                ElecNekoDescriptor descriptor = g_geometryStaticMeshMaskedPipeline.GetFreeDescriptor();
+                descriptor.BindUniformBuffer(0, uniforms, camOffset, camSize);
+                descriptor.BindStorageBuffer(1, &renderScene->instanceBuffer, 0, renderScene->instanceBuffer.m_vkBufferSize);
+                descriptor.BindStorageBuffer(2, &renderScene->materialBuffer, 0, renderScene->materialBuffer.m_vkBufferSize);
+
+                descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, renderScene->textureArray->m_arrayImage.m_vkImageView,
+                                     ElecNeko::ElecNekoSampler::m_samplerCubemap);
+
+                descriptor.BindDescriptor(device, cmdBuffer, &g_geometryStaticMeshMaskedPipeline);
+
+                ElecNeko::MeshDrawRenderer::DrawMasked(cmd, g_geometryStaticMeshMaskedPipeline, *renderScene);
+            }
+            else if (!scene->maskVertices.empty())
             {
                 g_geometryMaskPipeline.BindPipeline(cmdBuffer);
 
@@ -755,7 +932,9 @@ namespace ElecNeko
                 descriptor.BindStorageBuffer(2, &scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize);
                 descriptor.BindImage(3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
                                      ElecNeko::ElecNekoSampler::m_samplerCubemap);
+
                 descriptor.BindDescriptor(device, cmdBuffer, &g_geometryMaskPipeline);
+
                 scene->DrawMaskIndexed(cmd);
             }
 
@@ -813,7 +992,30 @@ namespace ElecNeko
 
                     csm.m_shadowMaps[i].BeginRenderPass(device, cmdBufferIndex);
 
-                    if (!scene->opaqueVertices.empty())
+                    // if (!scene->opaqueVertices.empty())
+                    // {
+                    //     csm.m_pipelines[i].BindPipeline(cmdBuffer);
+
+                    //     ElecNekoDescriptor descriptor = csm.m_pipelines[i].GetFreeDescriptor();
+                    //     descriptor.BindUniformBuffer(0, &csm.m_viewMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
+                    //     descriptor.BindUniformBuffer(1, &csm.m_projMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
+                    //     descriptor.BindStorageBuffer(2, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
+                    //     descriptor.BindDescriptor(device, cmdBuffer, &csm.m_pipelines[i]);
+                    //     scene->DrawOpaqueIndexed(cmd);
+                    // }
+                    if (renderScene != nullptr && !renderScene->drawList.shadow.empty())
+                    {
+                        csm.m_staticMeshPipelines[i].BindPipeline(cmdBuffer);
+
+                        ElecNekoDescriptor descriptor = csm.m_staticMeshPipelines[i].GetFreeDescriptor();
+                        descriptor.BindUniformBuffer(0, &csm.m_viewMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
+                        descriptor.BindUniformBuffer(1, &csm.m_projMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
+                        descriptor.BindStorageBuffer(2, &renderScene->instanceBuffer, 0, renderScene->instanceBuffer.m_vkBufferSize);
+                        descriptor.BindDescriptor(device, cmdBuffer, &csm.m_staticMeshPipelines[i]);
+
+                        ElecNeko::MeshDrawRenderer::DrawShadow(cmd, csm.m_staticMeshPipelines[i], *renderScene);
+                    }
+                    else if (!scene->opaqueVertices.empty())
                     {
                         csm.m_pipelines[i].BindPipeline(cmdBuffer);
 
@@ -824,7 +1026,37 @@ namespace ElecNeko
                         descriptor.BindDescriptor(device, cmdBuffer, &csm.m_pipelines[i]);
                         scene->DrawOpaqueIndexed(cmd);
                     }
-                    if (!scene->maskVertices.empty())
+                    // if (!scene->maskVertices.empty())
+                    // {
+                    //     csm.m_maskPipelines[i].BindPipeline(cmdBuffer);
+
+                    //     ElecNekoDescriptor descriptor = csm.m_maskDescriptors.GetFreeDescriptor();
+                    //     descriptor.BindUniformBuffer(0, &csm.m_viewMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
+                    //     descriptor.BindUniformBuffer(1, &csm.m_projMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
+                    //     descriptor.BindStorageBuffer(2, &scene->modelMatrixBuffer, 0, scene->modelMatrixBuffer.m_vkBufferSize);
+                    //     descriptor.BindStorageBuffer(3, &scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize);
+                    //     descriptor.BindImage(4, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
+                    //                          ElecNekoSampler::m_samplerCubemap);
+                    //     descriptor.BindDescriptor(device, cmdBuffer, &csm.m_maskPipelines[i]);
+                    //     scene->DrawMaskIndexed(cmd);
+                    // }
+                    if (renderScene != nullptr && renderScene->textureArray != nullptr && !renderScene->drawList.masked.empty())
+                    {
+                        csm.m_staticMeshMaskPipelines[i].BindPipeline(cmdBuffer);
+
+                        ElecNekoDescriptor descriptor = csm.m_staticMeshMaskPipelines[i].GetFreeDescriptor();
+                        descriptor.BindUniformBuffer(0, &csm.m_viewMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
+                        descriptor.BindUniformBuffer(1, &csm.m_projMatrixBuffers, i * sizeof(Mat4), sizeof(Mat4));
+                        descriptor.BindStorageBuffer(2, &renderScene->instanceBuffer, 0, renderScene->instanceBuffer.m_vkBufferSize);
+                        descriptor.BindStorageBuffer(3, &renderScene->materialBuffer, 0, renderScene->materialBuffer.m_vkBufferSize);
+                        descriptor.BindImage(4, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, renderScene->textureArray->m_arrayImage.m_vkImageView,
+                                             ElecNekoSampler::m_samplerCubemap);
+
+                        descriptor.BindDescriptor(device, cmdBuffer, &csm.m_staticMeshMaskPipelines[i]);
+
+                        ElecNeko::MeshDrawRenderer::DrawMasked(cmd, csm.m_staticMeshMaskPipelines[i], *renderScene);
+                    }
+                    else if (!scene->maskVertices.empty())
                     {
                         csm.m_maskPipelines[i].BindPipeline(cmdBuffer);
 
@@ -835,7 +1067,9 @@ namespace ElecNeko
                         descriptor.BindStorageBuffer(3, &scene->materialBuffer, 0, scene->materialBuffer.m_vkBufferSize);
                         descriptor.BindImage(4, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL, scene->textureArray->m_arrayImage.m_vkImageView,
                                              ElecNekoSampler::m_samplerCubemap);
+
                         descriptor.BindDescriptor(device, cmdBuffer, &csm.m_maskPipelines[i]);
+
                         scene->DrawMaskIndexed(cmd);
                     }
 
@@ -1189,7 +1423,7 @@ namespace ElecNeko
     void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, ElecNekoWorld *scene, RenderOption &renderOption, CascadeShadow &csm)
     {
         VkCommandBuffer cmdBuffer = device->m_vkCommandBuffers[cmdBufferIndex];
-        RHICommandList cmd(cmdBuffer);
+        RHICommandList cmd(cmdBuffer, &device->m_bufferRegistry);
 
         const int camOffset = 0;
         const int camSize = sizeof(float) * 16 * 5;

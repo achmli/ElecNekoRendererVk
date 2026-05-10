@@ -15,6 +15,8 @@
 
 #include "RHI/OffscreenRenderer.h"
 
+#include "Renderer/Scene/LegacyWorldConverter.h"
+#include "Renderer/Scene/RenderScene.h"
 #include "Scene.h"
 
 #include "imgui_impl_glfw.h"
@@ -168,10 +170,39 @@ void Application::Initialize()
     {
         light->UpdateUBO(&m_deviceContext);
     }
-    m_scene = new ElecNeko::Scene();
+    // m_scene = new ElecNeko::Scene();
+    // m_scene->Initialize(&m_deviceContext, world);
+    // m_scene->MakeVBO(&m_deviceContext);
+    // m_scene->MakeUBO(&m_deviceContext);
+    // m_scene = new ElecNeko::Scene();
+    // m_scene->SetBuildLegacyOpaqueGeometry(false);
+    // m_scene->Initialize(&m_deviceContext, world);
+    // m_scene->MakeVBO(&m_deviceContext);
+    // m_scene->MakeUBO(&m_deviceContext);
+    m_scene = new ElecNeko::Scene;
+
+    m_scene->SetBuildLegacyOpaqueGeometry(false);
+    m_scene->SetBuildLegacyMaskedGeometry(false);
+    m_scene->SetBuildLegacyTransparentGeometry(false);
+
     m_scene->Initialize(&m_deviceContext, world);
     m_scene->MakeVBO(&m_deviceContext);
     m_scene->MakeUBO(&m_deviceContext);
+
+    printf("[Legacy Scene] opaqueVerts=%zu opaqueIdx=%zu maskVerts=%zu maskIdx=%zu transparentVerts=%zu transparentIdx=%zu materials=%zu matrices=%zu "
+           "textureArray=%p\n",
+           m_scene->opaqueVertices.size(), m_scene->opaqueIndices.size(), m_scene->maskVertices.size(), m_scene->maskIndices.size(),
+           m_scene->transparentVertices.size(), m_scene->transparentIndices.size(), m_scene->materials.size(), m_scene->modelMatrices.size(),
+           static_cast<void *>(m_scene->textureArray));
+
+    m_renderScene = ElecNeko::ConvertLegacyWorldToRenderScene(&m_deviceContext, world).release();
+
+    printf("[RenderScene] meshes=%zu instances=%zu opaque=%zu masked=%zu transparent=%zu shadow=%zu gpuInstances=%zu gpuMaterials=%zu instanceBuffer=%llu "
+           "materialBuffer=%llu\n",
+           m_renderScene->meshes.size(), m_renderScene->meshInstances.size(), m_renderScene->drawList.opaque.size(), m_renderScene->drawList.masked.size(),
+           m_renderScene->drawList.transparent.size(), m_renderScene->drawList.shadow.size(), m_renderScene->gpuInstances.size(),
+           m_renderScene->gpuMaterials.size(), static_cast<unsigned long long>(m_renderScene->instanceBuffer.m_vkBufferSize),
+           static_cast<unsigned long long>(m_renderScene->materialBuffer.m_vkBufferSize));
 
     m_shadowCamera.Initialize(world->m_cam->position + Vec3(renderOption.sunDirection) * 10, world->m_cam->position, static_cast<float>(WINDOW_WIDTH),
                               static_cast<float>(WINDOW_HEIGHT), 25, 175);
@@ -519,6 +550,13 @@ void Application::Cleanup()
 
     m_skyBox.Cleanup(&m_deviceContext);
 
+    if (m_renderScene != nullptr)
+    {
+        m_renderScene->Cleanup(&m_deviceContext);
+        delete m_renderScene;
+        m_renderScene = nullptr;
+    }
+
     m_scene->Cleanup(&m_deviceContext);
     delete m_scene;
 
@@ -840,7 +878,7 @@ void Application::MainLoop()
             printf("frame dt_ms: %.2f %.2f %.2f", avgTime * 0.001f, maxTime * 0.001f, dt_us * 0.001f);
         }
 
-        if (deletingWorld && deletingScene)
+        if (deletingWorld && deletingScene && deletingRenderScene)
         {
             /*int deletingNums = m_toDeleteMeshes.size();
             for (int i = 0; i < deletingNums; i++)
@@ -865,12 +903,18 @@ void Application::MainLoop()
             }
             else
             {
+                deletingRenderScene->Cleanup(&m_deviceContext);
+                delete deletingRenderScene;
+                deletingRenderScene = nullptr;
+
                 deletingScene->Cleanup(&m_deviceContext);
                 delete deletingScene;
                 deletingScene = nullptr;
+
                 deletingWorld->LightClean(&m_deviceContext);
                 delete deletingWorld;
                 deletingWorld = nullptr;
+
                 currentLoop = 0;
             }
         }
@@ -1142,7 +1186,8 @@ void Application::DrawFrame()
     // Draw everything in an offscreen buffer
     // DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
     // ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes, renderOption);
-    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_scene, renderOption, m_csm);
+    // ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_scene, renderOption, m_csm);
+    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_scene, renderOption, m_csm, m_renderScene);
     //
     //	Draw the offscreen framebuffer to the swap chain frame buffer
     //
@@ -1194,8 +1239,15 @@ void Application::DrawFrame()
             {
                 sceneName = m_sceneFiles[sampleSceneIdx].string();
 
+                // deletingWorld = world;
+                // deletingScene = m_scene;
+                // world = new ElecNeko::World;
+                // world->LoadSceneFromFile(&m_deviceContext, sceneName);
+                // world->CreateDefaultTextures(&m_deviceContext);
                 deletingWorld = world;
                 deletingScene = m_scene;
+                deletingRenderScene = m_renderScene;
+
                 world = new ElecNeko::World;
                 world->LoadSceneFromFile(&m_deviceContext, sceneName);
                 world->CreateDefaultTextures(&m_deviceContext);
@@ -1208,10 +1260,42 @@ void Application::DrawFrame()
                 // {
                 //     mate.MakeBuffer(&m_deviceContext);
                 // }
-                m_scene = new ElecNeko::Scene;
+                // m_scene = new ElecNeko::Scene;
+                // m_scene->Initialize(&m_deviceContext, world);
+                // m_scene->MakeVBO(&m_deviceContext);
+                // m_scene->MakeUBO(&m_deviceContext);
+                // m_scene = new ElecNeko::Scene;
+                // m_scene->SetBuildLegacyOpaqueGeometry(false);
+                // m_scene->Initialize(&m_deviceContext, world);
+                // m_scene->MakeVBO(&m_deviceContext);
+                // m_scene->MakeUBO(&m_deviceContext);
+                m_scene = new ElecNeko::Scene();
+
+                m_scene->SetBuildLegacyOpaqueGeometry(false);
+                m_scene->SetBuildLegacyMaskedGeometry(false);
+                m_scene->SetBuildLegacyTransparentGeometry(false);
+
                 m_scene->Initialize(&m_deviceContext, world);
                 m_scene->MakeVBO(&m_deviceContext);
                 m_scene->MakeUBO(&m_deviceContext);
+
+
+                printf("[Legacy Scene] opaqueVerts=%zu opaqueIdx=%zu maskVerts=%zu maskIdx=%zu transparentVerts=%zu transparentIdx=%zu materials=%zu "
+                       "matrices=%zu "
+                       "textureArray=%p\n",
+                       m_scene->opaqueVertices.size(), m_scene->opaqueIndices.size(), m_scene->maskVertices.size(), m_scene->maskIndices.size(),
+                       m_scene->transparentVertices.size(), m_scene->transparentIndices.size(), m_scene->materials.size(), m_scene->modelMatrices.size(),
+                       static_cast<void *>(m_scene->textureArray));
+
+                m_renderScene = ElecNeko::ConvertLegacyWorldToRenderScene(&m_deviceContext, world).release();
+
+                printf("[RenderScene] meshes=%zu instances=%zu opaque=%zu masked=%zu transparent=%zu shadow=%zu gpuInstances=%zu gpuMaterials=%zu "
+                       "instanceBuffer=%llu materialBuffer=%llu\n",
+                       m_renderScene->meshes.size(), m_renderScene->meshInstances.size(), m_renderScene->drawList.opaque.size(),
+                       m_renderScene->drawList.masked.size(), m_renderScene->drawList.transparent.size(), m_renderScene->drawList.shadow.size(),
+                       m_renderScene->gpuInstances.size(), m_renderScene->gpuMaterials.size(),
+                       static_cast<unsigned long long>(m_renderScene->instanceBuffer.m_vkBufferSize),
+                       static_cast<unsigned long long>(m_renderScene->materialBuffer.m_vkBufferSize));
             }
         }
         ImGui::Checkbox("Deferred Rendering", &renderOption.isDeferred);

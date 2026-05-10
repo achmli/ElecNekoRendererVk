@@ -118,6 +118,7 @@ namespace ElecNeko
         {
             USAGE_DEFAULT,
             USAGE_MESH,
+            USAGE_STATIC_MESH,
             USAGE_FULL_SCREEN,
             USAGE_TRANSPARENCY
         };

@@ -24,12 +24,15 @@
 #include "Loader/Mesh.h"
 
 #include "Scene/CascadedShadow.h"
+#include "Scene/ElecNekoWorld.h"
 #include "Scene/SkyBox.h"
 #include "Scene/World.h"
-#include "Scene/ElecNekoWorld.h"
+
 
 #include "RenderOption.h"
 #include "Scene.h"
+
+#include "Renderer/Scene/RenderScene.h"
 
 /*
 ====================================================
@@ -112,6 +115,9 @@ private:
 
     ElecNeko::Scene *m_scene;
     ElecNeko::Scene *deletingScene = nullptr;
+
+    ElecNeko::RenderScene *m_renderScene = nullptr;
+    ElecNeko::RenderScene *deletingRenderScene = nullptr;
 
     ElecNeko::ElecNekoWorld *m_elecNekoWorld;
 

@@ -116,4 +116,4 @@ if (WIN32 AND EXISTS "${SHADERC_SDK_PATH}/bin/shaderc_shared.dll")
     message(STATUS "will copy shaderc_shared.dll")
 endif ()
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE USE_SHADERC=1)
+target_compile_definitions(${PROJECT_NAME} PRIVATE USE_SHADERC=1) 

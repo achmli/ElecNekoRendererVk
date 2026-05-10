@@ -29,6 +29,9 @@ namespace ElecNeko
 
         Buffer m_vertexBuffer;
         Buffer m_indexBuffer;
+
+        RHI::BufferHandle m_vertexBufferHandle;
+        RHI::BufferHandle m_indexBufferHandle;
     };
 
     class ElecNekoMeshInstance

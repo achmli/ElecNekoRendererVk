@@ -75,6 +75,14 @@ namespace ElecNeko
         bool Initialize(DeviceContext *device, World *inWorld);
         void Cleanup(DeviceContext *device);
 
+        void SetBuildLegacyOpaqueGeometry(bool enabled) { m_buildLegacyOpaqueGeometry = enabled; }
+
+        void SetBuildLegacyMaskedGeometry(bool enabled) { m_buildLegacyMaskedGeometry = enabled; }
+
+        void SetBuildLegacyTransparentGeometry(bool enabled) { m_buildLegacyTransparentGeometry = enabled; }
+
+        bool NeedsLegacyGeometry() const { return m_buildLegacyOpaqueGeometry || m_buildLegacyMaskedGeometry || m_buildLegacyTransparentGeometry; }
+
         // void DrawOpaqueIndexed(VkCommandBuffer vkCommandBuffer);
         // void DrawMaskIndexed(VkCommandBuffer vkCommandBuffer);
         // void DrawTransparentIndexed(VkCommandBuffer vkCommandBuffer);
@@ -84,6 +92,11 @@ namespace ElecNeko
 
         bool MakeVBO(DeviceContext *device);
         bool MakeUBO(DeviceContext *device);
+
+    private:
+        bool m_buildLegacyOpaqueGeometry = true;
+        bool m_buildLegacyMaskedGeometry = true;
+        bool m_buildLegacyTransparentGeometry = true;
 
     public:
         std::vector<ElecNekoVertex> opaqueVertices;
@@ -113,5 +126,14 @@ namespace ElecNeko
 
         Buffer materialBuffer;
         Buffer modelMatrixBuffer;
+
+        RHI::BufferHandle opaqueVertexBufferHandle;
+        RHI::BufferHandle opaqueIndexBufferHandle;
+
+        RHI::BufferHandle maskVertexBufferHandle;
+        RHI::BufferHandle maskIndexBufferHandle;
+
+        RHI::BufferHandle transparentVertexBufferHandle;
+        RHI::BufferHandle transparentIndexBufferHandle;
     };
 } // namespace ElecNeko

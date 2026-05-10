@@ -120,6 +120,9 @@ namespace ElecNeko
         Buffer m_indexBuffer;
         Buffer m_uniformBuffer;
 
+        RHI::BufferHandle m_vertexBufferHandle;
+        RHI::BufferHandle m_indexBufferHandle;
+
         bool m_isVBO;
     };
 

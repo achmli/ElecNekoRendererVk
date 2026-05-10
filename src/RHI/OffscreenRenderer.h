@@ -15,6 +15,7 @@ namespace ElecNeko
     class SkyBox;
     class World;
     class Scene;
+    class RenderScene;
     class ElecNekoWorld;
     class CascadeShadow;
 
@@ -23,8 +24,10 @@ namespace ElecNeko
 
     bool ReinitializeSky(DeviceContext *device, const RenderOption &renderOption);
 
+    // void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, Scene *scene, RenderOption &renderOption,
+    //                    CascadeShadow &csm);
     void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, Scene *scene, RenderOption &renderOption,
-                       CascadeShadow &csm);
+                       CascadeShadow &csm, RenderScene *renderScene = nullptr);
 
     void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, ElecNekoWorld *scene, RenderOption &renderOption, CascadeShadow &csm);
 } // namespace ElecNeko

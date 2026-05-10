@@ -27,6 +27,9 @@ namespace ElecNeko
             return false;
         }
 
+        vertexBufferHandle = device->m_bufferRegistry.Register(&m_vertexBuffer);
+        indexBufferHandle = device->m_bufferRegistry.Register(&m_indexBuffer);
+
         return true;
     }
 
@@ -1058,12 +1061,13 @@ namespace ElecNeko
 
             // // bind index buffer
             // vkCmdBindIndexBuffer(cmd, model->m_indexBuffer.m_vkBuffer, 0, VK_INDEX_TYPE_UINT32);
-            VkBuffer vbs[] = {model->m_vertexBuffer.m_vkBuffer, instanceBuffer.m_vkBuffer};
+            RHI::BufferHandle buffers[] = {model->vertexBufferHandle, instanceBufferHandle};
 
-            VkDeviceSize offsets[] = {model->m_vertexBuffer.m_offset, instanceBuffer.m_offset};
+            VkDeviceSize offsets[] = {0, 0};
 
-            cmd.SetVertexBuffers(0, 2, vbs, offsets);
-            cmd.SetIndexBuffer(model->m_indexBuffer, RHIIndexFormat::UInt32);
+            cmd.SetVertexBuffers(0, 2, buffers, offsets);
+
+            cmd.SetIndexBuffer(model->indexBufferHandle, RHIIndexFormat::UInt32);
 
             // We must issue vkCmdDrawIndexedIndirect for this mesh's section
             // However if you need per-submesh material descriptor bind before each sub-draw, you can provide bindMaterialFn to do that.
@@ -1096,7 +1100,7 @@ namespace ElecNeko
             {
                 // one big multi-draw for this mesh
                 // vkCmdDrawIndexedIndirect(cmd, indirectBuffer.m_vkBuffer, info.indirectOffsetInBytes, info.drawCount, sizeof(VkDrawIndexedIndirectCommand));
-                cmd.DrawIndexedIndirect(indirectBuffer, info.indirectOffsetInBytes, info.drawCount, sizeof(VkDrawIndexedIndirectCommand));
+                cmd.DrawIndexedIndirect(indirectBufferHandle, info.indirectOffsetInBytes, info.drawCount, sizeof(VkDrawIndexedIndirectCommand));
             }
             else
             {
@@ -1109,7 +1113,7 @@ namespace ElecNeko
                     bindMaterialFunc(-1); // placeholder: bind generic / fallback descriptor or use material SSBO.
                     // vkCmdDrawIndexedIndirect(cmd, indirectBuffer.m_vkBuffer, info.indirectOffsetInBytes + di * stride, 1,
                     // sizeof(VkDrawIndexedIndirectCommand));
-                    cmd.DrawIndexedIndirect(indirectBuffer, info.indirectOffsetInBytes + di * stride, 1, sizeof(VkDrawIndexedIndirectCommand));
+                    cmd.DrawIndexedIndirect(indirectBufferHandle, info.indirectOffsetInBytes + di * stride, 1, sizeof(VkDrawIndexedIndirectCommand));
                 }
             }
         }

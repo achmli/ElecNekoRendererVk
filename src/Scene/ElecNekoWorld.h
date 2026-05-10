@@ -39,6 +39,9 @@ namespace ElecNeko
         Buffer m_vertexBuffer;
         Buffer m_indexBuffer;
 
+        RHI::BufferHandle vertexBufferHandle;
+        RHI::BufferHandle indexBufferHandle;
+
         bool MakeVBO(DeviceContext *device);
         void Cleanup(DeviceContext *device);
     };
@@ -91,6 +94,9 @@ namespace ElecNeko
 
         Buffer instanceBuffer;
         Buffer indirectBuffer;
+
+        RHI::BufferHandle instanceBufferHandle;
+        RHI::BufferHandle indirectBufferHandle;
 
         uint32_t indirectCount = 0;
         std::unordered_map<int, MeshIndirectInfo> meshIndirectInfos;

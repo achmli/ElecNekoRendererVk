@@ -21,26 +21,58 @@ namespace ElecNeko
         // textures.reserve(world->m_textures.size() + 1);
         // textures.insert(textures.end(), world->m_textures.begin(), world->m_textures.end());
         // textures.push_back(world->defaultAlbedo);
-        std::vector<TextureProperty> properties;
-        properties.reserve(world->m_textures.size() + 1);
-        for (auto tex: world->m_textures)
+        // std::vector<TextureProperty> properties;
+        // properties.reserve(world->m_textures.size() + 1);
+        // for (auto tex: world->m_textures)
+        // {
+        //     properties.push_back(tex->ExtractProperties());
+        // }
+        // properties.push_back(world->defaultAlbedo->ExtractProperties());
+        // textureArray = new TextureArray();
+        // if (!textureArray->CreateFromData(device, properties, 2048, 2048, 4))
+        // {
+        //     printf("Failed to create texture array!\n");
+        //     assert(0);
+        //     return false;
+        // }
+        if (NeedsLegacyGeometry())
         {
-            properties.push_back(tex->ExtractProperties());
-        }
-        properties.push_back(world->defaultAlbedo->ExtractProperties());
-        textureArray = new TextureArray();
-        if (!textureArray->CreateFromData(device, properties, 2048, 2048, 4))
-        {
-            printf("Failed to create texture array!\n");
-            assert(0);
-            return false;
+            std::vector<TextureProperty> properties;
+            properties.reserve(world->m_textures.size() + 1);
+
+            for (auto tex: world->m_textures)
+            {
+                properties.push_back(tex->ExtractProperties());
+            }
+
+            properties.push_back(world->defaultAlbedo->ExtractProperties());
+
+            textureArray = new TextureArray();
+
+            if (!textureArray->CreateFromData(device, properties, 2048, 2048, 4))
+            {
+                printf("Failed to create texture array!\n");
+                assert(0);
+                return false;
+            }
         }
 
+        // materials.clear();
+        // materials.reserve(world->m_materials.size());
+        // for (auto material: world->m_materials)
+        // {
+        //     materials.push_back(material.MakeStrcut());
+        // }
         materials.clear();
-        materials.reserve(world->m_materials.size());
-        for (auto material: world->m_materials)
+
+        if (NeedsLegacyGeometry())
         {
-            materials.push_back(material.MakeStrcut());
+            materials.reserve(world->m_materials.size());
+
+            for (auto material: world->m_materials)
+            {
+                materials.push_back(material.MakeStrcut());
+            }
         }
 
         int opaqueIndexOffset = 0;
@@ -51,25 +83,73 @@ namespace ElecNeko
             int matID = world->m_meshInstances[i].materialId;
             int meshID = world->m_meshInstances[i].meshId;
 
-            modelMatrices.push_back(world->m_meshInstances[i].transform);
+            // modelMatrices.push_back(world->m_meshInstances[i].transform);
+            if (NeedsLegacyGeometry())
+            {
+                modelMatrices.push_back(world->m_meshInstances[i].transform);
+            }
 
+            // for (int j = 0; j < world->m_meshes[meshID]->m_indices.size(); j++)
+            // {
+            //     uint32_t idx = world->m_meshes[meshID]->m_indices[j];
+            //     if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+            //     {
+            //         idx += maskIndexOffset;
+            //         maskIndices.push_back(idx);
+            //     }
+            //     else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+            //     {
+            //         idx += transparentIndexOffset;
+            //         transparentIndices.push_back(idx);
+            //     }
+            //     else
+            //     {
+            //         idx += opaqueIndexOffset;
+            //         opaqueIndices.push_back(idx);
+            //     }
+            // }
             for (int j = 0; j < world->m_meshes[meshID]->m_indices.size(); j++)
             {
                 uint32_t idx = world->m_meshes[meshID]->m_indices[j];
+
+                // if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+                // {
+                //     idx += maskIndexOffset;
+                //     maskIndices.push_back(idx);
+                // }
+                // else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+                // {
+                //     idx += transparentIndexOffset;
+                //     transparentIndices.push_back(idx);
+                // }
+                // else if (m_buildLegacyOpaqueGeometry)
+                // {
+                //     idx += opaqueIndexOffset;
+                //     opaqueIndices.push_back(idx);
+                // }
                 if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
                 {
-                    idx += maskIndexOffset;
-                    maskIndices.push_back(idx);
+                    if (m_buildLegacyMaskedGeometry)
+                    {
+                        idx += maskIndexOffset;
+                        maskIndices.push_back(idx);
+                    }
                 }
                 else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
                 {
-                    idx += transparentIndexOffset;
-                    transparentIndices.push_back(idx);
+                    if (m_buildLegacyTransparentGeometry)
+                    {
+                        idx += transparentIndexOffset;
+                        transparentIndices.push_back(idx);
+                    }
                 }
                 else
                 {
-                    idx += opaqueIndexOffset;
-                    opaqueIndices.push_back(idx);
+                    if (m_buildLegacyOpaqueGeometry)
+                    {
+                        idx += opaqueIndexOffset;
+                        opaqueIndices.push_back(idx);
+                    }
                 }
             }
 
@@ -89,30 +169,98 @@ namespace ElecNeko
 
                 v.materialIdx = matID;
                 v.modelMatrixIdx = i;
+                // if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+                // {
+                //     maskVertices.push_back(v);
+                // }
+                // else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+                // {
+                //     transparentVertices.push_back(v);
+                // }
+                // else
+                // {
+                //     opaqueVertices.push_back(v);
+                // }
+                // if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+                // {
+                //     maskVertices.push_back(v);
+                // }
+                // else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+                // {
+                //     transparentVertices.push_back(v);
+                // }
+                // else if (m_buildLegacyOpaqueGeometry)
+                // {
+                //     opaqueVertices.push_back(v);
+                // }
                 if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
                 {
-                    maskVertices.push_back(v);
+                    if (m_buildLegacyMaskedGeometry)
+                    {
+                        maskVertices.push_back(v);
+                    }
                 }
                 else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
                 {
-                    transparentVertices.push_back(v);
+                    if (m_buildLegacyTransparentGeometry)
+                    {
+                        transparentVertices.push_back(v);
+                    }
                 }
                 else
                 {
-                    opaqueVertices.push_back(v);
+                    if (m_buildLegacyOpaqueGeometry)
+                    {
+                        opaqueVertices.push_back(v);
+                    }
                 }
             }
+            // if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+            // {
+            //     maskIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+            // }
+            // else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+            // {
+            //     transparentIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+            // }
+            // else
+            // {
+            //     opaqueIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+            // }
+            // if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+            // {
+            //     maskIndexOffset += static_cast<int>(world->m_meshes[meshID]->m_vertices.size());
+            // }
+            // else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+            // {
+            //     transparentIndexOffset += static_cast<int>(world->m_meshes[meshID]->m_vertices.size());
+            // }
+            // else if (m_buildLegacyOpaqueGeometry)
+            // {
+            //     opaqueIndexOffset += static_cast<int>(world->m_meshes[meshID]->m_vertices.size());
+            // }
+            const int vertexCount = static_cast<int>(world->m_meshes[meshID]->m_vertices.size());
+
             if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
             {
-                maskIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+                if (m_buildLegacyMaskedGeometry)
+                {
+                    maskIndexOffset += vertexCount;
+                }
             }
             else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
             {
-                transparentIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+                if (m_buildLegacyTransparentGeometry)
+                {
+                    transparentIndexOffset += vertexCount;
+                }
             }
             else
             {
-                opaqueIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+                if (m_buildLegacyOpaqueGeometry)
+                {
+                    opaqueIndexOffset += vertexCount;
+                }
             }
         }
 
@@ -122,26 +270,58 @@ namespace ElecNeko
     bool Scene::Initialize(DeviceContext *device, World *inWorld)
     {
         world = inWorld;
-        std::vector<TextureProperty> properties;
-        properties.reserve(world->m_textures.size() + 1);
-        for (auto tex: world->m_textures)
+        // std::vector<TextureProperty> properties;
+        // properties.reserve(world->m_textures.size() + 1);
+        // for (auto tex: world->m_textures)
+        // {
+        //     properties.push_back(tex->ExtractProperties());
+        // }
+        // properties.push_back(world->defaultAlbedo->ExtractProperties());
+        // textureArray = new TextureArray();
+        // if (!textureArray->CreateFromData(device, properties, 2048, 2048, 4))
+        // {
+        //     printf("Failed to create texture array!\n");
+        //     assert(0);
+        //     return false;
+        // }
+        if (NeedsLegacyGeometry())
         {
-            properties.push_back(tex->ExtractProperties());
-        }
-        properties.push_back(world->defaultAlbedo->ExtractProperties());
-        textureArray = new TextureArray();
-        if (!textureArray->CreateFromData(device, properties, 2048, 2048, 4))
-        {
-            printf("Failed to create texture array!\n");
-            assert(0);
-            return false;
+            std::vector<TextureProperty> properties;
+            properties.reserve(world->m_textures.size() + 1);
+
+            for (auto tex: world->m_textures)
+            {
+                properties.push_back(tex->ExtractProperties());
+            }
+
+            properties.push_back(world->defaultAlbedo->ExtractProperties());
+
+            textureArray = new TextureArray();
+
+            if (!textureArray->CreateFromData(device, properties, 2048, 2048, 4))
+            {
+                printf("Failed to create texture array!\n");
+                assert(0);
+                return false;
+            }
         }
 
+        // materials.clear();
+        // materials.reserve(world->m_materials.size());
+        // for (auto material: world->m_materials)
+        // {
+        //     materials.push_back(material.MakeStrcut());
+        // }
         materials.clear();
-        materials.reserve(world->m_materials.size());
-        for (auto material: world->m_materials)
+
+        if (NeedsLegacyGeometry())
         {
-            materials.push_back(material.MakeStrcut());
+            materials.reserve(world->m_materials.size());
+
+            for (auto material: world->m_materials)
+            {
+                materials.push_back(material.MakeStrcut());
+            }
         }
 
         int opaqueIndexOffset = 0;
@@ -152,25 +332,73 @@ namespace ElecNeko
             int matID = world->m_meshInstances[i].materialId;
             int meshID = world->m_meshInstances[i].meshId;
 
-            modelMatrices.push_back(world->m_meshInstances[i].transform);
+            // modelMatrices.push_back(world->m_meshInstances[i].transform);
+            if (NeedsLegacyGeometry())
+            {
+                modelMatrices.push_back(world->m_meshInstances[i].transform);
+            }
 
+            // for (int j = 0; j < world->m_meshes[meshID]->m_indices.size(); j++)
+            // {
+            //     uint32_t idx = world->m_meshes[meshID]->m_indices[j];
+            //     if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+            //     {
+            //         idx += maskIndexOffset;
+            //         maskIndices.push_back(idx);
+            //     }
+            //     else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+            //     {
+            //         idx += transparentIndexOffset;
+            //         transparentIndices.push_back(idx);
+            //     }
+            //     else
+            //     {
+            //         idx += opaqueIndexOffset;
+            //         opaqueIndices.push_back(idx);
+            //     }
+            // }
             for (int j = 0; j < world->m_meshes[meshID]->m_indices.size(); j++)
             {
                 uint32_t idx = world->m_meshes[meshID]->m_indices[j];
+
+                // if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+                // {
+                //     idx += maskIndexOffset;
+                //     maskIndices.push_back(idx);
+                // }
+                // else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+                // {
+                //     idx += transparentIndexOffset;
+                //     transparentIndices.push_back(idx);
+                // }
+                // else if (m_buildLegacyOpaqueGeometry)
+                // {
+                //     idx += opaqueIndexOffset;
+                //     opaqueIndices.push_back(idx);
+                // }
                 if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
                 {
-                    idx += maskIndexOffset;
-                    maskIndices.push_back(idx);
+                    if (m_buildLegacyMaskedGeometry)
+                    {
+                        idx += maskIndexOffset;
+                        maskIndices.push_back(idx);
+                    }
                 }
                 else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
                 {
-                    idx += transparentIndexOffset;
-                    transparentIndices.push_back(idx);
+                    if (m_buildLegacyTransparentGeometry)
+                    {
+                        idx += transparentIndexOffset;
+                        transparentIndices.push_back(idx);
+                    }
                 }
                 else
                 {
-                    idx += opaqueIndexOffset;
-                    opaqueIndices.push_back(idx);
+                    if (m_buildLegacyOpaqueGeometry)
+                    {
+                        idx += opaqueIndexOffset;
+                        opaqueIndices.push_back(idx);
+                    }
                 }
             }
 
@@ -190,30 +418,98 @@ namespace ElecNeko
 
                 v.materialIdx = matID;
                 v.modelMatrixIdx = i;
+                // if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+                // {
+                //     maskVertices.push_back(v);
+                // }
+                // else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+                // {
+                //     transparentVertices.push_back(v);
+                // }
+                // else
+                // {
+                //     opaqueVertices.push_back(v);
+                // }
+                // if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+                // {
+                //     maskVertices.push_back(v);
+                // }
+                // else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+                // {
+                //     transparentVertices.push_back(v);
+                // }
+                // else if (m_buildLegacyOpaqueGeometry)
+                // {
+                //     opaqueVertices.push_back(v);
+                // }
                 if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
                 {
-                    maskVertices.push_back(v);
+                    if (m_buildLegacyMaskedGeometry)
+                    {
+                        maskVertices.push_back(v);
+                    }
                 }
                 else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
                 {
-                    transparentVertices.push_back(v);
+                    if (m_buildLegacyTransparentGeometry)
+                    {
+                        transparentVertices.push_back(v);
+                    }
                 }
                 else
                 {
-                    opaqueVertices.push_back(v);
+                    if (m_buildLegacyOpaqueGeometry)
+                    {
+                        opaqueVertices.push_back(v);
+                    }
                 }
             }
+            // if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+            // {
+            //     maskIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+            // }
+            // else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+            // {
+            //     transparentIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+            // }
+            // else
+            // {
+            //     opaqueIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+            // }
+            // if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
+            // {
+            //     maskIndexOffset += static_cast<int>(world->m_meshes[meshID]->m_vertices.size());
+            // }
+            // else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
+            // {
+            //     transparentIndexOffset += static_cast<int>(world->m_meshes[meshID]->m_vertices.size());
+            // }
+            // else if (m_buildLegacyOpaqueGeometry)
+            // {
+            //     opaqueIndexOffset += static_cast<int>(world->m_meshes[meshID]->m_vertices.size());
+            // }
+            const int vertexCount = static_cast<int>(world->m_meshes[meshID]->m_vertices.size());
+
             if (world->m_materials[matID].alphaMode == AlphaMode::Mask)
             {
-                maskIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+                if (m_buildLegacyMaskedGeometry)
+                {
+                    maskIndexOffset += vertexCount;
+                }
             }
             else if (world->m_materials[matID].alphaMode == AlphaMode::Blend)
             {
-                transparentIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+                if (m_buildLegacyTransparentGeometry)
+                {
+                    transparentIndexOffset += vertexCount;
+                }
             }
             else
             {
-                opaqueIndexOffset += world->m_meshes[meshID]->m_vertices.size();
+                if (m_buildLegacyOpaqueGeometry)
+                {
+                    opaqueIndexOffset += vertexCount;
+                }
             }
         }
 
@@ -240,6 +536,9 @@ namespace ElecNeko
                 assert(0);
                 return false;
             }
+
+            opaqueVertexBufferHandle = device->m_bufferRegistry.Register(&opaqueVertexBuffer);
+            opaqueIndexBufferHandle = device->m_bufferRegistry.Register(&opaqueIndexBuffer);
         }
 
         if (!maskVertices.empty())
@@ -259,6 +558,9 @@ namespace ElecNeko
                 assert(0);
                 return false;
             }
+
+            maskVertexBufferHandle = device->m_bufferRegistry.Register(&maskVertexBuffer);
+            maskIndexBufferHandle = device->m_bufferRegistry.Register(&maskIndexBuffer);
         }
 
         if (!transparentVertices.empty())
@@ -278,6 +580,9 @@ namespace ElecNeko
                 assert(0);
                 return false;
             }
+
+            transparentVertexBufferHandle = device->m_bufferRegistry.Register(&transparentVertexBuffer);
+            transparentIndexBufferHandle = device->m_bufferRegistry.Register(&transparentIndexBuffer);
         }
 
         return true;
@@ -285,6 +590,11 @@ namespace ElecNeko
 
     bool Scene::MakeUBO(DeviceContext *device)
     {
+        if (!NeedsLegacyGeometry())
+        {
+            return true;
+        }
+
         if (!materials.empty())
         {
             int bufferSize = static_cast<int>(sizeof(Material_t) * materials.size());
@@ -344,7 +654,13 @@ namespace ElecNeko
             modelMatrixBuffer.Cleanup(device);
         }
 
-        textureArray->Cleanup(device);
+        // textureArray->Cleanup(device);
+        if (textureArray != nullptr)
+        {
+            textureArray->Cleanup(device);
+            delete textureArray;
+            textureArray = nullptr;
+        }
     }
 
     // void Scene::DrawOpaqueIndexed(VkCommandBuffer vkCommandBuffer)
@@ -358,8 +674,8 @@ namespace ElecNeko
     // }
     void Scene::DrawOpaqueIndexed(RHICommandList &cmd)
     {
-        cmd.SetVertexBuffer(opaqueVertexBuffer, 0);
-        cmd.SetIndexBuffer(opaqueIndexBuffer, RHIIndexFormat::UInt32);
+        cmd.SetVertexBuffer(opaqueVertexBufferHandle, 0);
+        cmd.SetIndexBuffer(opaqueIndexBufferHandle, RHIIndexFormat::UInt32);
 
         cmd.DrawIndexed(static_cast<uint32_t>(opaqueIndices.size()), 1, 0, 0, 0);
     }
@@ -375,8 +691,8 @@ namespace ElecNeko
     // }
     void Scene::DrawMaskIndexed(RHICommandList &cmd)
     {
-        cmd.SetVertexBuffer(maskVertexBuffer, 0);
-        cmd.SetIndexBuffer(maskIndexBuffer, RHIIndexFormat::UInt32);
+        cmd.SetVertexBuffer(maskVertexBufferHandle, 0);
+        cmd.SetIndexBuffer(maskIndexBufferHandle, RHIIndexFormat::UInt32);
 
         cmd.DrawIndexed(static_cast<uint32_t>(maskIndices.size()), 1, 0, 0, 0);
     }
@@ -392,8 +708,8 @@ namespace ElecNeko
     // }
     void Scene::DrawTransparentIndexed(RHICommandList &cmd)
     {
-        cmd.SetVertexBuffer(transparentVertexBuffer, 0);
-        cmd.SetIndexBuffer(transparentIndexBuffer, RHIIndexFormat::UInt32);
+        cmd.SetVertexBuffer(transparentVertexBufferHandle, 0);
+        cmd.SetIndexBuffer(transparentIndexBufferHandle, RHIIndexFormat::UInt32);
 
         cmd.DrawIndexed(static_cast<uint32_t>(transparentIndices.size()), 1, 0, 0, 0);
     }

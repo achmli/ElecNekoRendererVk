@@ -8,9 +8,12 @@
 #include "ElecNekoShader.h"
 #include "FrameBuffer.h"
 #include "Loader/Mesh.h"
+#include "Renderer/Mesh/MeshVertex.h"
 #include "Scene.h"
 #include "model.h"
 #include "shader.h"
+
+#include <cstddef>
 
 /*
 ========================================================================================================
@@ -1173,6 +1176,45 @@ bool Pipeline::CreateForTransparency(DeviceContext *device, const CreateParms_t 
     return true;
 }
 
+namespace
+{
+    VkVertexInputBindingDescription GetStaticMeshVertexBindingDescription()
+    {
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(ElecNeko::MeshVertex);
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return bindingDescription;
+    }
+
+    std::vector<VkVertexInputAttributeDescription> GetStaticMeshVertexAttributeDescriptions()
+    {
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions(4);
+
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(ElecNeko::MeshVertex, position);
+
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(ElecNeko::MeshVertex, uv);
+
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(ElecNeko::MeshVertex, normal);
+
+        attributeDescriptions[3].binding = 0;
+        attributeDescriptions[3].location = 3;
+        attributeDescriptions[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        attributeDescriptions[3].offset = offsetof(ElecNeko::MeshVertex, tangent);
+
+        return attributeDescriptions;
+    }
+} // namespace
+
 
 namespace ElecNeko
 {
@@ -1237,28 +1279,70 @@ namespace ElecNeko
             return false;
         }
 
+        // VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+        // vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+        // VkVertexInputBindingDescription bindingDescription;
+        // std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions;
+
+        // if (usage != USAGE_FULL_SCREEN)
+        // {
+
+        //     if (usage == Usage_t::USAGE_MESH || usage == Usage_t::USAGE_TRANSPARENCY)
+        //     {
+        //         bindingDescription = ElecNeko::ElecNekoVertex::GetBindingDescription();
+        //         attributeDescriptions = ElecNeko::ElecNekoVertex::GetAttributeDescriptions();
+        //     }
+        //     else
+        //     {
+        //         bindingDescription = vert_t::GetBindingDescription();
+        //         attributeDescriptions = vert_t::GetAttributeDescriptions();
+        //     }
+
+        //     vertexInputInfo.vertexBindingDescriptionCount = 1;
+        //     vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t) attributeDescriptions.size();
+        //     vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        //     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+        // }
+        // else
+        // {
+        //     vertexInputInfo.vertexBindingDescriptionCount = 0;
+        //     vertexInputInfo.vertexAttributeDescriptionCount = 0;
+        //     vertexInputInfo.pVertexBindingDescriptions = nullptr;
+        //     vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+        // }
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-        VkVertexInputBindingDescription bindingDescription;
-        std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions;
+        VkVertexInputBindingDescription bindingDescription{};
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
         if (usage != USAGE_FULL_SCREEN)
         {
-
-            if (usage == Usage_t::USAGE_MESH || usage == Usage_t::USAGE_TRANSPARENCY)
+            if (usage == Usage_t::USAGE_STATIC_MESH)
+            {
+                bindingDescription = GetStaticMeshVertexBindingDescription();
+                attributeDescriptions = GetStaticMeshVertexAttributeDescriptions();
+            }
+            else if (usage == Usage_t::USAGE_MESH || usage == Usage_t::USAGE_TRANSPARENCY)
             {
                 bindingDescription = ElecNeko::ElecNekoVertex::GetBindingDescription();
-                attributeDescriptions = ElecNeko::ElecNekoVertex::GetAttributeDescriptions();
+
+                const std::array<VkVertexInputAttributeDescription, 5> oldAttributes = ElecNeko::ElecNekoVertex::GetAttributeDescriptions();
+
+                attributeDescriptions.assign(oldAttributes.begin(), oldAttributes.end());
             }
             else
             {
                 bindingDescription = vert_t::GetBindingDescription();
-                attributeDescriptions = vert_t::GetAttributeDescriptions();
+
+                const std::array<VkVertexInputAttributeDescription, 5> oldAttributes = vert_t::GetAttributeDescriptions();
+
+                attributeDescriptions.assign(oldAttributes.begin(), oldAttributes.end());
             }
 
             vertexInputInfo.vertexBindingDescriptionCount = 1;
-            vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t) attributeDescriptions.size();
+            vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
             vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
             vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
         }
