@@ -5,10 +5,16 @@
 #include <assert.h>
 #include <vector>
 #include "DeviceContext.h"
-#include "Image.h"
 #include "Pipeline.h"
-#include "Samplers.h"
-#include "model.h"
+
+// #include "RHI2/RHIBuffer.h"
+// #include "RHI2/RHISampler.h"
+// #include "RHI2/RHITexture.h"
+#include "RHI2/RHIBinding.h"
+#include "RHI2/Vulkan/VulkanBuffer.h"
+#include "RHI2/Vulkan/VulkanSampler.h"
+#include "RHI2/Vulkan/VulkanTexture.h"
+
 
 /*
 ========================================================================================================
@@ -547,11 +553,26 @@ namespace ElecNeko
 
     void ElecNekoDescriptors::Cleanup(DeviceContext *device)
     {
-        vkFreeDescriptorSets(device->m_vkDevice, m_vkDescriptorPool, MAX_DESCRIPTOR_SETS, m_vkDescriptorSets);
+        if (m_vkDescriptorPool != VK_NULL_HANDLE)
+        {
+            vkFreeDescriptorSets(device->m_vkDevice, m_vkDescriptorPool, MAX_DESCRIPTOR_SETS, m_vkDescriptorSets);
+        }
 
-        vkDestroyDescriptorSetLayout(device->m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+        if (m_vkDescriptorSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(device->m_vkDevice, m_vkDescriptorSetLayout, nullptr);
 
-        vkDestroyDescriptorPool(device->m_vkDevice, m_vkDescriptorPool, nullptr);
+            m_vkDescriptorSetLayout = VK_NULL_HANDLE;
+        }
+
+        if (m_vkDescriptorPool != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorPool(device->m_vkDevice, m_vkDescriptorPool, nullptr);
+
+            m_vkDescriptorPool = VK_NULL_HANDLE;
+        }
+
+        m_numDescriptorUsed = 0;
     }
 
     void ElecNekoDescriptor::BindUniformBuffer(int bindingPoint, Buffer *buffer, int offset, int size)
@@ -567,6 +588,35 @@ namespace ElecNeko
         m_bindings.push_back(binding);
     }
 
+    void ElecNekoDescriptor::BindUniformBuffer(int bindingPoint, RHI::Buffer *buffer, int offset, int size)
+    {
+        if (buffer == nullptr)
+        {
+            return;
+        }
+
+        RHI::VulkanBuffer *vulkanBuffer = dynamic_cast<RHI::VulkanBuffer *>(buffer);
+
+        if (vulkanBuffer == nullptr)
+        {
+            return;
+        }
+
+        ::Buffer *legacyBuffer = vulkanBuffer->GetLegacyBufferForTransition();
+
+        if (legacyBuffer == nullptr)
+        {
+            return;
+        }
+
+        BindUniformBuffer(bindingPoint, legacyBuffer, offset, size);
+    }
+
+    void ElecNekoDescriptor::BindUniformBuffer(const RHI::BufferBinding &binding)
+    {
+        BindUniformBuffer(static_cast<int>(binding.binding), binding.buffer, static_cast<int>(binding.offset), static_cast<int>(binding.size));
+    }
+
     void ElecNekoDescriptor::BindStorageBuffer(int bindingPoint, Buffer *buffer, int offset, int size)
     {
         DescriptorBinding binding;
@@ -580,6 +630,52 @@ namespace ElecNeko
         m_bindings.push_back(binding);
     }
 
+    void ElecNekoDescriptor::BindStorageBuffer(const RHI::BufferBinding &binding)
+    {
+        BindStorageBuffer(static_cast<int>(binding.binding), binding.buffer, static_cast<int>(binding.offset), static_cast<int>(binding.size));
+    }
+
+    // void ElecNekoDescriptor::BindStorageBuffer(uint32_t binding, RHI::Buffer *buffer, VkDeviceSize offset, VkDeviceSize range)
+    // {
+    //     if (buffer == nullptr)
+    //     {
+    //         return;
+    //     }
+
+    //     ::Buffer *legacyBuffer = buffer->GetLegacyBufferForTransition();
+
+    //     if (legacyBuffer == nullptr)
+    //     {
+    //         return;
+    //     }
+
+    //     BindStorageBuffer(binding, legacyBuffer, offset, range);
+    // }
+
+    void ElecNekoDescriptor::BindStorageBuffer(int bindingPoint, RHI::Buffer *buffer, int offset, int size)
+    {
+        if (buffer == nullptr)
+        {
+            return;
+        }
+
+        RHI::VulkanBuffer *vulkanBuffer = dynamic_cast<RHI::VulkanBuffer *>(buffer);
+
+        if (vulkanBuffer == nullptr)
+        {
+            return;
+        }
+
+        ::Buffer *legacyBuffer = vulkanBuffer->GetLegacyBufferForTransition();
+
+        if (legacyBuffer == nullptr)
+        {
+            return;
+        }
+
+        BindStorageBuffer(bindingPoint, legacyBuffer, offset, size);
+    }
+
     void ElecNekoDescriptor::BindImage(int bindingPoint, VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler)
     {
         DescriptorBinding binding;
@@ -591,6 +687,68 @@ namespace ElecNeko
         binding.isImage = true;
 
         m_bindings.push_back(binding);
+    }
+
+    void ElecNekoDescriptor::BindImage(int bindingPoint, VkImageLayout imageLayout, RHI::Texture *texture, VkSampler sampler)
+    {
+        if (texture == nullptr)
+        {
+            return;
+        }
+
+        RHI::VulkanTexture *vulkanTexture = dynamic_cast<RHI::VulkanTexture *>(texture);
+
+        if (vulkanTexture == nullptr)
+        {
+            return;
+        }
+
+        const VkImageView imageView = vulkanTexture->GetVkImageView();
+
+        if (imageView == VK_NULL_HANDLE)
+        {
+            return;
+        }
+
+        BindImage(bindingPoint, imageLayout, imageView, sampler);
+    }
+
+    void ElecNekoDescriptor::BindImage(int bindingPoint, VkImageLayout imageLayout, RHI::Texture *texture, RHI::Sampler *sampler)
+    {
+        if (texture == nullptr || sampler == nullptr)
+        {
+            return;
+        }
+
+        RHI::VulkanTexture *vulkanTexture = dynamic_cast<RHI::VulkanTexture *>(texture);
+
+        if (vulkanTexture == nullptr)
+        {
+            return;
+        }
+
+        RHI::VulkanSampler *vulkanSampler = dynamic_cast<RHI::VulkanSampler *>(sampler);
+
+        if (vulkanSampler == nullptr)
+        {
+            return;
+        }
+
+        const VkImageView imageView = vulkanTexture->GetVkImageView();
+
+        const VkSampler vkSampler = vulkanSampler->GetVkSampler();
+
+        if (imageView == VK_NULL_HANDLE || vkSampler == VK_NULL_HANDLE)
+        {
+            return;
+        }
+
+        BindImage(bindingPoint, imageLayout, imageView, vkSampler);
+    }
+
+    void ElecNekoDescriptor::BindSampledTexture(int bindingPoint, RHI::Texture *texture, RHI::Sampler *sampler)
+    {
+        BindImage(bindingPoint, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, texture, sampler);
     }
 
     void ElecNekoDescriptor::BindDescriptor(DeviceContext *device, VkCommandBuffer vkCommandBuffer, Pipeline *pso)
@@ -623,6 +781,29 @@ namespace ElecNeko
         vkUpdateDescriptorSets(device->m_vkDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         vkCmdBindDescriptorSets(vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pso->m_vkPipelineLayout, 0, 1, &m_parent->m_vkDescriptorSets[m_id], 0,
                                 nullptr);
+    }
+
+    void ElecNekoDescriptor::BindSampledTexture(const RHI::SampledTextureBinding &binding)
+    {
+        BindSampledTexture(static_cast<int>(binding.binding), binding.texture, binding.sampler);
+    }
+
+    void ElecNekoDescriptor::BindBindingSet(const RHI::BindingSetDesc &desc)
+    {
+        for (const RHI::BufferBinding &binding: desc.uniformBuffers)
+        {
+            BindUniformBuffer(binding);
+        }
+
+        for (const RHI::BufferBinding &binding: desc.storageBuffers)
+        {
+            BindStorageBuffer(binding);
+        }
+
+        for (const RHI::SampledTextureBinding &binding: desc.sampledTextures)
+        {
+            BindSampledTexture(binding);
+        }
     }
 
     void ElecNekoDescriptor::BindDescriptor(DeviceContext *device, VkCommandBuffer vkCommandBuffer, ElecNekoPipeline *pso)

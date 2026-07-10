@@ -2,11 +2,11 @@
 #pragma once
 
 #include "Loader/Material.h"
-#include "Loader/Texture.h"
 
 #include "Math/Matrix.h"
 
-#include "RHI/Buffer.h"
+#include "RHI2/RHIBuffer.h"
+#include "RHI2/RHITexture.h"
 
 #include "Renderer/Mesh/MeshDrawList.h"
 #include "Renderer/Mesh/StaticMesh.h"
@@ -15,7 +15,11 @@
 #include <memory>
 #include <vector>
 
-class DeviceContext;
+namespace RHI
+{
+    class Device;
+    class UploadBatch;
+} // namespace RHI
 
 namespace ElecNeko
 {
@@ -26,15 +30,11 @@ namespace ElecNeko
         Mat4 localToWorld;
         Mat4 worldToLocal;
 
-        // 为空时使用 StaticMeshSection::materialIndex。
-        // 不为空时，按 sectionIndex 覆盖材质。
         std::vector<uint32_t> materialOverrides;
 
         bool visible = true;
     };
 
-    // GPU 侧实例数据。
-    // 后面 shader 里通过 instanceIndex 访问。
     struct MeshInstanceGPU
     {
         Mat4 localToWorld;
@@ -47,24 +47,17 @@ namespace ElecNeko
         std::vector<std::unique_ptr<StaticMeshGPU>> meshes;
         std::vector<MeshInstance> meshInstances;
 
-        std::vector<Material> materials;
-        std::vector<Texture *> textures;
-
-        TextureArray *textureArray = nullptr;
+        std::unique_ptr<RHI::Texture> textureArrayRHI;
 
         MeshDrawList drawList;
 
-        // CPU 侧上传缓存。
         std::vector<MeshInstanceGPU> gpuInstances;
         std::vector<Material_t> gpuMaterials;
 
-        // GPU buffer。
-        // 暂时仍然用旧 Buffer 类，后面 RHI Device 完成后再替换成 RHI::BufferHandle 管理。
-        Buffer instanceBuffer;
-        Buffer materialBuffer;
+        std::vector<Material> materials;
 
-        RHI::BufferHandle instanceBufferHandle;
-        RHI::BufferHandle materialBufferHandle;
+        std::unique_ptr<RHI::Buffer> instanceBufferRHI;
+        std::unique_ptr<RHI::Buffer> materialBufferRHI;
 
         uint32_t AddMesh(std::unique_ptr<StaticMeshGPU> mesh);
         uint32_t AddMeshInstance(const MeshInstance &instance);
@@ -72,10 +65,25 @@ namespace ElecNeko
         void BuildDrawLists();
         void ClearDrawLists();
 
-        bool UploadGpuSceneBuffers(DeviceContext *device);
+        bool UploadGpuSceneBuffers(RHI::Device *rhiDevice);
 
-        bool CreateTextureArray(DeviceContext *device);
+        RHI::Buffer *GetInstanceBuffer();
+        RHI::Buffer *GetMaterialBuffer();
 
-        void Cleanup(DeviceContext *device);
+        const RHI::Buffer *GetInstanceBuffer() const;
+        const RHI::Buffer *GetMaterialBuffer() const;
+
+        uint64_t GetInstanceBufferSize() const;
+        uint64_t GetMaterialBufferSize() const;
+
+        bool CreateDefaultTextureArray(RHI::Device *rhiDevice, RHI::UploadBatch *uploadBatch = nullptr);
+        bool CreateTextureArrayFromRGBA8Pixels(RHI::Device *rhiDevice, RHI::UploadBatch *uploadBatch, uint32_t width, uint32_t height, uint32_t layers,
+                                               const void *rgba8Pixels, uint64_t rgba8ByteSize, const char *debugName);
+        RHI::Texture *GetTextureArray();
+        const RHI::Texture *GetTextureArray() const;
+
+        bool HasTextureArray() const;
+
+        void Cleanup();
     };
 } // namespace ElecNeko

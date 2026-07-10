@@ -8,19 +8,22 @@ layout(std140, binding = 0) uniform uboCamera {
     mat4 viewNoTrans;
     mat4 invView;
     mat4 invProj;
-} camera;
+}
+camera;
 layout(std140, binding = 1) uniform uboShadowView {
     mat4 cascade0;
     mat4 cascade1;
     mat4 cascade2;
     mat4 cascade3;
-} shadowView;
-layout(std140, binding = 2) uniform uboShadowProj{
+}
+shadowView;
+layout(std140, binding = 2) uniform uboShadowProj {
     mat4 cascade0;
     mat4 cascade1;
     mat4 cascade2;
     mat4 cascade3;
-} shadowProj;
+}
+shadowProj;
 layout(std140, binding = 3) uniform lightParms {
     vec2 viewport;
     vec2 _pad0;
@@ -28,8 +31,9 @@ layout(std140, binding = 3) uniform lightParms {
     float sunIntensity;
     vec3 sunColor;
     float _pad1;
-} lightParm;
-layout(std140, binding = 4) uniform cascadeParms{
+}
+lightParm;
+layout(std140, binding = 4) uniform cascadeParms {
     float splits0;
     float splits1;
     float splits2;
@@ -38,11 +42,12 @@ layout(std140, binding = 4) uniform cascadeParms{
     float texelSize;
     uint numCascades;
     int visualizeCascade;
-} shadowParm;
+}
+shadowParm;
 
 // output
-layout (set = 0, binding = 5, rgba16f) uniform writeonly image2D outImage;
-layout (set = 0, binding = 6, rgba16f) uniform writeonly image2D outImageSpecular;
+layout(set = 0, binding = 5, rgba16f) uniform writeonly image2D outImage;
+layout(set = 0, binding = 6, rgba16f) uniform writeonly image2D outImageSpecular;
 
 // G-buffer samplers
 layout(set = 0, binding = 7) uniform sampler2D uAlbedo;
@@ -58,16 +63,16 @@ layout(set = 0, binding = 15) uniform sampler2DShadow uShadowCascade1;
 layout(set = 0, binding = 16) uniform sampler2DShadow uShadowCascade2;
 layout(set = 0, binding = 17) uniform sampler2DShadow uShadowCascade3;
 
-layout(push_constant) uniform PC
-{
+layout(push_constant) uniform PC {
     int useAO;
     int useContactShadow;
-}pc;
+}
+pc;
 
 const float PI = 3.14159265359;
 
 // --- helpers ---
-//vec3 reconstructWorldPosition(vec2 uv, float depth) {
+// vec3 reconstructWorldPosition(vec2 uv, float depth) {
 //    // depth from depth buffer in [0,1]
 //    vec4 ndcPos = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
 //    vec4 viewPos = camera.invProj * ndcPos;
@@ -81,68 +86,65 @@ vec3 reconstructWorldPosition(vec2 uv, float depth) {
     // depth assumed in [0,1] (Vulkan). NDC.xy in [-1,1], NDC.z in [0,1]
     vec3 ndc;
     ndc.xy = uv * 2.0 - 1.0;
-    ndc.z = depth;// **Vulkan**: depth already 0..1
-    vec4 clip = vec4(ndc, 1.0);// clip.w = 1 here; note we treat as (x,y,z,1)
+    ndc.z = depth; // **Vulkan**: depth already 0..1
+    vec4 clip = vec4(ndc, 1.0); // clip.w = 1 here; note we treat as (x,y,z,1)
     vec4 viewPos = camera.invProj * clip;
     viewPos /= viewPos.w;
     vec4 worldPos = camera.invView * viewPos;
     return worldPos.xyz;
 }
 
-//vec3 getShadowPos(vec3 worldPos) {
-//    vec4 sp = shadow.proj * shadow.view * vec4(worldPos, 1.0);
-//    sp /= sp.w;
-//    return sp.xyz * 0.5 + 0.5;// map [-1,1] to [0,1]
-//}
-//vec3 getShadowPos(vec3 worldPos) {
-//    vec4 sp = shadow.proj * shadow.view * vec4(worldPos, 1.0);
-//    sp /= sp.w;
-//    // Vulkan proj produces NDC.z in [0,1], so we do NOT remap z.
-//    // uv for sampler (normalized) is (sp.xy*0.5+0.5) only if your proj gives xy in [-1,1].
-//    // For XY we still need to map from NDC[-1,1] -> [0,1].
-//    vec2 uv = sp.xy * 0.5 + 0.5;
-//    return vec3(uv, sp.z);
-//}
+// vec3 getShadowPos(vec3 worldPos) {
+//     vec4 sp = shadow.proj * shadow.view * vec4(worldPos, 1.0);
+//     sp /= sp.w;
+//     return sp.xyz * 0.5 + 0.5;// map [-1,1] to [0,1]
+// }
+// vec3 getShadowPos(vec3 worldPos) {
+//     vec4 sp = shadow.proj * shadow.view * vec4(worldPos, 1.0);
+//     sp /= sp.w;
+//     // Vulkan proj produces NDC.z in [0,1], so we do NOT remap z.
+//     // uv for sampler (normalized) is (sp.xy*0.5+0.5) only if your proj gives xy in [-1,1].
+//     // For XY we still need to map from NDC[-1,1] -> [0,1].
+//     vec2 uv = sp.xy * 0.5 + 0.5;
+//     return vec3(uv, sp.z);
+// }
 
 // csm helpers
-int ChooseCascade(float viewDepth)
-{
+int ChooseCascade(float viewDepth) {
     int nc = int(shadowParm.numCascades);
-    if (nc <= 1)return 0;
-    if (viewDepth <= shadowParm.splits1)return 0;
-    if (nc>=3 && viewDepth <= shadowParm.splits2)return 1;// [split1,split2] second cascade. so cascade2
-    if (nc>=4 && viewDepth <= shadowParm.splits3)return 2;// [split2,split3] third cascade. so cascade3
+    if (nc <= 1)
+    return 0;
+    if (viewDepth <= shadowParm.splits1)
+    return 0;
+    if (nc >= 3 && viewDepth <= shadowParm.splits2)
+    return 1; // [split1,split2] second cascade. so cascade2
+    if (nc >= 4 && viewDepth <= shadowParm.splits3)
+    return 2; // [split2,split3] third cascade. so cascade3
     return max(0, nc - 1);
 }
 
-vec3 CalcShadowPosForCascade(vec3 worldPos, int cascadeIndex)
-{
+vec3 CalcShadowPosForCascade(vec3 worldPos, int cascadeIndex) {
     mat4 sv;
     mat4 sp;
-    if (cascadeIndex == 0)
-    {
+    if (cascadeIndex == 0) {
         sv = shadowView.cascade0;
         sp = shadowProj.cascade0;
     }
-    else if (cascadeIndex == 1)
-    {
+    else if (cascadeIndex == 1) {
         sv = shadowView.cascade1;
         sp = shadowProj.cascade1;
     }
-    else if (cascadeIndex == 2)
-    {
+    else if (cascadeIndex == 2) {
         sv = shadowView.cascade2;
         sp = shadowProj.cascade2;
     }
-    else
-    {
+    else {
         sv = shadowView.cascade3;
         sp = shadowProj.cascade3;
     }
 
     vec4 clip = sp * sv * vec4(worldPos, 1.0);
-    if (abs(clip.w) < 1e-6)
-    {
+    if (abs(clip.w) < 1e-6) {
         return vec3(-1.0, -1.0, -1.0);
     }
     vec3 ndc = clip.xyz / clip.w;
@@ -151,62 +153,53 @@ vec3 CalcShadowPosForCascade(vec3 worldPos, int cascadeIndex)
     return vec3(uv, z);
 }
 
-float ComputeShadowPCFForCascade(vec3 shadowPos, float NdotL, int cascadeIndex)
-{
+float ComputeShadowPCFForCascade(vec3 shadowPos, float NdotL, int cascadeIndex) {
     vec2 uv = shadowPos.xy;
     float currentDepth = shadowPos.z;
 
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || currentDepth <= 0.0 || currentDepth >= 1.0)
-    {
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || currentDepth <= 0.0 || currentDepth >= 1.0) {
         return 1.0;
     }
 
     ivec2 ts;
     // float bias = max(0.0005, 0.05 * (1.0 - NdotL));
-    //float bias = max(0.0005, shadowParm.texelSize * 2.0 * (1.0 - NdotL));// texelSize is 1.0 / shadowMapResolution
-    float bias = 0.0005;
-    vec2 offs[9] = vec2[](vec2(-1.0, -1.0), vec2(0.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 0.0), vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(-1.0, 1.0), vec2(0.0, 1.0), vec2(1.0, 1.0));
+    // float bias = max(0.0005, shadowParm.texelSize * 2.0 * (1.0 - NdotL));// texelSize is 1.0 / shadowMapResolution
+    float bias = 0.001;
+    vec2 offs[9] = vec2[](vec2(-1.0, -1.0), vec2(0.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 0.0), vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(-1.0, 1.0), vec2(0.0, 1.0),
+        vec2(1.0, 1.0));
 
     float sum = 0.0;
-    if (cascadeIndex == 0)
-    {
+    if (cascadeIndex == 0) {
         ts = textureSize(uShadowCascade0, 0);
         vec2 texel = 1.0 / vec2(max(ts.x, 1), max(ts.y, 1));
-        for (int i = 0; i < 9; i++)
-        {
+        for (int i = 0; i < 9; i++) {
             vec2 sampleUV = clamp(uv + offs[i] * texel, vec2(0.0), vec2(1.0));
             float cmp = texture(uShadowCascade0, vec3(sampleUV, currentDepth - bias));
             sum += cmp;
         }
     }
-    else if (cascadeIndex == 1)
-    {
+    else if (cascadeIndex == 1) {
         ts = textureSize(uShadowCascade1, 0);
         vec2 texel = 1.0 / vec2(max(ts.x, 1), max(ts.y, 1));
-        for (int i = 0; i < 9; i++)
-        {
+        for (int i = 0; i < 9; i++) {
             vec2 sampleUV = clamp(uv + offs[i] * texel, vec2(0.0), vec2(1.0));
             float cmp = texture(uShadowCascade1, vec3(sampleUV, currentDepth - bias));
             sum += cmp;
         }
     }
-    else if (cascadeIndex == 2)
-    {
+    else if (cascadeIndex == 2) {
         ts = textureSize(uShadowCascade2, 0);
         vec2 texel = 1.0 / vec2(max(ts.x, 1), max(ts.y, 1));
-        for (int i = 0; i < 9; i++)
-        {
+        for (int i = 0; i < 9; i++) {
             vec2 sampleUV = clamp(uv + offs[i] * texel, vec2(0.0), vec2(1.0));
             float cmp = texture(uShadowCascade2, vec3(sampleUV, currentDepth - bias));
             sum += cmp;
         }
     }
-    else
-    {
+    else {
         ts = textureSize(uShadowCascade3, 0);
         vec2 texel = 1.0 / vec2(max(ts.x, 1), max(ts.y, 1));
-        for (int i = 0; i < 9; i++)
-        {
+        for (int i = 0; i < 9; i++) {
             vec2 sampleUV = clamp(uv + offs[i] * texel, vec2(0.0), vec2(1.0));
             float cmp = texture(uShadowCascade3, vec3(sampleUV, currentDepth - bias));
             sum += cmp;
@@ -216,19 +209,18 @@ float ComputeShadowPCFForCascade(vec3 shadowPos, float NdotL, int cascadeIndex)
     return sum / 9.0;
 }
 
-float ComputeCSMVisibility(vec3 worldPos, float NdotL, vec2 uv)
-{
+float ComputeCSMVisibility(vec3 worldPos, float NdotL, vec2 uv) {
     float viewDepth = texture(uLinearDepth, uv).r;
 
     int cascade = ChooseCascade(viewDepth);
 
     int nc = int(shadowParm.numCascades);
-    if (cascade >= nc) cascade = max(0, nc -1);
+    if (cascade >= nc)
+    cascade = max(0, nc - 1);
 
     vec3 sp = CalcShadowPosForCascade(worldPos, cascade);
 
-    if (sp.z < 0.0 || sp.z > 1.0)
-    {
+    if (sp.z < 0.0 || sp.z > 1.0) {
         return 1.0;
     }
 
@@ -263,7 +255,7 @@ float G_Smith(float NdotV, float NdotL, float rough) {
 // 3x3 PCF using sampler2DShadow (hardware compare if sampler was created with compareEnable = true).
 // Assumes uShadowMap is sampler2DShadow and the Vulkan sampler has linear filtering.
 // Returns visibility (1.0 = fully lit, 0.0 = fully in shadow).
-//float ComputeShadowPCF(vec3 shadowPos, float NdotL)
+// float ComputeShadowPCF(vec3 shadowPos, float NdotL)
 //{
 //    vec2 uv = shadowPos.xy;
 //    float currentDepth = shadowPos.z;
@@ -303,11 +295,10 @@ float G_Smith(float NdotV, float NdotL, float rough) {
 //    return sum / 9.0;
 //}
 
-vec3 getWorldDirFromUV(vec2 uv)
-{
+vec3 getWorldDirFromUV(vec2 uv) {
     vec3 ndc;
-    ndc.xy = uv * 2.0 -1.0;
-    ndc.z = 1.0;// looking forward in view space
+    ndc.xy = uv * 2.0 - 1.0;
+    ndc.z = 1.0; // looking forward in view space
 
     vec4 clip = vec4(ndc, 1.0);
 
@@ -321,14 +312,13 @@ vec3 getWorldDirFromUV(vec2 uv)
 }
 
 // ssct
-float ScreenSpaceContactShadow(vec3 viewPos, vec3 N)
-{
-    const float MAX_DIST = 0.08;// 减小搜索范围
+float ScreenSpaceContactShadow(vec3 viewPos, vec3 N) {
+    const float MAX_DIST = 0.08; // 减小搜索范围
     const float START_OFFSET = 0.002;
 
     // 调试参数 - 可以暴露为uniform
-    const float DEPTH_BIAS = 0.0005;// 非常小的偏差
-    const float INTENSITY = 0.8;// 阴影强度
+    const float DEPTH_BIAS = 0.0005; // 非常小的偏差
+    const float INTENSITY = 0.8; // 阴影强度
 
     float t = START_OFFSET;
     float shadow = 1.0;
@@ -359,8 +349,8 @@ float ScreenSpaceContactShadow(vec3 viewPos, vec3 N)
     viewPos_scene /= viewPos_scene.w;
 
     // 计算深度差异（使用线性深度）
-    float sampleDepth = -samplePosView.z;// 采样点深度
-    float sceneDepthLinear = -viewPos_scene.z;// 场景点深度
+    float sampleDepth = -samplePosView.z; // 采样点深度
+    float sceneDepthLinear = -viewPos_scene.z; // 场景点深度
 
     float depthDiff = sampleDepth - sceneDepthLinear;
 
@@ -370,11 +360,10 @@ float ScreenSpaceContactShadow(vec3 viewPos, vec3 N)
         return 1.0 - INTENSITY;
     }
 
-    return 1.0;// 无遮挡
+    return 1.0; // 无遮挡
 }
 
-float SmallSceneContactShadow(vec3 viewPos, vec3 N)
-{
+float SmallSceneContactShadow(vec3 viewPos, vec3 N) {
     const float SAMPLE_DISTANCE = 0.02;
     vec3 viewDir = normalize(-viewPos);
 
@@ -382,7 +371,7 @@ float SmallSceneContactShadow(vec3 viewPos, vec3 N)
 
     ivec2 despthMapSize = textureSize(uDepth, 0);
     float texelSize = 1.0 / float(max(despthMapSize.x, despthMapSize.y));
-    float baseBias = texelSize * 1.5;
+    float baseBias = texelSize * 2.0;
 
     float slopeBias = baseBias * slope * 0.5;
 
@@ -394,16 +383,14 @@ float SmallSceneContactShadow(vec3 viewPos, vec3 N)
     vec3 samplePosView = biasedViewPos + N * SAMPLE_DISTANCE;
 
     vec4 clip = camera.proj * vec4(samplePosView, 1.0);
-    if (clip.w <= 0.0)
-    {
+    if (clip.w <= 0.0) {
         return 1.0;
     }
 
     vec3 ndc = clip.xyz / clip.w;
-    vec2 sampleUV = ndc.xy * 0.5 +0.5;
+    vec2 sampleUV = ndc.xy * 0.5 + 0.5;
 
-    if (any(lessThan(sampleUV, vec2(0.0)))|| any(greaterThan(sampleUV, vec2(1.0))))
-    {
+    if (any(lessThan(sampleUV, vec2(0.0))) || any(greaterThan(sampleUV, vec2(1.0)))) {
         return 1.0;
     }
 
@@ -414,15 +401,14 @@ float SmallSceneContactShadow(vec3 viewPos, vec3 N)
 
     float depthDiff = (-samplePosView.z) - (-viewPosScene.z);
 
-    if (depthDiff > totalBias * 2.0)
-    {
+    if (depthDiff > totalBias * 2.0) {
         return 0.0;
     }
 
     return 1.0;
 }
 
-void main(){
+void main() {
     ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
     ivec2 vp = ivec2(int(lightParm.viewport.x), int(lightParm.viewport.y));
     if (pix.x >= vp.x || pix.y >= vp.y) {
@@ -470,7 +456,7 @@ void main(){
     // float specTrans = mat.b;
 
     vec3 worldPos = reconstructWorldPosition(uv, depth);
-    //vec3 shadowPos = getShadowPos(worldPos);
+    // vec3 shadowPos = getShadowPos(worldPos);
 
     // viewer (camera) world position
     vec3 camPos = (camera.invView * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
@@ -517,22 +503,22 @@ void main(){
     directDiffuse *= visibility;
     directSpecular *= visibility;
 
-    //vec3 color = ambient + Lo * visibility;
-    // IBL contribution -----------------------------------
-    //    vec3 irradiance = textureLod(uEnvMap, nrm, 4.5).rgb;
-    //    vec3 diffuseIBL = irradiance * albedo;
+    // vec3 color = ambient + Lo * visibility;
+    //  IBL contribution -----------------------------------
+    //     vec3 irradiance = textureLod(uEnvMap, nrm, 4.5).rgb;
+    //     vec3 diffuseIBL = irradiance * albedo;
     //
-    //    vec3 R = reflect(-V, nrm);
+    //     vec3 R = reflect(-V, nrm);
     //
-    //    float mip = clamp(roughness, 0.0, 1.0) * 9.0;
-    //    vec3 prefilterColor = textureLod(uEnvMap, R, mip).rgb;
+    //     float mip = clamp(roughness, 0.0, 1.0) * 9.0;
+    //     vec3 prefilterColor = textureLod(uEnvMap, R, mip).rgb;
     //
-    //    vec3 F_ibl = F_Schlick(max(dot(nrm, V), 0.0), F0);
-    //    vec3 specIBL = prefilterColor * F_ibl;// * envBRDF.x + envBRDF.y;
+    //     vec3 F_ibl = F_Schlick(max(dot(nrm, V), 0.0), F0);
+    //     vec3 specIBL = prefilterColor * F_ibl;// * envBRDF.x + envBRDF.y;
     //
-    //    vec3 kD_ibl = (vec3(1.0) - F_ibl) * (1.0 - metallic);
+    //     vec3 kD_ibl = (vec3(1.0) - F_ibl) * (1.0 - metallic);
     //
-    //    vec3 iblColor = kD_ibl * diffuseIBL + specIBL;
+    //     vec3 iblColor = kD_ibl * diffuseIBL + specIBL;
 
     // baseline IBL
     // diffuse IBL
@@ -563,9 +549,7 @@ void main(){
     float contact = ScreenSpaceContactShadow(viewPosPixel, N_view);
 
     // Ambient + Direct Diffuse + IBL Diffuse (all in diffuse buffer)
-    vec3 diffuseAndAmbient = pc.useAO > 0
-    ? (ambient + diffuse + iblDiffuse) * ao
-    : (ambient + diffuse + iblDiffuse);
+    vec3 diffuseAndAmbient = pc.useAO > 0 ? (ambient + diffuse + iblDiffuse) * ao : (ambient + diffuse + iblDiffuse);
 
     vec3 directLight = pc.useContactShadow > 0 ? directDiffuse * visibility * contact : directDiffuse * visibility;
 
@@ -575,8 +559,7 @@ void main(){
     // Note: directSpecular already multiplied by visibility at line 518
     vec3 outSpecularRGB = directSpecular + iblSpecular;
 
-    if (shadowParm.visualizeCascade > 0)
-    {
+    if (shadowParm.visualizeCascade > 0) {
         // cascade visualize
         float overlayStrength = 0.6;
         vec4 cascadeColors[4];

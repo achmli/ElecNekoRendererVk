@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RHI/RHIHandle.h"
+#include "RHI2/RHIBuffer.h"
 
 #include <cstdint>
 
@@ -15,12 +15,10 @@ namespace ElecNeko
         DepthOnly
     };
 
-    // 渲染器真正消费的 draw 数据。
-    // 新模型系统里，Mesh 不再自己 Draw，而是生成 MeshDrawCommand。
     struct MeshDrawCommand
     {
-        RHI::BufferHandle vertexBuffer;
-        RHI::BufferHandle indexBuffer;
+        RHI::Buffer *vertexBuffer = nullptr;
+        RHI::Buffer *indexBuffer = nullptr;
 
         uint32_t firstIndex = 0;
         uint32_t indexCount = 0;

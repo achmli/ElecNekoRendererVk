@@ -14,20 +14,23 @@ A general buffer
 ================================================================================================
 */
 
-class Buffer {
+class Buffer
+{
 public:
-	Buffer();
+    Buffer();
 
-	bool Allocate( DeviceContext * device, const void * data, int size, VkBufferUsageFlagBits usageFlags );
-	void Cleanup( DeviceContext * device );
-	void * MapBuffer( DeviceContext * device );
-	void UnmapBuffer( DeviceContext * device );
+    bool Allocate(DeviceContext *device, const void *data, int size, VkBufferUsageFlagBits usageFlags);
+    void Cleanup(DeviceContext *device);
+    void *MapBuffer(DeviceContext *device);
+    void UnmapBuffer(DeviceContext *device);
 
-	Buffer CreateSectionView(DeviceContext *device, VkDeviceSize offset, VkDeviceSize size);
+    Buffer CreateSectionView(DeviceContext *device, VkDeviceSize offset, VkDeviceSize size);
 
-	VkBuffer		m_vkBuffer;
-	VkDeviceMemory	m_vkBufferMemory;
-	VkDeviceSize	m_vkBufferSize;
-	VkMemoryPropertyFlags m_vkMemoryPropertyFlags;
+    VkBuffer m_vkBuffer;
+    VkDeviceMemory m_vkBufferMemory;
+    VkDeviceSize m_vkBufferSize;
+    VkMemoryPropertyFlags m_vkMemoryPropertyFlags;
     VkDeviceSize m_offset = 0;
+
+    void *m_mapped = nullptr;
 };

@@ -2,10 +2,10 @@
 //  DeviceContext.h
 //
 #pragma once
+#include <functional>
 #include <vector>
-#include "SwapChain.h"
 #include "RHIBufferRegistry.h"
-
+#include "SwapChain.h"
 
 /*
 ====================================================
@@ -16,9 +16,11 @@ class vfs
 {
 public:
     static void Link(VkInstance instance);
+    static void LinkDevice(VkDevice device);
 
     static PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT;
     static PFN_vkDestroyDebugReportCallbackEXT vkDestroyDebugReportCallbackEXT;
+    static PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT;
 };
 
 /*
@@ -54,9 +56,12 @@ public:
     bool CreateInstance(bool enableLayers, const std::vector<const char *> &extensions);
     void Cleanup();
 
+    bool m_debugUtilsEnabled = false;
     bool m_enableLayers;
     VkInstance m_vkInstance;
     VkDebugReportCallbackEXT m_vkDebugCallback;
+
+    void SetObjectName(uint64_t objectHandle, VkObjectType objectType, const char *name);
 
     VkSurfaceKHR m_vkSurface;
 
@@ -109,11 +114,30 @@ public:
     void ResizeWindow(int width, int height) { m_swapChain.Resize(this, width, height); }
 
     uint32_t BeginFrame() { return m_swapChain.BeginFrame(this); }
-    void EndFrame() { m_swapChain.EndFrame(this); }
+    void EndFrame()
+    {
+        m_swapChain.EndFrame(this);
+        m_frameIndex++;
+        ProcessDeferredDeletes();
+    }
 
     void BeginRenderPass() { m_swapChain.BeginRenderPass(this); }
     void EndRenderPass() { m_swapChain.EndRenderPass(this); }
 
 
     int GetAligendUniformByteOffset(const int offset) const;
+
+    // deferred deletion
+    struct DeferredDeleteItem
+    {
+        uint64_t executeFrame = 0;
+        std::function<void()> deleter;
+    };
+
+    void EnqueueDeferredDelete(std::function<void()> deleter);
+    void ProcessDeferredDeletes();
+    void FlushDeferredDeletes();
+
+    uint64_t m_frameIndex = 0;
+    std::vector<DeferredDeleteItem> m_deferredDeletes;
 };

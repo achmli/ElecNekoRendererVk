@@ -2,6 +2,7 @@
 
 #include "Light.h"
 #include "Loader/Mesh.h"
+#include "Renderer/Mesh/StaticMesh.h"
 
 #include "RHI/RHICommandList.h"
 
@@ -64,6 +65,10 @@ namespace ElecNeko
         World() : m_cam(nullptr), defaultAlbedo(nullptr), defaultNormal(nullptr), defaultMetalRough(nullptr), defaultEmission(nullptr) {}
         ~World() = default;
 
+        void SetUploadLegacyMeshBuffers(bool enabled) { m_uploadLegacyMeshBuffers = enabled; }
+
+        bool ShouldUploadLegacyMeshBuffers() const { return m_uploadLegacyMeshBuffers; }
+
         int AddTexture(DeviceContext *device, const std::string &filename);
         int AddMaterial(const Material &material);
         // int AddMeshInstance(const ElecNekoMeshInstance &meshInstance);
@@ -84,8 +89,12 @@ namespace ElecNeko
         void Cleanup(DeviceContext *device);
         void LightClean(DeviceContext *device);
 
+    private:
+        bool m_uploadLegacyMeshBuffers = true;
+
     public:
         std::vector<ElecNekoMesh *> m_meshes;
+        std::vector<StaticMeshAsset> m_staticMeshAssets;
         std::unordered_map<std::string, int> m_meshIndexByKey;
 
         std::vector<Material> m_materials;

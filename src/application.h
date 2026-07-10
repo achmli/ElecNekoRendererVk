@@ -5,6 +5,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <filesystem>
+#include <memory>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -20,17 +21,17 @@
 #include "RHI/FrameBuffer.h"
 #include "RHI/model.h"
 #include "RHI/shader.h"
+#include "RHI2/RHIBuffer.h"
+#include "RHI2/RHIDevice.h"
+#include "RHI2/RHISampler.h"
 
-#include "Loader/Mesh.h"
-
+#include "Scene/Camera.h"
 #include "Scene/CascadedShadow.h"
-#include "Scene/ElecNekoWorld.h"
+#include "Scene/Light.h"
 #include "Scene/SkyBox.h"
-#include "Scene/World.h"
 
 
 #include "RenderOption.h"
-#include "Scene.h"
 
 #include "Renderer/Scene/RenderScene.h"
 
@@ -67,6 +68,8 @@ private:
 
     void ResizeWindow(int windowWidth, int windowHeight);
 
+    void ReloadScene();
+
     void MouseMoved(float x, float y);
 
     void LeftMouseMoved(float x, float y);
@@ -93,6 +96,8 @@ private:
     GLFWwindow *m_glfwWindow;
 
     DeviceContext m_deviceContext;
+    std::unique_ptr<RHI::Device> m_rhiDevice;
+    std::unique_ptr<RHI::Sampler> m_textureArraySamplerRHI;
 
     VkDescriptorPool m_imguiDescriptorPool;
     VkRenderPass m_imguiRenderPass;
@@ -101,29 +106,26 @@ private:
     //	Uniform Buffer
     //
     Buffer m_uniformBuffer;
-
+    std::unique_ptr<RHI::Buffer> m_uniformBufferRHI;
     //
     //	Model
     //
     Model m_modelFullScreen;
     // std::vector<Model *> m_models; // models for the bodies
 
-    ElecNeko::World *world;
-    ElecNeko::World *deletingWorld = nullptr;
+    ElecNeko::Camera m_camera;
+    std::vector<ElecNeko::Light *> m_lights;
 
     std::vector<std::filesystem::path> m_sceneFiles;
 
-    ElecNeko::Scene *m_scene;
-    ElecNeko::Scene *deletingScene = nullptr;
+    /*ElecNeko::Scene *m_scene;
+    ElecNeko::Scene *deletingScene = nullptr;*/
 
     ElecNeko::RenderScene *m_renderScene = nullptr;
-    ElecNeko::RenderScene *deletingRenderScene = nullptr;
-
-    ElecNeko::ElecNekoWorld *m_elecNekoWorld;
+    // ElecNeko::RenderScene *deletingRenderScene = nullptr;
 
     ElecNeko::SkyBox m_skyBox;
 
-    // ElecNeko::Camera m_camera;
     ElecNeko::OrthoCamera m_shadowCamera;
     // ElecNeko::Camera m_shadowCam;
     ElecNeko::CascadeShadow m_csm;

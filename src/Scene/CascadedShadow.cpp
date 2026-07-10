@@ -179,7 +179,7 @@ namespace ElecNeko
 
         // light position relative to center
         // compute eye from lookAt via inverse if you have lightView
-        Mat4 inv = lightView.Inverse(); // 注意你 Inverse 是否正确
+        Mat4 inv = lightView.Inverse(); // attention your Inverse right or not
         Vec4 eye4 = inv * Vec4(0, 0, 0, 1); // light-space origin maps to world eye pos
         printf("lightEyeWorld ~= (%f,%f,%f)\n", eye4.x, eye4.y, eye4.z);
     }
@@ -269,49 +269,49 @@ namespace ElecNeko
             }
         }
 
-        {
-            if (!m_shader.Load(device, "csmGen"))
-            {
-                std::cerr << "Failed to Load csmGen Shader\n";
-                return false;
-            }
+        // {
+        //     if (!m_shader.Load(device, "csmGen"))
+        //     {
+        //         std::cerr << "Failed to Load csmGen Shader\n";
+        //         return false;
+        //     }
 
-            ElecNekoDescriptors::CreateParms_t descriptorParms{};
-            memset(&descriptorParms, 0, sizeof(descriptorParms));
-            descriptorParms.numUniformsVertex = 2;
-            descriptorParms.numStorageVertex = 1;
-            descriptorParms.numUniformsFragment = 0;
-            descriptorParms.numStorageFragment = 0;
-            descriptorParms.numImageSamplers = 0;
-            if (!m_descriptors.Create(device, descriptorParms))
-            {
-                std::cerr << "Failed to Load csmGen Descriptors\n";
-                return false;
-            }
+        //     ElecNekoDescriptors::CreateParms_t descriptorParms{};
+        //     memset(&descriptorParms, 0, sizeof(descriptorParms));
+        //     descriptorParms.numUniformsVertex = 2;
+        //     descriptorParms.numStorageVertex = 1;
+        //     descriptorParms.numUniformsFragment = 0;
+        //     descriptorParms.numStorageFragment = 0;
+        //     descriptorParms.numImageSamplers = 0;
+        //     if (!m_descriptors.Create(device, descriptorParms))
+        //     {
+        //         std::cerr << "Failed to Load csmGen Descriptors\n";
+        //         return false;
+        //     }
 
-            m_pipelines.resize(numCascade);
-            for (int i = 0; i < numCascade; ++i)
-            {
-                ElecNekoPipeline::CreateParms_t pipelineParms{};
-                pipelineParms.framebuffer = &m_shadowMaps[i];
-                pipelineParms.descriptors = &m_descriptors;
-                pipelineParms.shader = &m_shader;
-                pipelineParms.width = 4096;
-                pipelineParms.height = 4096;
-                pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_BACK;
-                pipelineParms.depthTest = true;
-                pipelineParms.depthWrite = true;
-                if (!m_pipelines[i].Create(device, pipelineParms, ElecNekoPipeline::USAGE_MESH))
-                {
-                    std::cerr << "Failed to Load csmGen pipeline\n";
-                    return false;
-                }
-            }
+        //     m_pipelines.resize(numCascade);
+        //     for (int i = 0; i < numCascade; ++i)
+        //     {
+        //         ElecNekoPipeline::CreateParms_t pipelineParms{};
+        //         pipelineParms.framebuffer = &m_shadowMaps[i];
+        //         pipelineParms.descriptors = &m_descriptors;
+        //         pipelineParms.shader = &m_shader;
+        //         pipelineParms.width = 4096;
+        //         pipelineParms.height = 4096;
+        //         pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_BACK;
+        //         pipelineParms.depthTest = true;
+        //         pipelineParms.depthWrite = true;
+        //         if (!m_pipelines[i].Create(device, pipelineParms, ElecNekoPipeline::USAGE_MESH))
+        //         {
+        //             std::cerr << "Failed to Load csmGen pipeline\n";
+        //             return false;
+        //         }
+        //     }
+        // }
 
-            m_viewMatrixBuffers.Allocate(device, nullptr, sizeof(Mat4) * numCascade, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-            m_projMatrixBuffers.Allocate(device, nullptr, sizeof(Mat4) * numCascade, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-            m_uniformBuffer.Allocate(device, nullptr, sizeof(ShadowUniforms), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-        }
+        m_viewMatrixBuffers.Allocate(device, nullptr, sizeof(Mat4) * numCascade, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        m_projMatrixBuffers.Allocate(device, nullptr, sizeof(Mat4) * numCascade, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+        m_uniformBuffer.Allocate(device, nullptr, sizeof(ShadowUniforms), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
         {
             if (!m_staticMeshShader.Load(device, "csmStaticMesh"))
@@ -413,45 +413,45 @@ namespace ElecNeko
             }
         }
 
-        {
-            if (!m_maskShader.Load(device, "csmMaskGen"))
-            {
-                std::cerr << "Failed to Load csmMaskGen Shader\n";
-                return false;
-            }
+        // {
+        //     if (!m_maskShader.Load(device, "csmMaskGen"))
+        //     {
+        //         std::cerr << "Failed to Load csmMaskGen Shader\n";
+        //         return false;
+        //     }
 
-            ElecNekoDescriptors::CreateParms_t descriptorParms{};
-            memset(&descriptorParms, 0, sizeof(descriptorParms));
-            descriptorParms.numUniformsVertex = 2;
-            descriptorParms.numStorageVertex = 1;
-            descriptorParms.numUniformsFragment = 0;
-            descriptorParms.numStorageFragment = 1;
-            descriptorParms.numImageSamplers = 1;
-            if (!m_maskDescriptors.Create(device, descriptorParms))
-            {
-                std::cerr << "Failed to Load csmMaskGen Descriptors\n";
-                return false;
-            }
+        //     ElecNekoDescriptors::CreateParms_t descriptorParms{};
+        //     memset(&descriptorParms, 0, sizeof(descriptorParms));
+        //     descriptorParms.numUniformsVertex = 2;
+        //     descriptorParms.numStorageVertex = 1;
+        //     descriptorParms.numUniformsFragment = 0;
+        //     descriptorParms.numStorageFragment = 1;
+        //     descriptorParms.numImageSamplers = 1;
+        //     if (!m_maskDescriptors.Create(device, descriptorParms))
+        //     {
+        //         std::cerr << "Failed to Load csmMaskGen Descriptors\n";
+        //         return false;
+        //     }
 
-            m_maskPipelines.resize(numCascade);
-            for (int i = 0; i < numCascade; ++i)
-            {
-                ElecNekoPipeline::CreateParms_t pipelineParms{};
-                pipelineParms.framebuffer = &m_shadowMaps[i];
-                pipelineParms.descriptors = &m_maskDescriptors;
-                pipelineParms.shader = &m_maskShader;
-                pipelineParms.width = 4096;
-                pipelineParms.height = 4096;
-                pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_BACK;
-                pipelineParms.depthTest = true;
-                pipelineParms.depthWrite = true;
-                if (!m_maskPipelines[i].Create(device, pipelineParms, ElecNekoPipeline::USAGE_MESH))
-                {
-                    std::cerr << "Failed to Load csmMaskGen pipeline\n";
-                    return false;
-                }
-            }
-        }
+        //     m_maskPipelines.resize(numCascade);
+        //     for (int i = 0; i < numCascade; ++i)
+        //     {
+        //         ElecNekoPipeline::CreateParms_t pipelineParms{};
+        //         pipelineParms.framebuffer = &m_shadowMaps[i];
+        //         pipelineParms.descriptors = &m_maskDescriptors;
+        //         pipelineParms.shader = &m_maskShader;
+        //         pipelineParms.width = 4096;
+        //         pipelineParms.height = 4096;
+        //         pipelineParms.cullMode = ElecNekoPipeline::CULL_MODE_BACK;
+        //         pipelineParms.depthTest = true;
+        //         pipelineParms.depthWrite = true;
+        //         if (!m_maskPipelines[i].Create(device, pipelineParms, ElecNekoPipeline::USAGE_MESH))
+        //         {
+        //             std::cerr << "Failed to Load csmMaskGen pipeline\n";
+        //             return false;
+        //         }
+        //     }
+        // }
 
         return true;
     }
@@ -602,26 +602,26 @@ namespace ElecNeko
         // m_maskDescriptors.Cleanup(device);
         for (int i = 0; i < numCascade; ++i)
         {
-            m_pipelines[i].Cleanup(device);
+            // m_pipelines[i].Cleanup(device);
             m_staticMeshPipelines[i].Cleanup(device);
             m_staticMeshMaskPipelines[i].Cleanup(device);
-            m_maskPipelines[i].Cleanup(device);
+            // m_maskPipelines[i].Cleanup(device);
         }
 
-        m_pipelines.clear();
+        // m_pipelines.clear();
         m_staticMeshPipelines.clear();
         m_staticMeshMaskPipelines.clear();
-        m_maskPipelines.clear();
+        // m_maskPipelines.clear();
 
-        m_shader.Cleanup(device);
+        // m_shader.Cleanup(device);
         m_staticMeshShader.Cleanup(device);
         m_staticMeshMaskShader.Cleanup(device);
-        m_maskShader.Cleanup(device);
+        // m_maskShader.Cleanup(device);
 
-        m_descriptors.Cleanup(device);
+        // m_descriptors.Cleanup(device);
         m_staticMeshDescriptors.Cleanup(device);
         m_staticMeshMaskDescriptors.Cleanup(device);
-        m_maskDescriptors.Cleanup(device);
+        // m_maskDescriptors.Cleanup(device);
 
         m_viewMatrixBuffers.Cleanup(device);
         m_projMatrixBuffers.Cleanup(device);

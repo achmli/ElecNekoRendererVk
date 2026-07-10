@@ -6,17 +6,12 @@
 
 namespace ElecNeko
 {
-    // 新模型系统的统一顶点格式。
-    // 注意：这里不要放 materialId / modelMatrixId。
-    // 材质和实例索引以后通过 MeshDrawCommand / InstanceBuffer 传。
     struct MeshVertex
     {
         float position[3] = {0.0f, 0.0f, 0.0f};
         float uv[2] = {0.0f, 0.0f};
         float normal[3] = {0.0f, 0.0f, 1.0f};
 
-        // 先预留 tangent，后面做 normal map / PBR 会用到。
-        // w 通常用于 bitangent sign。
         float tangent[4] = {1.0f, 0.0f, 0.0f, 1.0f};
 
         bool operator==(const MeshVertex &other) const
@@ -61,9 +56,4 @@ namespace ElecNeko
             return h;
         }
     };
-
-    // 临时兼容旧代码。
-    // 后面把旧 VVertex 全部替换成 MeshVertex 后，再删掉这两个 using。
-    // using VVertex = MeshVertex;
-    // using VVertexHash = MeshVertexHash;
 } // namespace ElecNeko

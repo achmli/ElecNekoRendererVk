@@ -1,53 +1,66 @@
 #include "Renderer/Mesh/StaticMesh.h"
 
-#include "RHI/DeviceContext.h"
+#include "RHI2/RHIDevice.h"
 
 #include <cassert>
 
 namespace ElecNeko
 {
-    bool StaticMeshGPU::Upload(DeviceContext *device, const StaticMeshAsset &asset)
+    bool StaticMeshGPU::Upload(RHI::Device *rhiDevice, RHI::UploadBatch *uploadBatch, const StaticMeshAsset &asset)
     {
+        assert(rhiDevice != nullptr);
+
         name = asset.name;
         vertexCount = static_cast<uint32_t>(asset.vertices.size());
         indexCount = static_cast<uint32_t>(asset.indices.size());
         sections = asset.sections;
+
+        vertexBufferRHI.reset();
+        indexBufferRHI.reset();
 
         if (vertexCount == 0 || indexCount == 0)
         {
             return true;
         }
 
-        const int vertexBufferSize = static_cast<int>(sizeof(MeshVertex) * asset.vertices.size());
+        const uint64_t vertexBufferSize = static_cast<uint64_t>(sizeof(MeshVertex) * asset.vertices.size());
 
-        const int indexBufferSize = static_cast<int>(sizeof(uint32_t) * asset.indices.size());
+        const uint64_t indexBufferSize = static_cast<uint64_t>(sizeof(uint32_t) * asset.indices.size());
 
-        const bool vertexOk = legacyVertexBuffer.Allocate(device, asset.vertices.data(), vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        RHI::BufferDesc vertexDesc{};
+        vertexDesc.size = vertexBufferSize;
+        vertexDesc.usage = RHI::BufferUsage::Vertex | RHI::BufferUsage::TransferDst;
+        vertexDesc.cpuVisible = false;
+        vertexDesc.debugName = "StaticMesh.VertexBuffer";
 
-        assert(vertexOk);
+        vertexBufferRHI = rhiDevice->CreateBuffer(vertexDesc, asset.vertices.data(), uploadBatch);
 
-        const bool indexOk = legacyIndexBuffer.Allocate(device, asset.indices.data(), indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-
-        assert(indexOk);
-
-        if (!vertexOk || !indexOk)
+        if (!vertexBufferRHI)
         {
             return false;
         }
 
-        vertexBuffer = device->m_bufferRegistry.Register(&legacyVertexBuffer);
-        indexBuffer = device->m_bufferRegistry.Register(&legacyIndexBuffer);
+        RHI::BufferDesc indexDesc{};
+        indexDesc.size = indexBufferSize;
+        indexDesc.usage = RHI::BufferUsage::Index | RHI::BufferUsage::TransferDst;
+        indexDesc.cpuVisible = false;
+        indexDesc.debugName = "StaticMesh.IndexBuffer";
+
+        indexBufferRHI = rhiDevice->CreateBuffer(indexDesc, asset.indices.data(), uploadBatch);
+
+        if (!indexBufferRHI)
+        {
+            vertexBufferRHI.reset();
+            return false;
+        }
 
         return true;
     }
 
-    void StaticMeshGPU::Cleanup(DeviceContext *device)
+    void StaticMeshGPU::Cleanup()
     {
-        legacyVertexBuffer.Cleanup(device);
-        legacyIndexBuffer.Cleanup(device);
-
-        vertexBuffer = {};
-        indexBuffer = {};
+        vertexBufferRHI.reset();
+        indexBufferRHI.reset();
 
         vertexCount = 0;
         indexCount = 0;

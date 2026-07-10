@@ -1,12 +1,12 @@
 // src/Renderer/Mesh/MeshDrawRenderer.h
 #pragma once
 
+#include "RHI/RHICommandList.h"
+
 #include "Renderer/Mesh/MeshDrawCommand.h"
 
 #include <cstdint>
 #include <vector>
-
-class RHICommandList;
 
 namespace ElecNeko
 {
@@ -24,7 +24,7 @@ namespace ElecNeko
     public:
         static void DrawDrawList(RHICommandList &cmd, ElecNekoPipeline &pipeline, const std::vector<MeshDrawCommand> &draws);
 
-        static void DrawOpaque(RHICommandList &cmd, ElecNekoPipeline &pipeline, const RenderScene &scene);
+        static void DrawOpaque(RHICommandList &cmd, ElecNekoPipeline &pipeline, const RenderScene &renderScene);
 
         static void DrawMasked(RHICommandList &cmd, ElecNekoPipeline &pipeline, const RenderScene &scene);
 

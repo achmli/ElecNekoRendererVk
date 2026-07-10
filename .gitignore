@@ -20,3 +20,9 @@ res/CubeMaps/Indoor/*
 res/CubeMaps/Skybox/*.txt
 
 src/shaders/spirv/*.spirv
+
+clang-build/*
+build-clangd/*
+
+*.md
+-README.md

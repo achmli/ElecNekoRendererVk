@@ -4,7 +4,6 @@
 #include "Renderer/Scene/RenderScene.h"
 
 #include "RHI/Pipeline.h"
-#include "RHI/RHICommandList.h"
 
 #include <cassert>
 
@@ -12,13 +11,11 @@ namespace ElecNeko
 {
     void MeshDrawRenderer::DrawDrawList(RHICommandList &cmd, ElecNekoPipeline &pipeline, const std::vector<MeshDrawCommand> &draws)
     {
-        assert(cmd.IsValid());
-
         VkCommandBuffer vkCmd = cmd.GetNativeCommandBuffer();
 
         for (const MeshDrawCommand &draw: draws)
         {
-            if (!draw.vertexBuffer.IsValid() || !draw.indexBuffer.IsValid())
+            if (draw.vertexBuffer == nullptr || draw.indexBuffer == nullptr)
             {
                 continue;
             }
@@ -34,7 +31,8 @@ namespace ElecNeko
 
             pipeline.PushConstants(vkCmd, &push, sizeof(MeshDrawPushConstant));
 
-            cmd.SetVertexBuffer(draw.vertexBuffer, 0);
+            cmd.SetVertexBuffer(0, draw.vertexBuffer);
+
             cmd.SetIndexBuffer(draw.indexBuffer, RHIIndexFormat::UInt32);
 
             cmd.DrawIndexed(draw.indexCount, 1, draw.firstIndex, draw.vertexOffset, 0);

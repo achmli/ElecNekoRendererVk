@@ -2,19 +2,21 @@
 
 #include "Renderer/Mesh/MeshVertex.h"
 
-#include "RHI/Buffer.h"
-#include "RHI/RHIHandle.h"
+#include "RHI2/RHIBuffer.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
-class DeviceContext;
+namespace RHI
+{
+    class Device;
+    class UploadBatch;
+} // namespace RHI
 
 namespace ElecNeko
 {
-    // 一个 StaticMesh 可以有多个 section。
-    // 每个 section 通常对应一个材质。
     struct StaticMeshSection
     {
         uint32_t firstIndex = 0;
@@ -24,8 +26,6 @@ namespace ElecNeko
         uint32_t materialIndex = 0;
     };
 
-    // CPU 资产数据。
-    // 只存顶点、索引、section，不接触 Vulkan。
     class StaticMeshAsset
     {
     public:
@@ -36,27 +36,21 @@ namespace ElecNeko
         std::vector<StaticMeshSection> sections;
     };
 
-    // GPU 侧资源。
-    // 现在先用 legacy Buffer 过渡，之后再换成 RHI::Device::CreateBuffer。
     class StaticMeshGPU
     {
     public:
         std::string name;
 
-        RHI::BufferHandle vertexBuffer;
-        RHI::BufferHandle indexBuffer;
-
-        // 过渡字段：当前 Buffer 系统还没完全 RHI 化，所以先保留真实 Buffer。
-        // 以后正式 RHI Device 做好后，这两个字段要删掉。
-        Buffer legacyVertexBuffer;
-        Buffer legacyIndexBuffer;
+        std::unique_ptr<RHI::Buffer> vertexBufferRHI;
+        std::unique_ptr<RHI::Buffer> indexBufferRHI;
 
         uint32_t vertexCount = 0;
         uint32_t indexCount = 0;
 
         std::vector<StaticMeshSection> sections;
 
-        bool Upload(DeviceContext *device, const StaticMeshAsset &asset);
-        void Cleanup(DeviceContext *device);
+        bool Upload(RHI::Device *rhiDevice, RHI::UploadBatch *uploadBatch, const StaticMeshAsset &asset);
+
+        void Cleanup();
     };
 } // namespace ElecNeko

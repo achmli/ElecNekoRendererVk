@@ -1,0 +1,12 @@
+{
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/build-clangd",
+        "--background-index",
+        "--clang-tidy",
+        "--header-insertion=never",
+        "--query-driver=C:/Program Files/Microsoft Visual Studio/2022/*/VC/Tools/MSVC/*/bin/Hostx64/x64/cl.exe,C:/Program Files/LLVM/bin/clang++.exe"
+    ],
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "cmake.configureOnOpen": false,
+    "cmake.buildDirectory": "${workspaceFolder}/build"
+}

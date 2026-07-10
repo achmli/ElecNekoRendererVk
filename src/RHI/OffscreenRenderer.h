@@ -9,6 +9,12 @@ class Buffer;
 struct RenderModel;
 struct RenderOption;
 
+namespace RHI
+{
+    class Buffer;
+    class Sampler;
+} // namespace RHI
+
 namespace ElecNeko
 {
     class Mesh;
@@ -26,8 +32,11 @@ namespace ElecNeko
 
     // void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, Scene *scene, RenderOption &renderOption,
     //                    CascadeShadow &csm);
-    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, Scene *scene, RenderOption &renderOption,
-                       CascadeShadow &csm, RenderScene *renderScene = nullptr);
-
+    // void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, SkyBox &skyBox, Scene *scene, RenderOption &renderOption,
+    //                    CascadeShadow &csm, RenderScene *renderScene = nullptr);
+    void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, RHI::Buffer *uniformsRHI, SkyBox &skyBox, RenderScene *renderScene,
+                       RHI::Sampler *textureArraySampler, RenderOption &renderOption, CascadeShadow &csm);
+#if 0
     void DrawOffscreen(DeviceContext *device, int cmdBufferIndex, Buffer *uniforms, ElecNekoWorld *scene, RenderOption &renderOption, CascadeShadow &csm);
+#endif
 } // namespace ElecNeko

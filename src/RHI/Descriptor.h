@@ -10,6 +10,17 @@ class Pipeline;
 class Image;
 struct RenderModel;
 
+namespace RHI
+{
+    class Buffer;
+    class Texture;
+    class Sampler;
+    class BufferBinding;
+    class SampledTextureBinding;
+    class BindingSetDesc;
+    class BindingSet;
+} // namespace RHI
+
 namespace ElecNeko
 {
     class ElecNekoPipeline;
@@ -102,9 +113,18 @@ namespace ElecNeko
 
         //
         void BindUniformBuffer(int bindingPoint, Buffer *buffer, int offset, int size);
+        void BindUniformBuffer(int bindingPoint, RHI::Buffer *buffer, int offset, int size);
+        void BindUniformBuffer(const RHI::BufferBinding &binding);
         void BindStorageBuffer(int bindingPoint, Buffer *buffer, int offset, int size);
+        void BindStorageBuffer(const RHI::BufferBinding &binding);
+        // void BindStorageBuffer(uint32_t binding, RHI::Buffer *buffer, VkDeviceSize offset, VkDeviceSize range);
+        void BindStorageBuffer(int bindingPoint, RHI::Buffer *buffer, int offset, int size);
         void BindImage(int bindingPoint, VkImageLayout imageLayout, VkImageView imageView, VkSampler sampler);
-
+        void BindImage(int bindingPoint, VkImageLayout imageLayout, RHI::Texture *texture, VkSampler sampler);
+        void BindImage(int bindingPoint, VkImageLayout imageLayout, RHI::Texture *texture, RHI::Sampler *sampler);
+        void BindSampledTexture(int bindingPoint, RHI::Texture *texture, RHI::Sampler *sampler);
+        void BindSampledTexture(const RHI::SampledTextureBinding &binding);
+        void BindBindingSet(const RHI::BindingSetDesc &desc);
         //
         void BindDescriptor(DeviceContext *device, VkCommandBuffer vkCommandBuffer, Pipeline *pso);
         void BindDescriptor(DeviceContext *device, VkCommandBuffer vkCommandBuffer, ElecNekoPipeline *pso);
@@ -152,8 +172,8 @@ namespace ElecNeko
 
         static const int MAX_DESCRIPTOR_SETS = 256;
 
-        VkDescriptorPool m_vkDescriptorPool;
-        VkDescriptorSetLayout m_vkDescriptorSetLayout;
+        VkDescriptorPool m_vkDescriptorPool = VK_NULL_HANDLE;
+        VkDescriptorSetLayout m_vkDescriptorSetLayout = VK_NULL_HANDLE;
 
 
         int m_numDescriptorUsed;

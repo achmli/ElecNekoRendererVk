@@ -1,9 +1,9 @@
-// src/RHI/RHIBufferRegistry.h
 #pragma once
 
+#include "RHI2/RHIBuffer.h"
 #include "RHIHandle.h"
 
-#include <cassert>
+
 #include <vector>
 
 class Buffer;
@@ -13,29 +13,24 @@ namespace RHI
     class BufferRegistry
     {
     public:
-        BufferHandle Register(Buffer *buffer)
-        {
-            BufferHandle handle;
-            handle.index = static_cast<uint32_t>(m_buffers.size());
-            m_buffers.push_back(buffer);
-            return handle;
-        }
+        BufferHandle Register(::Buffer *buffer);
+        BufferHandle Register(RHI::Buffer *buffer);
 
-        Buffer *Get(BufferHandle handle)
-        {
-            assert(handle.IsValid());
-            assert(handle.index < m_buffers.size());
-            return m_buffers[handle.index];
-        }
+        ::Buffer *GetLegacy(BufferHandle handle);
+        const ::Buffer *GetLegacy(BufferHandle handle) const;
 
-        const Buffer *Get(BufferHandle handle) const
-        {
-            assert(handle.IsValid());
-            assert(handle.index < m_buffers.size());
-            return m_buffers[handle.index];
-        }
+        RHI::Buffer *GetRHI(BufferHandle handle);
+        const RHI::Buffer *GetRHI(BufferHandle handle) const;
+
+        void Clear();
 
     private:
-        std::vector<Buffer *> m_buffers;
+        struct BufferEntry
+        {
+            ::Buffer *legacyBuffer = nullptr;
+            RHI::Buffer *rhiBuffer = nullptr;
+        };
+
+        std::vector<BufferEntry> m_buffers;
     };
 } // namespace RHI

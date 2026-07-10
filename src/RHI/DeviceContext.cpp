@@ -15,6 +15,7 @@ vfs
 
 PFN_vkCreateDebugReportCallbackEXT vfs::vkCreateDebugReportCallbackEXT;
 PFN_vkDestroyDebugReportCallbackEXT vfs::vkDestroyDebugReportCallbackEXT;
+PFN_vkSetDebugUtilsObjectNameEXT vfs::vkSetDebugUtilsObjectNameEXT;
 
 /*
 ====================================================
@@ -25,6 +26,16 @@ void vfs::Link(VkInstance instance)
 {
     vfs::vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
     vfs::vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+}
+
+/*
+====================================================
+vfs::LinkDevice
+====================================================
+*/
+void vfs::LinkDevice(VkDevice device)
+{
+    vfs::vkSetDebugUtilsObjectNameEXT = reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(vkGetDeviceProcAddr(device, "vkSetDebugUtilsObjectNameEXT"));
 }
 
 /*
@@ -185,7 +196,7 @@ DeviceContext
 */
 const std::vector<const char *> DeviceContext::m_deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+        // VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
 };
 
 /*
@@ -215,6 +226,31 @@ bool DeviceContext::CreateInstance(bool enableLayers, const std::vector<const ch
 
     std::vector<const char *> extensions = extensions_required;
     extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+    m_debugUtilsEnabled = false;
+
+    {
+        uint32_t extensionCount = 0;
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
+
+        for (const VkExtensionProperties &extension: availableExtensions)
+        {
+            if (strcmp(extension.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0)
+            {
+                m_debugUtilsEnabled = true;
+                break;
+            }
+        }
+
+        if (m_debugUtilsEnabled)
+        {
+            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+    }
 
     std::vector<const char *> validationLayers;
     if (m_enableLayers)
@@ -252,7 +288,7 @@ bool DeviceContext::CreateInstance(bool enableLayers, const std::vector<const ch
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "GamePhysicsWeekend";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.apiVersion = VK_API_VERSION_1_2;
 
     VkInstanceCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -297,11 +333,23 @@ DeviceContext::Cleanup
 */
 void DeviceContext::Cleanup()
 {
+    if (m_vkDevice != VK_NULL_HANDLE)
+    {
+        vkDeviceWaitIdle(m_vkDevice);
+        FlushDeferredDeletes();
+    }
+
     m_swapChain.Cleanup(this);
 
     // Destroy Command Buffers
     vkFreeCommandBuffers(m_vkDevice, m_vkCommandPool, (uint32_t) m_vkCommandBuffers.size(), m_vkCommandBuffers.data());
     vkDestroyCommandPool(m_vkDevice, m_vkCommandPool, nullptr);
+
+    if (m_vkDevice != VK_NULL_HANDLE)
+    {
+        vkDeviceWaitIdle(m_vkDevice);
+        FlushDeferredDeletes();
+    }
 
     vkDestroyDevice(m_vkDevice, nullptr);
 
@@ -569,6 +617,8 @@ bool DeviceContext::CreateLogicalDevice()
         return false;
     }
 
+    vfs::LinkDevice(m_vkDevice);
+
     vkGetDeviceQueue(m_vkDevice, m_graphicsFamilyIdx, 0, &m_vkGraphicsQueue);
     vkGetDeviceQueue(m_vkDevice, m_presentFamilyIdx, 0, &m_vkPresentQueue);
 
@@ -580,14 +630,97 @@ bool DeviceContext::CreateLogicalDevice()
 DeviceContext::FindMemoryType
 ====================================================
 */
+// uint32_t DeviceContext::FindMemoryTypeIndex(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+// {
+//     VkPhysicalDeviceMemoryProperties memProperties = m_physicalDevices[m_deviceIndex].m_vkMemoryProperties;
+
+//     for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+//     {
+//         if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+//         {
+//             return i;
+//         }
+//     }
+
+//     printf("ERROR: Failed to find memory type index\n");
+//     assert(0);
+//     return 0;
+// }
 uint32_t DeviceContext::FindMemoryTypeIndex(uint32_t typeFilter, VkMemoryPropertyFlags properties)
 {
     VkPhysicalDeviceMemoryProperties memProperties = m_physicalDevices[m_deviceIndex].m_vkMemoryProperties;
 
+    // printf("[FindMemoryTypeIndex] typeFilter=0x%x required=0x%x memoryTypeCount=%u\n", typeFilter, static_cast<unsigned int>(properties),
+    //        memProperties.memoryTypeCount);
+
     for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
     {
-        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+        const bool supported = (typeFilter & (1u << i)) != 0;
+
+        const VkMemoryPropertyFlags flags = memProperties.memoryTypes[i].propertyFlags;
+
+        // printf("  memoryType[%u] supported=%d flags=0x%x heap=%u\n", i, supported ? 1 : 0, static_cast<unsigned int>(flags),
+        //        memProperties.memoryTypes[i].heapIndex);
+    }
+
+    const bool wantsHostVisible = (properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
+
+    if (wantsHostVisible)
+    {
+        // Prefer cached host memory first.
+        // Under Nsight, the first HOST_VISIBLE | HOST_COHERENT type can hit
+        // external host allocation validation. The cached host type is safer
+        // for CPU-side uniform/staging-style buffers and also faster to read/write.
+        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
         {
+            const bool supported = (typeFilter & (1u << i)) != 0;
+
+            const VkMemoryPropertyFlags flags = memProperties.memoryTypes[i].propertyFlags;
+
+            const bool hasRequired = (flags & properties) == properties;
+
+            const bool isHostCached = (flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) != 0;
+
+            const bool isDeviceLocal = (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0;
+
+            if (supported && hasRequired && isHostCached && !isDeviceLocal)
+            {
+                // printf("[FindMemoryTypeIndex] selected cached host memory type %u flags=0x%x\n", i, static_cast<unsigned int>(flags));
+
+                return i;
+            }
+        }
+
+        // Fallback: any non-device-local host memory.
+        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+        {
+            const bool supported = (typeFilter & (1u << i)) != 0;
+
+            const VkMemoryPropertyFlags flags = memProperties.memoryTypes[i].propertyFlags;
+
+            const bool hasRequired = (flags & properties) == properties;
+
+            const bool isDeviceLocal = (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0;
+
+            if (supported && hasRequired && !isDeviceLocal)
+            {
+                // printf("[FindMemoryTypeIndex] selected non-device-local host memory type %u flags=0x%x\n", i, static_cast<unsigned int>(flags));
+
+                return i;
+            }
+        }
+    }
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+    {
+        const bool supported = (typeFilter & (1u << i)) != 0;
+
+        const VkMemoryPropertyFlags flags = memProperties.memoryTypes[i].propertyFlags;
+
+        if (supported && (flags & properties) == properties)
+        {
+            // printf("[FindMemoryTypeIndex] selected fallback memory type %u flags=0x%x\n", i, static_cast<unsigned int>(flags));
+
             return i;
         }
     }
@@ -760,4 +893,66 @@ int DeviceContext::GetAligendUniformByteOffset(const int offset) const
     const int n = (offset + minByteOffsetAlignment - 1) / minByteOffsetAlignment;
     const int alignedOffset = n * minByteOffsetAlignment;
     return alignedOffset;
+}
+
+void DeviceContext::EnqueueDeferredDelete(std::function<void()> deleter)
+{
+    if (!deleter)
+    {
+        return;
+    }
+
+    DeferredDeleteItem item{};
+    item.executeFrame = m_frameIndex + 3;
+    item.deleter = std::move(deleter);
+
+    m_deferredDeletes.push_back(std::move(item));
+}
+
+void DeviceContext::ProcessDeferredDeletes()
+{
+    auto it = m_deferredDeletes.begin();
+
+    while (it != m_deferredDeletes.end())
+    {
+        if (it->executeFrame <= m_frameIndex)
+        {
+            it->deleter();
+            it = m_deferredDeletes.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
+void DeviceContext::FlushDeferredDeletes()
+{
+    for (DeferredDeleteItem &item: m_deferredDeletes)
+    {
+        if (item.deleter)
+        {
+            item.deleter();
+        }
+    }
+
+    m_deferredDeletes.clear();
+}
+
+void DeviceContext::SetObjectName(uint64_t objectHandle, VkObjectType objectType, const char *name)
+{
+    if (!m_debugUtilsEnabled || vfs::vkSetDebugUtilsObjectNameEXT == nullptr || objectHandle == 0 || name == nullptr || name[0] == '\0')
+    {
+        return;
+    }
+
+    VkDebugUtilsObjectNameInfoEXT nameInfo{};
+    nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+    nameInfo.pNext = nullptr;
+    nameInfo.objectType = objectType;
+    nameInfo.objectHandle = objectHandle;
+    nameInfo.pObjectName = name;
+
+    vfs::vkSetDebugUtilsObjectNameEXT(m_vkDevice, &nameInfo);
 }

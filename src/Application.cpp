@@ -4,32 +4,30 @@
 #include <chrono>
 #include <thread>
 
+#include "Math/LCP.h"
+
 #include "RHI/DeviceContext.h"
 #include "RHI/Samplers.h"
 #include "RHI/model.h"
-#include "RHI/shader.h"
+
+#include "RHI2/Vulkan/VulkanDevice.h"
 
 #include <assert.h>
-#include "Fileio.h"
 #include "application.h"
 
 #include "RHI/OffscreenRenderer.h"
 
-#include "Renderer/Scene/LegacyWorldConverter.h"
+#include "Renderer/Assets/AssetManager.h"
 #include "Renderer/Scene/RenderScene.h"
-#include "Scene.h"
+#include "Renderer/Scene/RenderSceneBuilder.h"
+#include "Renderer/Scene/SceneAssetBuilder.h"
+#include "Renderer/Scene/SceneFileLoader.h"
+
 
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 
 Application *g_application = NULL;
-
-#include <time.h>
-#include <windows.h>
-
-static bool gIsInitialized(false);
-static unsigned __int64 gTicksPerSecond;
-static unsigned __int64 gStartTicks;
 
 int sampleSceneIdx = 0;
 
@@ -40,26 +38,15 @@ GetTimeSeconds
 */
 int GetTimeMicroseconds()
 {
-    if (false == gIsInitialized)
-    {
-        gIsInitialized = true;
+    using Clock = std::chrono::steady_clock;
 
-        // Get the high frequency counter's resolution
-        QueryPerformanceFrequency((LARGE_INTEGER *) &gTicksPerSecond);
+    static const Clock::time_point startTime = Clock::now();
 
-        // Get the current time
-        QueryPerformanceCounter((LARGE_INTEGER *) &gStartTicks);
+    const Clock::time_point now = Clock::now();
 
-        return 0;
-    }
+    const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - startTime);
 
-    unsigned __int64 tick;
-    QueryPerformanceCounter((LARGE_INTEGER *) &tick);
-
-    const double ticks_per_micro = (double) (gTicksPerSecond / 1000000);
-
-    const unsigned __int64 timeMicro = (unsigned __int64) ((double) (tick - gStartTicks) / ticks_per_micro);
-    return (int) timeMicro;
+    return static_cast<int>(elapsed.count());
 }
 
 void CheckVkResult(VkResult err)
@@ -118,6 +105,212 @@ namespace ElecNeko
     }
 } // namespace ElecNeko
 
+namespace
+{
+    class ScopedTimer
+    {
+    public:
+        explicit ScopedTimer(const char *name) : m_name(name), m_begin(std::chrono::high_resolution_clock::now()) {}
+
+        ~ScopedTimer()
+        {
+            const auto end = std::chrono::high_resolution_clock::now();
+            const double ms = std::chrono::duration<double, std::milli>(end - m_begin).count();
+            printf("[LoadTimer] %s %.3f ms\n", m_name, ms);
+        }
+
+    private:
+        const char *m_name;
+        std::chrono::high_resolution_clock::time_point m_begin;
+    };
+
+    void CleanupApplicationLights(DeviceContext *device, std::vector<ElecNeko::Light *> &lights)
+    {
+        for (ElecNeko::Light *light: lights)
+        {
+            if (light != nullptr)
+            {
+                light->Cleanup(device);
+                delete light;
+            }
+        }
+
+        lights.clear();
+    }
+
+    void InitializeApplicationCameraFromScene(ElecNeko::Camera &camera, const ElecNeko::SceneLoadDesc &sceneDesc)
+    {
+        if (sceneDesc.camera.valid)
+        {
+            camera.Initialize(sceneDesc.camera.position, sceneDesc.camera.lookAt, sceneDesc.camera.fov, 9.0f / 16.0f, 0.1f, 1000.0f);
+
+            // camera.aperture = sceneDesc.camera.aperture;
+            // camera.focalDist = sceneDesc.camera.focalDist;
+        }
+        else
+        {
+            camera.Initialize(Vec3(75.0f, 75.0f, 75.0f), Vec3(0.0f, 0.0f, 0.0f), 60.0f, 9.0f / 16.0f, 0.1f, 1000.0f);
+        }
+    }
+
+    void InitializeApplicationLightsFromScene(DeviceContext *device, const ElecNeko::SceneLoadDesc &sceneDesc, std::vector<ElecNeko::Light *> &outLights)
+    {
+        CleanupApplicationLights(device, outLights);
+
+        for (const ElecNeko::SceneLightDesc &lightDesc: sceneDesc.lights)
+        {
+            if (lightDesc.type == ElecNeko::SceneLightType::Quad)
+            {
+                auto *light = new ElecNeko::QuadLight();
+
+                light->position = lightDesc.position;
+                light->emission = lightDesc.emission * lightDesc.intensity;
+                light->u = lightDesc.u - lightDesc.position;
+                light->v = lightDesc.v - lightDesc.position;
+                light->area = light->u.Cross(light->v).GetMagnitude();
+
+                light->MakeUBO(device);
+                light->UpdateUBO(device);
+                outLights.push_back(light);
+            }
+            else if (lightDesc.type == ElecNeko::SceneLightType::Sphere || lightDesc.type == ElecNeko::SceneLightType::Point)
+            {
+                auto *light = new ElecNeko::PointLight();
+
+                light->position = lightDesc.position;
+                light->emission = lightDesc.emission * lightDesc.intensity;
+                light->radius = lightDesc.radius;
+
+                light->MakeUBO(device);
+                light->UpdateUBO(device);
+                outLights.push_back(light);
+            }
+        }
+    }
+
+    bool LoadSceneWithNewPath(DeviceContext *device, RHI::Device *rhiDevice, const std::string &sceneName, ElecNeko::Camera &camera,
+                              std::vector<ElecNeko::Light *> &lights, ElecNeko::RenderScene *&outRenderScene)
+    {
+        ScopedTimer totalTimer("TotalNewSceneLoad");
+
+        ElecNeko::SceneLoadDesc sceneDesc;
+
+        {
+            ScopedTimer timer("SceneFileLoader");
+            if (!ElecNeko::SceneFileLoader::Load(sceneName, sceneDesc))
+            {
+                printf("[NewScenePath] Failed to load scene file: %s\n", sceneName.c_str());
+                return false;
+            }
+        }
+
+        InitializeApplicationCameraFromScene(camera, sceneDesc);
+        InitializeApplicationLightsFromScene(device, sceneDesc, lights);
+
+        ElecNeko::AssetManager assetManager;
+
+        ElecNeko::SceneAssetBuilderOptions assetBuildOptions{};
+        assetBuildOptions.importGeometryOnlyMeshes = true;
+        assetBuildOptions.importModelInstances = true;
+        assetBuildOptions.triangulate = true;
+        assetBuildOptions.generateNormals = false;
+        assetBuildOptions.generateTangents = false;
+        assetBuildOptions.flipUVs = false;
+        assetBuildOptions.mergeGeometryMeshes = true;
+        assetBuildOptions.deduplicateVertices = false;
+
+        ElecNeko::SceneAssetBuilderResult assetBuildResult;
+        {
+            ScopedTimer timer("SceneAssetBuilder");
+            assetBuildResult = ElecNeko::SceneAssetBuilder::BuildSceneAssets(sceneDesc, assetManager, assetBuildOptions);
+        }
+
+        if (!assetBuildResult.success)
+        {
+            printf("[NewScenePath] SceneAssetBuilder failed: %s\n", assetBuildResult.errorMessage.c_str());
+            return false;
+        }
+
+        ElecNeko::RenderSceneBuilderOptions renderSceneBuildOptions{};
+        renderSceneBuildOptions.enableTextures = false;
+        renderSceneBuildOptions.uploadGpuSceneBuffers = true;
+
+        ElecNeko::RenderSceneBuilderResult renderSceneBuildResult;
+        {
+            ScopedTimer timer("RenderSceneBuilder");
+            renderSceneBuildResult =
+                    ElecNeko::RenderSceneBuilder::BuildRenderScene(rhiDevice, assetBuildResult.buildData, assetManager, renderSceneBuildOptions);
+        }
+
+        if (!renderSceneBuildResult.success)
+        {
+            printf("[NewScenePath] RenderSceneBuilder failed: %s\n", renderSceneBuildResult.errorMessage.c_str());
+            return false;
+        }
+
+        outRenderScene = renderSceneBuildResult.renderScene.release();
+
+        printf("[NewScenePath] RenderScene meshes=%zu instances=%zu materials=%zu opaque=%zu masked=%zu transparent=%zu shadow=%zu lights=%zu\n",
+               outRenderScene->meshes.size(), outRenderScene->meshInstances.size(), outRenderScene->materials.size(), outRenderScene->drawList.opaque.size(),
+               outRenderScene->drawList.masked.size(), outRenderScene->drawList.transparent.size(), outRenderScene->drawList.shadow.size(), lights.size());
+
+        return true;
+    }
+
+    // static void TestRHI2Buffer(DeviceContext *device)
+    // {
+    //     if (device == nullptr)
+    //     {
+    //         printf("[RHI2Test] DeviceContext is null\n");
+    //         return;
+    //     }
+
+    //     RHI::VulkanDevice rhiDevice(device);
+
+    //     struct TestData
+    //     {
+    //         float values[4];
+    //     };
+
+    //     TestData data{};
+    //     data.values[0] = 1.0f;
+    //     data.values[1] = 2.0f;
+    //     data.values[2] = 3.0f;
+    //     data.values[3] = 4.0f;
+
+    //     RHI::BufferDesc desc{};
+    //     desc.size = sizeof(TestData);
+    //     desc.usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst;
+    //     desc.cpuVisible = true;
+    //     desc.debugName = "RHI2TestBuffer";
+
+    //     std::unique_ptr<RHI::Buffer> buffer = rhiDevice.CreateBuffer(desc, &data);
+
+    //     if (!buffer)
+    //     {
+    //         printf("[RHI2Test] Failed to create buffer\n");
+    //         return;
+    //     }
+
+    //     void *mapped = buffer->Map();
+
+    //     if (mapped == nullptr)
+    //     {
+    //         printf("[RHI2Test] Failed to map buffer\n");
+    //         return;
+    //     }
+
+    //     TestData *mappedData = reinterpret_cast<TestData *>(mapped);
+
+    //     printf("[RHI2Test] bufferSize=%llu values=(%.1f %.1f %.1f %.1f)\n", static_cast<unsigned long long>(buffer->GetSize()), mappedData->values[0],
+    //            mappedData->values[1], mappedData->values[2], mappedData->values[3]);
+
+    //     buffer->Unmap();
+
+    //     // unique_ptr destructor destroys the RHI2 buffer.
+    // }
+} // namespace
+
 /*
 ========================================================================================================
 
@@ -138,6 +331,8 @@ void Application::Initialize()
     InitializeGLFW();
     InitializeVulkan();
 
+    // TestRHI2Buffer(&m_deviceContext);
+
     InitializeImGui();
 
     // m_scene = new Scene;
@@ -153,58 +348,62 @@ void Application::Initialize()
     m_sceneFiles = ElecNeko::FindSceneFilesInDir("../res/scenes");
 
 
-    world = new ElecNeko::World();
-    world->LoadSceneFromFile(&m_deviceContext, m_sceneFiles[sampleSceneIdx].string());
-    // for (auto &instance: world->m_meshInstances)
-    // {
-    //     instance.MakeUBO(&m_deviceContext);
-    // }
-    //
-    // for (auto &mate: world->m_materials)
-    // {
-    //     mate.MakeBuffer(&m_deviceContext);
-    // }
+    m_rhiDevice = std::make_unique<RHI::VulkanDevice>(&m_deviceContext);
 
-    world->CreateDefaultTextures(&m_deviceContext);
-    for (auto *light: world->m_lights)
+    RHI::BufferDesc uniformDesc{};
+    uniformDesc.size = static_cast<uint64_t>(sizeof(float) * 16 * 4 * 128);
+    uniformDesc.usage = RHI::BufferUsage::Uniform;
+    uniformDesc.cpuVisible = true;
+    uniformDesc.debugName = "Application.FrameUniformBuffer";
+
+    m_uniformBufferRHI = m_rhiDevice->CreateBuffer(uniformDesc, nullptr);
+
+    if (!m_uniformBufferRHI)
     {
-        light->UpdateUBO(&m_deviceContext);
+        printf("ERROR: Failed to create RHI uniform buffer\n");
+        assert(false);
     }
-    // m_scene = new ElecNeko::Scene();
-    // m_scene->Initialize(&m_deviceContext, world);
-    // m_scene->MakeVBO(&m_deviceContext);
-    // m_scene->MakeUBO(&m_deviceContext);
-    // m_scene = new ElecNeko::Scene();
-    // m_scene->SetBuildLegacyOpaqueGeometry(false);
-    // m_scene->Initialize(&m_deviceContext, world);
-    // m_scene->MakeVBO(&m_deviceContext);
-    // m_scene->MakeUBO(&m_deviceContext);
-    m_scene = new ElecNeko::Scene;
 
-    m_scene->SetBuildLegacyOpaqueGeometry(false);
-    m_scene->SetBuildLegacyMaskedGeometry(false);
-    m_scene->SetBuildLegacyTransparentGeometry(false);
+    RHI::SamplerDesc textureArraySamplerDesc{};
+    textureArraySamplerDesc.minFilter = RHI::Filter::Linear;
+    textureArraySamplerDesc.magFilter = RHI::Filter::Linear;
+    textureArraySamplerDesc.mipmapMode = RHI::SamplerMipmapMode::Linear;
+    textureArraySamplerDesc.addressU = RHI::AddressMode::Repeat;
+    textureArraySamplerDesc.addressV = RHI::AddressMode::Repeat;
+    textureArraySamplerDesc.addressW = RHI::AddressMode::Repeat;
+    textureArraySamplerDesc.anisotropyEnable = false;
+    textureArraySamplerDesc.maxAnisotropy = 1.0f;
+    textureArraySamplerDesc.compareEnable = false;
+    textureArraySamplerDesc.compareOp = RHI::CompareOp::Always;
+    textureArraySamplerDesc.minLod = 0.0f;
+    textureArraySamplerDesc.maxLod = 0.0f;
+    textureArraySamplerDesc.mipLodBias = 0.0f;
+    textureArraySamplerDesc.borderColor = RHI::BorderColor::IntOpaqueBlack;
+    textureArraySamplerDesc.debugName = "RenderScene.TextureArraySampler";
 
-    m_scene->Initialize(&m_deviceContext, world);
-    m_scene->MakeVBO(&m_deviceContext);
-    m_scene->MakeUBO(&m_deviceContext);
+    m_textureArraySamplerRHI = m_rhiDevice->CreateSampler(textureArraySamplerDesc);
 
-    printf("[Legacy Scene] opaqueVerts=%zu opaqueIdx=%zu maskVerts=%zu maskIdx=%zu transparentVerts=%zu transparentIdx=%zu materials=%zu matrices=%zu "
-           "textureArray=%p\n",
-           m_scene->opaqueVertices.size(), m_scene->opaqueIndices.size(), m_scene->maskVertices.size(), m_scene->maskIndices.size(),
-           m_scene->transparentVertices.size(), m_scene->transparentIndices.size(), m_scene->materials.size(), m_scene->modelMatrices.size(),
-           static_cast<void *>(m_scene->textureArray));
+    if (!m_textureArraySamplerRHI)
+    {
+        printf("ERROR: Failed to create RHI texture array sampler\n");
+        assert(false);
+    }
 
-    m_renderScene = ElecNeko::ConvertLegacyWorldToRenderScene(&m_deviceContext, world).release();
+    const std::string initialSceneName = m_sceneFiles[sampleSceneIdx].string();
+
+    if (!LoadSceneWithNewPath(&m_deviceContext, m_rhiDevice.get(), initialSceneName, m_camera, m_lights, m_renderScene))
+    {
+        assert(false);
+    }
 
     printf("[RenderScene] meshes=%zu instances=%zu opaque=%zu masked=%zu transparent=%zu shadow=%zu gpuInstances=%zu gpuMaterials=%zu instanceBuffer=%llu "
            "materialBuffer=%llu\n",
            m_renderScene->meshes.size(), m_renderScene->meshInstances.size(), m_renderScene->drawList.opaque.size(), m_renderScene->drawList.masked.size(),
            m_renderScene->drawList.transparent.size(), m_renderScene->drawList.shadow.size(), m_renderScene->gpuInstances.size(),
-           m_renderScene->gpuMaterials.size(), static_cast<unsigned long long>(m_renderScene->instanceBuffer.m_vkBufferSize),
-           static_cast<unsigned long long>(m_renderScene->materialBuffer.m_vkBufferSize));
+           m_renderScene->gpuMaterials.size(), static_cast<unsigned long long>(m_renderScene->GetInstanceBufferSize()),
+           static_cast<unsigned long long>(m_renderScene->GetMaterialBufferSize()));
 
-    m_shadowCamera.Initialize(world->m_cam->position + Vec3(renderOption.sunDirection) * 10, world->m_cam->position, static_cast<float>(WINDOW_WIDTH),
+    m_shadowCamera.Initialize(m_camera.position + Vec3(renderOption.sunDirection) * 10, m_camera.position, static_cast<float>(WINDOW_WIDTH),
                               static_cast<float>(WINDOW_HEIGHT), 25, 175);
 
     m_csm.Initialize(&m_deviceContext);
@@ -512,6 +711,8 @@ bool Application::InitializeImGui()
 
     // VkCommandBuffer cmdBuffer = m_deviceContext.BeginSingleTimeCommands();
     ImGui_ImplVulkan_CreateFontsTexture();
+
+    return true;
 }
 
 
@@ -550,18 +751,32 @@ void Application::Cleanup()
 
     m_skyBox.Cleanup(&m_deviceContext);
 
+    if (m_deviceContext.m_vkDevice != VK_NULL_HANDLE)
+    {
+        vkDeviceWaitIdle(m_deviceContext.m_vkDevice);
+    }
+
     if (m_renderScene != nullptr)
     {
-        m_renderScene->Cleanup(&m_deviceContext);
+        m_renderScene->Cleanup();
         delete m_renderScene;
         m_renderScene = nullptr;
     }
 
-    m_scene->Cleanup(&m_deviceContext);
-    delete m_scene;
+    m_textureArraySamplerRHI.reset();
+    m_uniformBufferRHI.reset();
 
-    world->LightClean(&m_deviceContext);
-    delete world;
+    if (m_rhiDevice)
+    {
+        m_rhiDevice->FlushDeferredDeletes();
+    }
+
+    m_deviceContext.FlushDeferredDeletes();
+    m_deviceContext.m_bufferRegistry.Clear();
+
+    /*m_scene->Cleanup(&m_deviceContext);
+    delete m_scene;*/
+    CleanupApplicationLights(&m_deviceContext, m_lights);
 
     m_csm.Cleanup(&m_deviceContext);
 
@@ -571,6 +786,8 @@ void Application::Cleanup()
     // Delete Samplers
     Samplers::Cleanup(&m_deviceContext);
     ElecNeko::ElecNekoSampler::Cleanup(&m_deviceContext);
+
+    m_rhiDevice.reset();
 
     // Delete Device Context
     m_deviceContext.Cleanup();
@@ -632,6 +849,33 @@ void Application::ResizeWindow(int windowWidth, int windowHeight)
     }
 }
 
+void Application::ReloadScene()
+{
+    vkDeviceWaitIdle(m_deviceContext.m_vkDevice);
+
+    if (m_renderScene != nullptr)
+    {
+        m_renderScene->Cleanup();
+        delete m_renderScene;
+        m_renderScene = nullptr;
+    }
+
+    if (m_rhiDevice)
+    {
+        m_rhiDevice->FlushDeferredDeletes();
+    }
+
+    m_deviceContext.FlushDeferredDeletes();
+    m_deviceContext.m_bufferRegistry.Clear();
+
+    CleanupApplicationLights(&m_deviceContext, m_lights);
+
+    if (!LoadSceneWithNewPath(&m_deviceContext, m_rhiDevice.get(), m_sceneFiles[sampleSceneIdx].string(), m_camera, m_lights, m_renderScene))
+    {
+        assert(false);
+    }
+}
+
 /*
 ====================================================
 Application::OnMouseMoved
@@ -660,7 +904,7 @@ void Application::MouseMoved(float x, float y)
     Vec2 ds = newPosition - m_mousePosition;
     m_mousePosition = newPosition;
 
-    world->m_cam->OffsetOrientation(ds.x, ds.y);
+    m_camera.OffsetOrientation(ds.x, ds.y);
 }
 
 void Application::LeftMouseMoved(float x, float y)
@@ -725,7 +969,7 @@ void Application::OnMouseWheelScrolled(GLFWwindow *window, double x, double y)
 Application::MouseScrolled
 ====================================================
 */
-void Application::MouseScrolled(float z) { world->m_cam->position += world->m_cam->forward * z * m_cameraMoveSpeed; }
+void Application::MouseScrolled(float z) { m_camera.position += m_camera.forward * z * m_cameraMoveSpeed; }
 
 /*
 ====================================================
@@ -768,17 +1012,17 @@ void Application::ProcessKeyboard(float deltaTime)
     float velocity = m_cameraMoveSpeed * deltaTime;
 
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_W) == GLFW_PRESS)
-        world->m_cam->position += world->m_cam->forward * velocity;
+        m_camera.position += m_camera.forward * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_S) == GLFW_PRESS)
-        world->m_cam->position -= world->m_cam->forward * velocity;
+        m_camera.position -= m_camera.forward * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_A) == GLFW_PRESS)
-        world->m_cam->position -= world->m_cam->right * velocity;
+        m_camera.position -= m_camera.right * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_D) == GLFW_PRESS)
-        world->m_cam->position += world->m_cam->right * velocity;
+        m_camera.position += m_camera.right * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_SPACE) == GLFW_PRESS)
-        world->m_cam->position += world->m_cam->up * velocity;
+        m_camera.position += m_camera.up * velocity;
     if (glfwGetKey(m_glfwWindow, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-        world->m_cam->position -= world->m_cam->up * velocity;
+        m_camera.position -= m_camera.up * velocity;
 }
 
 /*
@@ -878,48 +1122,7 @@ void Application::MainLoop()
             printf("frame dt_ms: %.2f %.2f %.2f", avgTime * 0.001f, maxTime * 0.001f, dt_us * 0.001f);
         }
 
-        if (deletingWorld && deletingScene && deletingRenderScene)
-        {
-            /*int deletingNums = m_toDeleteMeshes.size();
-            for (int i = 0; i < deletingNums; i++)
-            {
-                m_toDeleteMeshes[i].DeferedCleanup(&m_deviceContext);
-
-                if (m_toDeleteMeshes[i].currentLoop > m_toDeleteMeshes[i].loopTime)
-                {
-                    if (i < (deletingNums - 1))
-                    {
-                        std::swap(m_toDeleteMeshes[i], m_toDeleteMeshes[deletingNums - 1]);
-                    }
-
-                    m_toDeleteMeshes.pop_back();
-                }
-            }*/
-            static int currentLoop = 0;
-            int totalLoops = 100;
-            if (currentLoop < totalLoops)
-            {
-                currentLoop++;
-            }
-            else
-            {
-                deletingRenderScene->Cleanup(&m_deviceContext);
-                delete deletingRenderScene;
-                deletingRenderScene = nullptr;
-
-                deletingScene->Cleanup(&m_deviceContext);
-                delete deletingScene;
-                deletingScene = nullptr;
-
-                deletingWorld->LightClean(&m_deviceContext);
-                delete deletingWorld;
-                deletingWorld = nullptr;
-
-                currentLoop = 0;
-            }
-        }
-
-        m_shadowCamera.UpdateCamera(world->m_cam->position, renderOption.sunDirection);
+        m_shadowCamera.UpdateCamera(m_camera.position, renderOption.sunDirection);
 
         // Draw the Scene
         DrawFrame();
@@ -1008,8 +1211,8 @@ void Application::UpdateUniforms()
             camera.invView = camera.matView.Inverse();
             camera.invProj = camera.matProj.Inverse();*/
 
-            camera.matProj = world->m_cam->ComputeProjectionMatrix();
-            camera.matView = world->m_cam->ComputeViewMatrix();
+            camera.matProj = m_camera.ComputeProjectionMatrix();
+            camera.matView = m_camera.ComputeViewMatrix();
 
 
             camera.viewNoTrans = camera.matView;
@@ -1029,7 +1232,7 @@ void Application::UpdateUniforms()
             // update offset into the buffer
             uboByteOffset += m_deviceContext.GetAligendUniformByteOffset(sizeof(camera));
 
-            m_csm.UpdateMainView(camera.matView, camera.invView, world->m_cam->fov);
+            m_csm.UpdateMainView(camera.matView, camera.invView, m_camera.fov);
         }
 
         //
@@ -1107,9 +1310,9 @@ void Application::UpdateUniforms()
             skyParms.horizonFalloffI = renderOption.thetaFixI;
             skyParms.lm = renderOption.Lm;
 
-            skyParms.cameraPos[0] = world->m_cam->position.x;
-            skyParms.cameraPos[1] = world->m_cam->position.y;
-            skyParms.cameraPos[2] = world->m_cam->position.z;
+            skyParms.cameraPos[0] = m_camera.position.x;
+            skyParms.cameraPos[1] = m_camera.position.y;
+            skyParms.cameraPos[2] = m_camera.position.z;
 
             memcpy(mappedData + uboByteOffset, &skyParms, sizeof(skyParms));
 
@@ -1147,6 +1350,20 @@ void Application::UpdateUniforms()
         //}
 
         m_uniformBuffer.UnmapBuffer(&m_deviceContext);
+
+        if (m_uniformBufferRHI)
+        {
+            void *rhiMappedData = m_uniformBufferRHI->Map();
+
+            if (rhiMappedData != nullptr)
+            {
+                std::memcpy(rhiMappedData, mappedData, static_cast<size_t>(uboByteOffset));
+
+                m_uniformBufferRHI->Unmap();
+            }
+        }
+
+        m_uniformBuffer.UnmapBuffer(&m_deviceContext);
     }
 }
 
@@ -1157,6 +1374,9 @@ Application::DrawFrame
 */
 void Application::DrawFrame()
 {
+    static int pendingSceneIdx = -1;
+    static std::string sceneName = m_sceneFiles[sampleSceneIdx].string();
+
     static int frameCount = 0;
     static float totalTime = 0.f;
     static auto lastTime = std::chrono::high_resolution_clock::now();
@@ -1187,7 +1407,8 @@ void Application::DrawFrame()
     // DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_renderModels.data(), (int) m_renderModels.size());
     // ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_meshes, renderOption);
     // ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_scene, renderOption, m_csm);
-    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_skyBox, m_scene, renderOption, m_csm, m_renderScene);
+    ElecNeko::DrawOffscreen(&m_deviceContext, imageIndex, &m_uniformBuffer, m_uniformBufferRHI.get(), m_skyBox, m_renderScene, m_textureArraySamplerRHI.get(),
+                            renderOption, m_csm);
     //
     //	Draw the offscreen framebuffer to the swap chain frame buffer
     //
@@ -1218,7 +1439,7 @@ void Application::DrawFrame()
         ImGui::Text(m_deviceContext.m_physicalDevices[m_deviceContext.m_deviceIndex].m_vkDeviceProperties.deviceName);
         ImGui::Text("FPS: %.1f", fps);
 
-        static std::string sceneName = m_sceneFiles[sampleSceneIdx].string();
+        // static std::string sceneName = m_sceneFiles[sampleSceneIdx].string();
 
         auto getter = [](void *data, int idx, const char **outText) -> bool
         {
@@ -1233,69 +1454,45 @@ void Application::DrawFrame()
             return true;
         };
 
-        if (ImGui::Combo("Scene", &sampleSceneIdx, getter, (void *) &m_sceneFiles, m_sceneFiles.size()))
+        // if (ImGui::Combo("Scene", &sampleSceneIdx, getter, (void *) &m_sceneFiles, m_sceneFiles.size()))
+        // {
+        //     if (sceneName != m_sceneFiles[sampleSceneIdx])
+        //     {
+        //         sceneName = m_sceneFiles[sampleSceneIdx].string();
+
+        //         vkDeviceWaitIdle(m_deviceContext.m_vkDevice);
+
+        //         if (m_renderScene != nullptr)
+        //         {
+        //             m_renderScene->Cleanup(&m_deviceContext);
+        //             delete m_renderScene;
+        //             m_renderScene = nullptr;
+        //         }
+
+        //         CleanupApplicationLights(&m_deviceContext, m_lights);
+
+        //         if (!LoadSceneWithNewPath(&m_deviceContext, sceneName, m_camera, m_lights, m_renderScene))
+        //         {
+        //             assert(false);
+        //         }
+
+        //         m_shadowCamera.Initialize(m_camera.position + Vec3(renderOption.sunDirection) * 10, m_camera.position, static_cast<float>(WINDOW_WIDTH),
+        //                                   static_cast<float>(WINDOW_HEIGHT), 25, 175);
+
+        //         printf("[RenderScene] meshes=%zu instances=%zu opaque=%zu masked=%zu transparent=%zu shadow=%zu gpuInstances=%zu gpuMaterials=%zu "
+        //                "instanceBuffer=%llu materialBuffer=%llu\n",
+        //                m_renderScene->meshes.size(), m_renderScene->meshInstances.size(), m_renderScene->drawList.opaque.size(),
+        //                m_renderScene->drawList.masked.size(), m_renderScene->drawList.transparent.size(), m_renderScene->drawList.shadow.size(),
+        //                m_renderScene->gpuInstances.size(), m_renderScene->gpuMaterials.size(),
+        //                static_cast<unsigned long long>(m_renderScene->instanceBuffer.m_vkBufferSize),
+        //                static_cast<unsigned long long>(m_renderScene->materialBuffer.m_vkBufferSize));
+        //     }
+        // }
+        if (ImGui::Combo("Scene", &sampleSceneIdx, getter, (void *) &m_sceneFiles, static_cast<int>(m_sceneFiles.size())))
         {
-            if (sceneName != m_sceneFiles[sampleSceneIdx])
+            if (sceneName != m_sceneFiles[sampleSceneIdx].string())
             {
-                sceneName = m_sceneFiles[sampleSceneIdx].string();
-
-                // deletingWorld = world;
-                // deletingScene = m_scene;
-                // world = new ElecNeko::World;
-                // world->LoadSceneFromFile(&m_deviceContext, sceneName);
-                // world->CreateDefaultTextures(&m_deviceContext);
-                deletingWorld = world;
-                deletingScene = m_scene;
-                deletingRenderScene = m_renderScene;
-
-                world = new ElecNeko::World;
-                world->LoadSceneFromFile(&m_deviceContext, sceneName);
-                world->CreateDefaultTextures(&m_deviceContext);
-                // for (auto &instance: world->m_meshInstances)
-                // {
-                //     instance.MakeUBO(&m_deviceContext);
-                // }
-                //
-                // for (auto &mate: world->m_materials)
-                // {
-                //     mate.MakeBuffer(&m_deviceContext);
-                // }
-                // m_scene = new ElecNeko::Scene;
-                // m_scene->Initialize(&m_deviceContext, world);
-                // m_scene->MakeVBO(&m_deviceContext);
-                // m_scene->MakeUBO(&m_deviceContext);
-                // m_scene = new ElecNeko::Scene;
-                // m_scene->SetBuildLegacyOpaqueGeometry(false);
-                // m_scene->Initialize(&m_deviceContext, world);
-                // m_scene->MakeVBO(&m_deviceContext);
-                // m_scene->MakeUBO(&m_deviceContext);
-                m_scene = new ElecNeko::Scene();
-
-                m_scene->SetBuildLegacyOpaqueGeometry(false);
-                m_scene->SetBuildLegacyMaskedGeometry(false);
-                m_scene->SetBuildLegacyTransparentGeometry(false);
-
-                m_scene->Initialize(&m_deviceContext, world);
-                m_scene->MakeVBO(&m_deviceContext);
-                m_scene->MakeUBO(&m_deviceContext);
-
-
-                printf("[Legacy Scene] opaqueVerts=%zu opaqueIdx=%zu maskVerts=%zu maskIdx=%zu transparentVerts=%zu transparentIdx=%zu materials=%zu "
-                       "matrices=%zu "
-                       "textureArray=%p\n",
-                       m_scene->opaqueVertices.size(), m_scene->opaqueIndices.size(), m_scene->maskVertices.size(), m_scene->maskIndices.size(),
-                       m_scene->transparentVertices.size(), m_scene->transparentIndices.size(), m_scene->materials.size(), m_scene->modelMatrices.size(),
-                       static_cast<void *>(m_scene->textureArray));
-
-                m_renderScene = ElecNeko::ConvertLegacyWorldToRenderScene(&m_deviceContext, world).release();
-
-                printf("[RenderScene] meshes=%zu instances=%zu opaque=%zu masked=%zu transparent=%zu shadow=%zu gpuInstances=%zu gpuMaterials=%zu "
-                       "instanceBuffer=%llu materialBuffer=%llu\n",
-                       m_renderScene->meshes.size(), m_renderScene->meshInstances.size(), m_renderScene->drawList.opaque.size(),
-                       m_renderScene->drawList.masked.size(), m_renderScene->drawList.transparent.size(), m_renderScene->drawList.shadow.size(),
-                       m_renderScene->gpuInstances.size(), m_renderScene->gpuMaterials.size(),
-                       static_cast<unsigned long long>(m_renderScene->instanceBuffer.m_vkBufferSize),
-                       static_cast<unsigned long long>(m_renderScene->materialBuffer.m_vkBufferSize));
+                pendingSceneIdx = sampleSceneIdx;
             }
         }
         ImGui::Checkbox("Deferred Rendering", &renderOption.isDeferred);
@@ -1437,4 +1634,35 @@ void Application::DrawFrame()
     //	End the render frame
     //
     m_deviceContext.EndFrame();
+
+    if (pendingSceneIdx >= 0)
+    {
+        sampleSceneIdx = pendingSceneIdx;
+        pendingSceneIdx = -1;
+
+        sceneName = m_sceneFiles[sampleSceneIdx].string();
+
+        vkDeviceWaitIdle(m_deviceContext.m_vkDevice);
+
+        if (m_renderScene != nullptr)
+        {
+            m_renderScene->Cleanup();
+            delete m_renderScene;
+            m_renderScene = nullptr;
+        }
+
+        CleanupApplicationLights(&m_deviceContext, m_lights);
+
+        if (!LoadSceneWithNewPath(&m_deviceContext, m_rhiDevice.get(), sceneName, m_camera, m_lights, m_renderScene))
+        {
+            assert(false);
+        }
+
+        m_shadowCamera.Initialize(m_camera.position + Vec3(renderOption.sunDirection) * 10, m_camera.position, static_cast<float>(WINDOW_WIDTH),
+                                  static_cast<float>(WINDOW_HEIGHT), 25, 175);
+
+        printf("[RenderScene] meshes=%zu instances=%zu opaque=%zu masked=%zu transparent=%zu shadow=%zu gpuInstances=%zu ", m_renderScene->meshes.size(),
+               m_renderScene->meshInstances.size(), m_renderScene->drawList.opaque.size(), m_renderScene->drawList.masked.size(),
+               m_renderScene->drawList.transparent.size(), m_renderScene->drawList.shadow.size(), m_renderScene->gpuInstances.size());
+    }
 }

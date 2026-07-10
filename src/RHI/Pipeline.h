@@ -6,6 +6,10 @@
 #include "Buffer.h"
 #include "Descriptor.h"
 
+#include "RHI2/RHIBinding.h"
+
+#include <memory>
+
 class DeviceContext;
 class FrameBuffer;
 class Descriptors;
@@ -163,6 +167,8 @@ namespace ElecNeko
 
         ElecNekoDescriptor GetFreeDescriptor() { return m_parms.descriptors->GetFreeDescriptor(); }
         ElecNekoDescriptorCompute GetFreeDescriptorCompute() { return m_parms.descriptorsCompute->GetFreeDescriptor(); }
+
+        void BindBindingSetDesc(DeviceContext *device, VkCommandBuffer vkCommandBuffer, const RHI::BindingSetDesc &desc);
 
         void PushConstants(VkCommandBuffer cmdBuffer, const void *data, uint32_t size, uint32_t offset = 0);
 

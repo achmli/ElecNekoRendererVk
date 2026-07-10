@@ -10,7 +10,12 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
+#include "Renderer/Mesh/AssimpStaticMeshLoader.h"
+#include "Renderer/Mesh/StaticMeshAssetBuilder.h"
 #include "assimp/pbrmaterial.h"
+
+#include "Renderer/Scene/SceneFileLoader.h"
+
 
 namespace ElecNeko
 {
@@ -65,8 +70,20 @@ namespace ElecNeko
 
     void ElecNekoMesh::Cleanup(DeviceContext *device)
     {
-        m_vertexBuffer.Cleanup(device);
-        m_indexBuffer.Cleanup(device);
+        // m_vertexBuffer.Cleanup(device);
+        // m_indexBuffer.Cleanup(device);
+        if (m_vertexBuffer.m_vkBuffer != VK_NULL_HANDLE)
+        {
+            m_vertexBuffer.Cleanup(device);
+        }
+
+        if (m_indexBuffer.m_vkBuffer != VK_NULL_HANDLE)
+        {
+            m_indexBuffer.Cleanup(device);
+        }
+
+        m_vertexBufferHandle = {};
+        m_indexBufferHandle = {};
     }
 
     bool ElecNekoMeshInstance::MakeUBO(DeviceContext *device)
@@ -716,21 +733,57 @@ namespace ElecNeko
             }
         }
 
+        // if (mesh->m_vertices.empty() || mesh->m_indices.empty())
+        // {
+        //     delete mesh;
+        //     return -1;
+        // }
+
+        // if (!mesh->MakeVBO(device))
+        // {
+        //     std::cerr << "Failed to make VBO\n";
+        //     delete mesh;
+        //     return -1;
+        // }
+
+        // int firstIndex = static_cast<int>(m_meshes.size());
+        // m_meshes.push_back(mesh);
+        // m_meshIndexByKey.emplace(key, firstIndex);
+        // return firstIndex;
         if (mesh->m_vertices.empty() || mesh->m_indices.empty())
         {
             delete mesh;
             return -1;
         }
 
-        if (!mesh->MakeVBO(device))
+        StaticMeshAsset staticMeshAsset = StaticMeshAssetBuilder::BuildFromLegacyMesh(*mesh);
+
+        printf("[StaticMeshAssetBuilder][GeometryOnly] mesh=%s oldV=%zu newV=%zu oldI=%zu newI=%zu sections=%zu\n", mesh->name.c_str(), mesh->m_vertices.size(),
+               staticMeshAsset.vertices.size(), mesh->m_indices.size(), staticMeshAsset.indices.size(), staticMeshAsset.sections.size());
+
+        if (m_uploadLegacyMeshBuffers)
         {
-            std::cerr << "Failed to make VBO\n";
-            delete mesh;
-            return -1;
+            if (!mesh->MakeVBO(device))
+            {
+                std::cerr << "Failed to make VBO\n";
+                delete mesh;
+                return -1;
+            }
+        }
+        else
+        {
+            std::cout << "[World] Skip legacy mesh VBO upload: " << mesh->name << "\n";
         }
 
+        // int firstIndex = static_cast<int>(m_meshes.size());
+        // m_meshes.push_back(mesh);
+        // m_meshIndexByKey.emplace(key, firstIndex);
+        // return firstIndex;
         int firstIndex = static_cast<int>(m_meshes.size());
+
         m_meshes.push_back(mesh);
+        m_staticMeshAssets.push_back(std::move(staticMeshAsset));
+
         m_meshIndexByKey.emplace(key, firstIndex);
         return firstIndex;
     }
@@ -801,6 +854,17 @@ namespace ElecNeko
             ElecNekoMesh *mesh = new ElecNekoMesh();
             mesh->name = (am->mName.C_Str() && am->mName.length) ? am->mName.C_Str()
                                                                  : (std::filesystem::path(filename).stem().string() + "_part" + std::to_string(mi));
+
+            // ElecNeko::StaticMeshAsset testAsset =
+            //         ElecNeko::AssimpStaticMeshLoader::BuildStaticMeshAssetFromAiMesh(am, mesh->name, aiToWorldMat[am->mMaterialIndex]);
+            uint32_t worldMaterialIndex = 0;
+
+            if (am->mMaterialIndex < aiToWorldMat.size() && aiToWorldMat[am->mMaterialIndex] >= 0)
+            {
+                worldMaterialIndex = static_cast<uint32_t>(aiToWorldMat[am->mMaterialIndex]);
+            }
+
+            StaticMeshAsset staticMeshAsset = AssimpStaticMeshLoader::BuildStaticMeshAssetFromAiMesh(am, mesh->name, worldMaterialIndex);
 
 
             // reserve
@@ -873,15 +937,42 @@ namespace ElecNeko
             }
 
             // upload vbo
-            if (!mesh->MakeVBO(device))
+            // if (!mesh->MakeVBO(device))
+            // {
+            //     std::cerr << "Warning: MakeVBO failed for mesh " << mesh->name << "\n";
+            //     delete mesh;
+            //     continue;
+            // }
+
+            // int worldMeshIndex = static_cast<int>(m_meshes.size());
+            // m_meshes.push_back(mesh);
+            // aiToWorldMesh[mi] = worldMeshIndex;
+            if (m_uploadLegacyMeshBuffers)
             {
-                std::cerr << "Warning: MakeVBO failed for mesh " << mesh->name << "\n";
-                delete mesh;
-                continue;
+                if (!mesh->MakeVBO(device))
+                {
+                    std::cerr << "Warning: MakeVBO failed for mesh " << mesh->name << "\n";
+                    delete mesh;
+                    continue;
+                }
+            }
+            else
+            {
+                std::cout << "[World] Skip legacy mesh VBO upload: " << mesh->name << "\n";
             }
 
+            printf("[MeshCompare] name=%s oldV=%zu newV=%zu oldI=%zu newI=%zu aiMat=%u worldMat=%u sectionMat=%u\n", mesh->name.c_str(),
+                   mesh->m_vertices.size(), staticMeshAsset.vertices.size(), mesh->m_indices.size(), staticMeshAsset.indices.size(), am->mMaterialIndex,
+                   worldMaterialIndex, staticMeshAsset.sections.empty() ? 999999u : staticMeshAsset.sections[0].materialIndex);
+
+            // int worldMeshIndex = static_cast<int>(m_meshes.size());
+            // m_meshes.push_back(mesh);
+            // aiToWorldMesh[mi] = worldMeshIndex;
             int worldMeshIndex = static_cast<int>(m_meshes.size());
+
             m_meshes.push_back(mesh);
+            m_staticMeshAssets.push_back(std::move(staticMeshAsset));
+
             aiToWorldMesh[mi] = worldMeshIndex;
         }
 
@@ -1443,6 +1534,7 @@ namespace ElecNeko
             }
         }
         m_meshes.clear();
+        m_staticMeshAssets.clear();
         m_meshIndexByKey.clear();
 
         for (auto *tex: m_textures)

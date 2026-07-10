@@ -1652,6 +1652,15 @@ namespace ElecNeko
         }
     }
 
+    void ElecNekoPipeline::BindBindingSetDesc(DeviceContext *device, VkCommandBuffer vkCommandBuffer, const RHI::BindingSetDesc &desc)
+    {
+        ElecNekoDescriptor descriptor = GetFreeDescriptor();
+
+        descriptor.BindBindingSet(desc);
+
+        descriptor.BindDescriptor(device, vkCommandBuffer, this);
+    }
+
     void ElecNekoPipeline::PushConstants(VkCommandBuffer cmdBuffer, const void *data, uint32_t size, uint32_t offset)
     {
         if (m_vkPipelineLayout == VK_NULL_HANDLE || size == 0)
@@ -1675,7 +1684,6 @@ namespace ElecNeko
 
         vkCmdPushConstants(cmdBuffer, m_vkPipelineLayout, m_parms.pushConstantShaderStages, offset, size, data);
     }
-
 
     void ElecNekoPipeline::BindPipeline(VkCommandBuffer cmdBuffer) { vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipeline); }
 

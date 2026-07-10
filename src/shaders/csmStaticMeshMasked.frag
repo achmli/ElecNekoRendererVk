@@ -57,7 +57,7 @@ void main() {
     float cutoff = material.alphaCutoff;
 
     if (cutoff <= 0.0) {
-        cutoff = 0.5;
+        cutoff = 0.8;
     }
 
     if (alpha < cutoff) {

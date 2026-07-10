@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.28)
 project(ElecNekoSurface)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 #set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -116,4 +118,7 @@ if (WIN32 AND EXISTS "${SHADERC_SDK_PATH}/bin/shaderc_shared.dll")
     message(STATUS "will copy shaderc_shared.dll")
 endif ()
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE USE_SHADERC=1) 
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    USE_SHADERC=1
+    GLFW_INCLUDE_NONE
+) 

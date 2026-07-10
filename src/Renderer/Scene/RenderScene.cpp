@@ -1,7 +1,7 @@
 // src/Renderer/Scene/RenderScene.cpp
 #include "Renderer/Scene/RenderScene.h"
 
-#include "RHI/DeviceContext.h"
+#include "RHI2/RHIDevice.h"
 
 #include <cassert>
 #include <cstdio>
@@ -61,8 +61,10 @@ namespace ElecNeko
                 }
 
                 MeshDrawCommand draw{};
-                draw.vertexBuffer = mesh->vertexBuffer;
-                draw.indexBuffer = mesh->indexBuffer;
+
+                draw.vertexBuffer = mesh->vertexBufferRHI.get();
+                draw.indexBuffer = mesh->indexBufferRHI.get();
+
                 draw.firstIndex = section.firstIndex;
                 draw.indexCount = section.indexCount;
                 draw.vertexOffset = section.vertexOffset;
@@ -102,9 +104,40 @@ namespace ElecNeko
         }
     }
 
-    bool RenderScene::UploadGpuSceneBuffers(DeviceContext *device)
+    RHI::Buffer *RenderScene::GetInstanceBuffer() { return instanceBufferRHI.get(); }
+
+    RHI::Buffer *RenderScene::GetMaterialBuffer() { return materialBufferRHI.get(); }
+
+    const RHI::Buffer *RenderScene::GetInstanceBuffer() const { return instanceBufferRHI.get(); }
+
+    const RHI::Buffer *RenderScene::GetMaterialBuffer() const { return materialBufferRHI.get(); }
+
+    uint64_t RenderScene::GetInstanceBufferSize() const
     {
-        assert(device != nullptr);
+        if (!instanceBufferRHI)
+        {
+            return 0;
+        }
+
+        return instanceBufferRHI->GetSize();
+    }
+
+    uint64_t RenderScene::GetMaterialBufferSize() const
+    {
+        if (!materialBufferRHI)
+        {
+            return 0;
+        }
+
+        return materialBufferRHI->GetSize();
+    }
+
+    bool RenderScene::UploadGpuSceneBuffers(RHI::Device *rhiDevice)
+    {
+        if (rhiDevice == nullptr)
+        {
+            return false;
+        }
 
         gpuInstances.clear();
         gpuInstances.reserve(meshInstances.size());
@@ -125,122 +158,123 @@ namespace ElecNeko
             gpuMaterials.push_back(material.MakeStrcut());
         }
 
+        instanceBufferRHI.reset();
+        materialBufferRHI.reset();
+
         if (!gpuInstances.empty())
         {
-            const int instanceBufferSize = static_cast<int>(sizeof(MeshInstanceGPU) * gpuInstances.size());
+            const uint64_t instanceBufferSize = static_cast<uint64_t>(gpuInstances.size() * sizeof(gpuInstances[0]));
 
-            const bool instanceOk = instanceBuffer.Allocate(device, gpuInstances.data(), instanceBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+            RHI::BufferDesc instanceDesc{};
+            instanceDesc.size = instanceBufferSize;
+            instanceDesc.usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst;
+            instanceDesc.cpuVisible = true;
+            instanceDesc.debugName = "RenderScene.InstanceBuffer";
 
-            assert(instanceOk);
+            instanceBufferRHI = rhiDevice->CreateBuffer(instanceDesc, gpuInstances.data());
 
-            if (!instanceOk)
+            if (!instanceBufferRHI)
             {
+                printf("[RenderScene] Failed to create RHI2 instance buffer\n");
                 return false;
             }
-
-            instanceBufferHandle = device->m_bufferRegistry.Register(&instanceBuffer);
         }
 
         if (!gpuMaterials.empty())
         {
-            const int materialBufferSize = static_cast<int>(sizeof(Material_t) * gpuMaterials.size());
+            const uint64_t materialBufferSize = static_cast<uint64_t>(gpuMaterials.size() * sizeof(gpuMaterials[0]));
 
-            const bool materialOk = materialBuffer.Allocate(device, gpuMaterials.data(), materialBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+            RHI::BufferDesc materialDesc{};
+            materialDesc.size = materialBufferSize;
+            materialDesc.usage = RHI::BufferUsage::Storage | RHI::BufferUsage::TransferDst;
+            materialDesc.cpuVisible = true;
+            materialDesc.debugName = "RenderScene.MaterialBuffer";
 
-            assert(materialOk);
+            materialBufferRHI = rhiDevice->CreateBuffer(materialDesc, gpuMaterials.data());
 
-            if (!materialOk)
+            if (!materialBufferRHI)
             {
+                printf("[RenderScene] Failed to create RHI2 material buffer\n");
                 return false;
             }
-
-            materialBufferHandle = device->m_bufferRegistry.Register(&materialBuffer);
         }
+
+        printf("[RenderScene] RHI2 scene buffers uploaded instances=%zu materials=%zu instanceBuffer=%llu materialBuffer=%llu\n", gpuInstances.size(),
+               gpuMaterials.size(), static_cast<unsigned long long>(GetInstanceBufferSize()), static_cast<unsigned long long>(GetMaterialBufferSize()));
 
         return true;
     }
 
-    bool RenderScene::CreateTextureArray(DeviceContext *device)
+    RHI::Texture *RenderScene::GetTextureArray() { return textureArrayRHI.get(); }
+
+    const RHI::Texture *RenderScene::GetTextureArray() const { return textureArrayRHI.get(); }
+
+    bool RenderScene::HasTextureArray() const { return textureArrayRHI != nullptr; }
+
+    bool RenderScene::CreateDefaultTextureArray(RHI::Device *rhiDevice, RHI::UploadBatch *uploadBatch)
     {
-        assert(device != nullptr);
+        const uint8_t whitePixel[4] = {255, 255, 255, 255};
 
-        if (textureArray != nullptr)
+        const bool ok =
+                CreateTextureArrayFromRGBA8Pixels(rhiDevice, uploadBatch, 1, 1, 1, whitePixel, sizeof(whitePixel), "RenderScene.DefaultWhiteTextureArray");
+
+        if (ok)
         {
-            textureArray->Cleanup(device);
-            delete textureArray;
-            textureArray = nullptr;
+            printf("[RenderSceneTextureArray] created default white texture array\n");
         }
 
-        std::vector<TextureProperty> properties;
-        properties.reserve(textures.size());
+        return ok;
+    }
 
-        for (Texture *texture: textures)
+    bool RenderScene::CreateTextureArrayFromRGBA8Pixels(RHI::Device *rhiDevice, RHI::UploadBatch *uploadBatch, uint32_t width, uint32_t height, uint32_t layers,
+                                                        const void *rgba8Pixels, uint64_t rgba8ByteSize, const char *debugName)
+    {
+        if (rhiDevice == nullptr || rgba8Pixels == nullptr || rgba8ByteSize == 0 || width == 0 || height == 0 || layers == 0)
         {
-            if (texture == nullptr)
-            {
-                continue;
-            }
-
-            properties.push_back(texture->ExtractProperties());
+            return false;
         }
 
-        if (properties.empty())
-        {
-            return true;
-        }
+        RHI::TextureDesc desc{};
+        desc.width = width;
+        desc.height = height;
+        desc.layers = layers;
+        desc.format = RHI::Format::RGBA8_UNorm;
+        desc.usage = RHI::TextureUsage::Sampled;
+        desc.force2DArrayView = true;
+        desc.debugName = debugName;
 
-        textureArray = new TextureArray();
+        textureArrayRHI = rhiDevice->CreateTexture(desc, rgba8Pixels, rgba8ByteSize, uploadBatch);
 
-        if (!textureArray->CreateFromData(device, properties, 2048, 2048, 4, "render_scene_texture_array"))
+        if (!textureArrayRHI)
         {
-            printf("Failed to create RenderScene texture array!\n");
-            delete textureArray;
-            textureArray = nullptr;
-            assert(false);
             return false;
         }
 
         return true;
     }
 
-    void RenderScene::Cleanup(DeviceContext *device)
+    void RenderScene::Cleanup()
     {
         for (std::unique_ptr<StaticMeshGPU> &mesh: meshes)
         {
             if (mesh)
             {
-                mesh->Cleanup(device);
+                mesh->Cleanup();
             }
         }
 
-        if (instanceBuffer.m_vkBuffer != VK_NULL_HANDLE)
-        {
-            instanceBuffer.Cleanup(device);
-        }
+        instanceBufferRHI.reset();
+        materialBufferRHI.reset();
 
-        if (materialBuffer.m_vkBuffer != VK_NULL_HANDLE)
-        {
-            materialBuffer.Cleanup(device);
-        }
-
-        if (textureArray != nullptr)
-        {
-            textureArray->Cleanup(device);
-            delete textureArray;
-            textureArray = nullptr;
-        }
+        textureArrayRHI.reset();
 
         meshes.clear();
         meshInstances.clear();
 
         materials.clear();
-        textures.clear();
 
         gpuInstances.clear();
         gpuMaterials.clear();
-
-        instanceBufferHandle = {};
-        materialBufferHandle = {};
 
         ClearDrawLists();
     }
